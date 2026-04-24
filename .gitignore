@@ -1,0 +1,33 @@
+# Java / Spring Boot
+*.class
+*.jar
+*.war
+target/
+build/
+.gradle/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Node / React
+node_modules/
+dist/
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/volumes/
+
+# Secrets
+application-secret.yml
+application-prod.yml
