@@ -60,6 +60,7 @@ com.eoghks.<service>/
 | ADR 운영 | docs/decisions/README.md |
 
 ## 토이 vs 운영 태그
-규칙 문서 일부 항목에 `[토이 필수]` / `[운영]` 태그가 있어요.
 - `[토이 필수]` — 7주 안에 무조건 적용
 - `[운영]` — 학습 가치는 있지만 토이 단계 미적용 (별도 문서 학습)
+- 태그 적용 대상: `coding-rule`, `security-rule`, `testing-rule`, `ops-rule` 4개 문서
+- 나머지(`naming`, `git`, `pr`, `frontend`)는 항목 전체가 토이·운영 공통 적용이라 태그 미사용

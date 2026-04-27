@@ -81,6 +81,11 @@ chore(infra): Docker Compose Kafka 추가
 | `revert` | 이전 커밋 되돌리기 |
 
 > 브랜치는 5종(`feature`/`fix`/`hotfix`/`chore`/`main`/`develop`), 커밋 type 은 변경 의도 단위로 더 세분 — 다른 차원이라 분리.
+>
+> 브랜치 ↔ 커밋 type 매핑:
+> - `feature/*` → `feat`
+> - `fix/*` / `hotfix/*` → `fix`
+> - `chore/*` → `chore` / `refactor` / `test` / `docs` / `perf` / `style` / `revert` (모두 비기능 변경)
 
 ### Breaking Change
 호환성 깨지는 변경:

@@ -25,7 +25,7 @@
 - `.dockerignore` 필수 (빌드 컨텍스트 최소화)
 - 이미지 사이즈 200MB 이하 목표 (alpine + JRE 21)
 
-## CI/CD [학습 + 토이 적용]
+## CI/CD [토이 필수]
 - **도구**: GitHub Actions (무료, 학습 자료 풍부)
 - **단계별 학습**: 상세는 [docs/study/cicd.md](../docs/study/cicd.md) 참고
 - **토이 단계 최소 구성** (Week 6 까지 도달 목표):
