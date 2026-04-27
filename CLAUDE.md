@@ -43,9 +43,23 @@ com.eoghks.<service>/
 | 파일 | 내용 |
 |------|------|
 | [coding-rule.md](rules/coding-rule.md) | Java/Spring 코딩 규칙, 레이어 책임 |
-| [security-rule.md](rules/security-rule.md) | 인증/인가, 데이터 보안, 환경변수 |
-| [git-convention.md](rules/git-convention.md) | 브랜치 전략, 커밋 메시지 규칙 |
-| [naming-convention.md](rules/naming-convention.md) | 클래스/메서드/변수/DB/Kafka 네이밍 |
-| [testing-rule.md](rules/testing-rule.md) | 테스트 작성 기준, 패턴 |
-| [pr-rule.md](rules/pr-rule.md) | PR 템플릿, 머지 전 체크리스트 |
-| [frontend-rule.md](rules/frontend-rule.md) | React 컴포넌트 구조, 네이밍 |
+| [security-rule.md](rules/security-rule.md) | 인증/인가, 데이터 보안, OWASP |
+| [git-convention.md](rules/git-convention.md) | 브랜치 전략, 커밋 메시지 |
+| [naming-convention.md](rules/naming-convention.md) | 클래스/메서드/REST URL/DB/Redis/Kafka 네이밍 |
+| [testing-rule.md](rules/testing-rule.md) | 테스트 작성 기준, 피라미드, 커버리지 (단일 출처) |
+| [pr-rule.md](rules/pr-rule.md) | PR 템플릿, 라벨, CI 게이트 |
+| [frontend-rule.md](rules/frontend-rule.md) | React 컴포넌트, TanStack Query, 토큰 처리 |
+| [ops-rule.md](rules/ops-rule.md) | 환경 분리, Docker, CI/CD, 모니터링 |
+
+## 교차 주제 (여러 규칙 참조)
+| 주제 | 관련 규칙 |
+|------|----------|
+| MSA 통신 보안 | coding-rule + security-rule |
+| 토큰 처리 | security-rule + frontend-rule |
+| 테스트 동시 작성 | coding-rule + testing-rule (testing-rule 단일 출처) |
+| ADR 운영 | docs/decisions/README.md |
+
+## 토이 vs 운영 태그
+규칙 문서 일부 항목에 `[토이 필수]` / `[운영]` 태그가 있어요.
+- `[토이 필수]` — 7주 안에 무조건 적용
+- `[운영]` — 학습 가치는 있지만 토이 단계 미적용 (별도 문서 학습)
