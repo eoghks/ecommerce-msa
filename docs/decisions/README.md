@@ -13,13 +13,13 @@
 | 문서 | 상태 | 작성 시점 |
 |------|------|----------|
 | [saga-pattern.md](saga-pattern.md) | ✅ 완료 | Week 0 |
-| [rate-limiting.md](rate-limiting.md) | 📝 학습 메모 (보류) | Week 0 |
-| [response-header-security.md](response-header-security.md) | 📝 학습 메모 (보류) | Week 0 |
 | [jwt-design.md](jwt-design.md) | 🔲 템플릿 | Week 2 (Auth Service) |
 | [db-design.md](db-design.md) | 🔲 템플릿 | Week 3 (Product Service) |
 | [concurrency-control.md](concurrency-control.md) | 🔲 템플릿 | Week 4 (Order Service) |
 | [transaction-isolation.md](transaction-isolation.md) | 🔲 템플릿 | Week 4 (Order Service) |
 | [testing-strategy.md](testing-strategy.md) | 🔲 템플릿 | Week 5~6 |
+
+> 보류된 항목(Rate Limiting, 응답 헤더 보안)은 [`docs/study/`](../study/README.md) 참고
 
 ## 표준 템플릿
 ```
