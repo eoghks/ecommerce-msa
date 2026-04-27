@@ -34,9 +34,18 @@
 
 ## Rate Limiting
 - API Gateway 레벨에서 적용 (Spring Cloud Gateway + Redis)
-- 인증 사용자: 분당 100req
+- 인증 사용자: 분당 100req (사용자 ID 기준)
 - 비인증 사용자: 분당 30req (IP 기준)
 - 초과 시 `429 Too Many Requests`
+
+## 응답 헤더 보안 (Defense in Depth)
+- `Content-Security-Policy` — XSS 방어 (실행 가능 스크립트 출처 제한)
+- `X-Content-Type-Options: nosniff` — MIME 스니핑 차단
+- `X-Frame-Options: DENY` — Clickjacking 차단
+- `Strict-Transport-Security` — HTTPS 강제 (HSTS, max-age 1년)
+- `Referrer-Policy: no-referrer-when-downgrade` — 다운그레이드 시 referrer 제한
+- `Permissions-Policy` — 카메라·마이크·위치 등 브라우저 기능 제어
+- API Gateway 의 `SecurityFilterChain` 에서 일괄 적용
 
 ## 데이터 보안 (OWASP A02, A03)
 - JPA 파라미터는 바인딩 변수 사용 (문자열 직접 치환 금지 — SQL Injection)
