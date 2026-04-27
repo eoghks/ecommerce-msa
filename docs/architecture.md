@@ -17,7 +17,7 @@
   │       │                  │
   └───────┴──────────────────┘
                │
-           MySQL (서비스별 DB 분리)
+        PostgreSQL (서비스별 DB 분리)
                │
         [Monitoring]
      Spring Actuator 수집
@@ -47,7 +47,7 @@
 
 - **Backend**: Spring Boot 3.x, Spring Security, Spring Data JPA
 - **Gateway**: Spring Cloud Gateway
-- **DB**: MySQL 8.x
+- **DB**: PostgreSQL 16.x
 - **Cache**: Redis 7.x
 - **Frontend**: React 18, Axios
 - **Infra**: Docker, Docker Compose
