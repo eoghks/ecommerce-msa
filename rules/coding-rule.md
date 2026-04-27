@@ -77,7 +77,8 @@ public ResponseEntity<Void> delete(@PathVariable Long id) {
 
 ### Repository
 - DB 접근만 — Spring Data JPA Repository 호출만 허용
-- 복잡한 쿼리는 JPQL 또는 QueryDSL 사용
+- 단순 쿼리는 Spring Data JPA 메서드 네이밍 사용
+- 복잡한 쿼리는 QueryDSL 사용 (JPQL 문자열 사용 지양)
 - 네이티브 쿼리 최소화
 
 ## 예외 처리
