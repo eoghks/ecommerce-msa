@@ -6,10 +6,11 @@ MSA 기반 이커머스 플랫폼 (포트폴리오 프로젝트)
 
 | 분류 | 기술 |
 |------|------|
-| Backend | Spring Boot 3.x, Spring Security, Spring Data JPA |
+| Backend | Spring Boot 3.x, Spring Security, Spring Data JPA, Spring Kafka |
 | Gateway | Spring Cloud Gateway |
 | Cache | Redis 7.x |
 | DB | PostgreSQL 16.x |
+| Message Broker | Apache Kafka (이벤트 기반 Saga) |
 | Frontend | React 18, Axios |
 | Infra | Docker, Docker Compose |
 

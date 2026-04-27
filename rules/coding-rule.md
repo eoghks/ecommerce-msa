@@ -61,5 +61,13 @@
 - Resilience4j 로 타임아웃 / 재시도 / 서킷브레이커 설정
 - 모든 요청에 `X-Request-ID` 헤더 부여 → MDC 로 분산 로그 추적
 
+## 분산 트랜잭션
+- 서비스 경계를 넘는 트랜잭션은 **Saga 패턴 (Choreography, 이벤트 기반)** 사용
+- 메시지 브로커: Apache Kafka
+- 이벤트 발행은 **Outbox 패턴**으로 DB 트랜잭션과 원자성 보장
+- 이벤트 소비는 멱등(idempotent) 처리 필수 (`eventId` 중복 방지)
+- 모든 이벤트에 `correlationId` 포함 → 분산 추적
+- 상세 근거: [docs/decisions/saga-pattern.md](../docs/decisions/saga-pattern.md)
+
 ## 파일 생성
 - `.java` `.jsx` `.js` `.xml` 생성 즉시 `git add` 실행
