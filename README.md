@@ -11,7 +11,7 @@ MSA 기반 이커머스 플랫폼 (포트폴리오 프로젝트)
 | Cache | Redis 7.x |
 | DB | PostgreSQL 16.x |
 | Message Broker | Apache Kafka (이벤트 기반 Saga) |
-| Frontend | React 18, Axios |
+| Frontend | React 18, TypeScript, Vite, TanStack Query, Zustand, Tailwind CSS |
 | Infra | Docker, Docker Compose |
 
 ## 서비스 구성

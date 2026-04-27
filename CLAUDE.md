@@ -2,7 +2,9 @@
 
 ## 프로젝트 개요
 MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
-- 스택: Java 21, Spring Boot 3.x, Spring Cloud Gateway, Spring Data JPA, Spring Kafka, React 18, PostgreSQL 16, Redis 7, Apache Kafka, Docker, Gradle
+- Backend: Java 21, Spring Boot 3.x, Spring Cloud Gateway, Spring Data JPA, Spring Kafka, Gradle
+- Frontend: React 18, TypeScript, Vite, TanStack Query, Zustand, Tailwind CSS
+- Infra: PostgreSQL 16, Redis 7, Apache Kafka, Docker
 - 구조: 모노레포 (서비스별 하위 디렉토리)
 
 ## 모노레포 구조

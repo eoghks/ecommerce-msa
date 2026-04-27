@@ -109,6 +109,6 @@
 - 상세 규칙: [testing-rule.md](testing-rule.md)
 
 ## 파일 생성 / 스테이징
-- `.java` `.jsx` `.js` `.xml` 생성 시 `git add <파일>` (개별 파일 명시)
+- `.java` `.tsx` `.ts` `.xml` 생성 시 `git add <파일>` (개별 파일 명시)
 - `git add .` / `git add -A` 금지 — WIP·민감 파일 실수 staging 위험
 - 커밋 전 `git status` 로 staged 영역 점검
