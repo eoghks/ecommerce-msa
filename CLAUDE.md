@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
-- 스택: Java 21, Spring Boot 3.x, Spring Data JPA, React 18, Docker, PostgreSQL 16, Redis 7, Gradle
+- 스택: Java 21, Spring Boot 3.x, Spring Cloud Gateway, Spring Data JPA, Spring Kafka, React 18, PostgreSQL 16, Redis 7, Apache Kafka, Docker, Gradle
 - 구조: 모노레포 (서비스별 하위 디렉토리)
 
 ## 모노레포 구조
@@ -43,7 +43,7 @@ com.eoghks.<service>/
 | [coding-rule.md](rules/coding-rule.md) | Java/Spring 코딩 규칙, 레이어 책임 |
 | [security-rule.md](rules/security-rule.md) | 인증/인가, 데이터 보안, 환경변수 |
 | [git-convention.md](rules/git-convention.md) | 브랜치 전략, 커밋 메시지 규칙 |
-| [naming-convention.md](rules/naming-convention.md) | 패키지/클래스/변수/DB 네이밍 |
+| [naming-convention.md](rules/naming-convention.md) | 클래스/메서드/변수/DB/Kafka 네이밍 |
 | [testing-rule.md](rules/testing-rule.md) | 테스트 작성 기준, 패턴 |
 | [pr-rule.md](rules/pr-rule.md) | PR 템플릿, 머지 전 체크리스트 |
 | [frontend-rule.md](rules/frontend-rule.md) | React 컴포넌트 구조, 네이밍 |
