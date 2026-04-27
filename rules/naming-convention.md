@@ -10,27 +10,23 @@ com.eoghks.<service>/
 ├── dto/
 │   ├── request/
 │   └── response/
-├── event/           # Kafka 이벤트 클래스
+├── event/           # Kafka 이벤트
 ├── exception/
 ├── config/
 └── common/
 ```
 
 ## 클래스 네이밍
-| 유형 | 규칙 | 예시 |
-|------|------|------|
-| Controller | `<도메인>Controller` | `AuthController` |
-| Service | `<도메인>Service` | `AuthService` |
-| Repository | `<도메인>Repository` | `UserRepository` |
-| Entity | 단수 명사 | `User`, `Order` |
-| Request DTO | `<동사><도메인>Request` | `LoginRequest` |
-| Response DTO | `<도메인>Response` | `UserResponse` |
-| Exception | `<도메인><이유>Exception` | `StockInsufficientException` |
-| Config | `<대상>Config` | `SecurityConfig` |
-| Event | `<도메인><동사ed>Event` | `OrderCreatedEvent`, `StockReservedEvent` |
-| Test | `<대상>Test` | `AuthServiceTest` |
+- Spring 표준 따름 (`<도메인>Controller`, `<도메인>Service`, `<도메인>Repository`, `<대상>Config`, `<대상>Test`)
+- Entity: 단수 명사 (`User`, `Order`)
+- Request DTO: `<동사><도메인>Request` (`LoginRequest`, `CreateProductRequest`)
+- Response DTO: `<도메인>Response` (`UserResponse`)
+- Exception: `<도메인><이유>Exception` (`StockInsufficientException`)
+- Event: `<도메인><동사ed>Event` (`OrderCreatedEvent`, `StockReservedEvent`)
 
 ## 메서드 네이밍
+
+### Service 외부 (public) — 유스케이스 단위
 | 유형 | 규칙 | 예시 |
 |------|------|------|
 | 단건 조회 | `find<도메인>By<조건>` | `findUserById` |
@@ -39,6 +35,11 @@ com.eoghks.<service>/
 | 수정 | `update<도메인>` | `updateProduct` |
 | 삭제 | `delete<도메인>` | `deleteProduct` |
 | 검증 | `validate<대상>` | `validateToken` |
+
+### Service 내부 (private) — 헬퍼 메서드
+- 위 규칙 강제 안 함, **구체적 행위 동사**로 자유롭게
+- 한 줄에 "무슨 일이 일어나는지" 드러나게 작성
+- 예: `reserveStock`, `loadAuthenticatedUser`, `buildPendingOrder`, `toResponse`, `publishOrderCreatedEvent`
 
 ## 변수/필드
 - camelCase
@@ -56,7 +57,7 @@ com.eoghks.<service>/
 - 유니크: `uk_<테이블>_<컬럼>` (`uk_user_email`)
 
 ## Kafka
-- 토픽: `<도메인>-events` (`order-events`, `product-events`)
+- 토픽: `<도메인>-events` (`order-events`)
 - 컨슈머 그룹: `<service>-<topic>-consumer` (`product-order-events-consumer`)
 - 이벤트 클래스: `<도메인><동사ed>Event`
 
