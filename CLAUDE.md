@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
-- 스택: Spring Boot + JPA, React, Docker, Redis
+- 스택: Java 21, Spring Boot 3.x, Spring Data JPA, React 18, Docker, PostgreSQL 16, Redis 7, Gradle
 - 구조: 모노레포 (서비스별 하위 디렉토리)
 
 ## 서비스 구조
@@ -27,8 +27,8 @@ ecommerce-msa/
 ### 레이어 책임 규칙
 - **Controller**: 요청/응답 처리, 입력값 바인딩만 — 비즈니스 로직 금지, `ResponseEntity` 사용
 - **Service**: 비즈니스 로직 전담, 트랜잭션 경계 관리
-- **Dao**: DB 접근만 — MyBatis mapper 호출, SQL 실행만 허용
-  - 파라미터 1개 → 그대로 전달 / 2개 이상 → 도메인 객체에 담아 전달 (`Object[]` 금지)
+- **Repository**: DB 접근만 — Spring Data JPA Repository 호출만 허용
+  - 복잡한 쿼리는 JPQL 또는 QueryDSL 사용, 네이티브 쿼리 최소화
 
 ### 파일 생성 규칙
 - `.java` `.jsx` `.js` `.xml` 파일 생성 후 즉시 `git add <파일경로>` 실행
@@ -38,7 +38,7 @@ ecommerce-msa/
 - 테스트 보고 형식: `통과 N건 / 실패 0건`
 
 ## 보안 규칙
-- SQL 파라미터는 항상 `#{}` 바인딩 (`${}` 금지)
+- JPA 파라미터는 바인딩 변수 사용 (네이티브 쿼리 문자열 직접 치환 금지 — SQL Injection)
 - 사용자 입력값은 Controller 진입 시점에 검증
 - 비밀번호/토큰/키는 평문 저장 및 로그 출력 금지
 
