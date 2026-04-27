@@ -13,7 +13,7 @@
   ▼    ▼                     ▼
 [Auth] [Product]          [Order]
   │       │                  │
-  │    Redis(캐싱)        Redis(Lock)
+  │   Redis(캐싱+Lock)     (이벤트 처리)
   │       │                  │
   └───────┴────[Kafka]──────┘
                │      │

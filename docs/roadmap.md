@@ -21,9 +21,9 @@
 
 | Day | 작업 |
 |-----|------|
-| 1 | Docker Compose 작성 (PostgreSQL, Redis, 네트워크 구성) |
+| 1 | Docker Compose 작성 (PostgreSQL, Redis, Kafka+Zookeeper, 네트워크 구성) |
 | 2 | Spring Cloud Gateway 프로젝트 생성 (Gradle, Java 21) |
-| 3 | 공통 모듈 — 응답 포맷(`ApiResponse`), 예외 처리(`GlobalException`) |
+| 3 | 공통 모듈 — `ProblemDetail` 핸들러, 공통 이벤트 베이스 클래스 |
 | 4 | 각 서비스 Spring Boot 프로젝트 스캐폴딩 (auth/product/order/monitoring) |
 | 5 | AI Agent 환경 구성 (Claude Code 플러그인 세팅) + PR → develop 머지 |
 
@@ -55,16 +55,16 @@
 
 ---
 
-## Week 4 — Order Service
+## Week 4 — Order Service + Saga (Kafka)
 > 브랜치: `feature/order-service`
 
 | Day | 작업 |
 |-----|------|
 | 1 | 주문 엔티티 설계 (주문/주문상품), PostgreSQL 연결 |
-| 2 | 주문 생성 API — Product Service 재고 확인 연동 |
-| 3 | Redis Lock 기반 재고 차감 동시성 처리 |
-| 4 | 주문 상태 관리 (PENDING→PAID→SHIPPED→DONE), 주문 취소 |
-| 5 | 주문 목록/상세 조회 + 테스트 작성 + PR → develop 머지 |
+| 2 | Kafka 토픽 구성, Spring Kafka 설정 (Producer/Consumer) |
+| 3 | 주문 생성 API + `OrderCreated` 이벤트 발행 (Outbox 패턴) |
+| 4 | Product Service 재고 차감 컨슈머 + Redis Lock 동시성 처리 + 결과 이벤트 발행 |
+| 5 | 보상 이벤트 처리 (StockReserveFailed → 주문 CANCELLED) + 테스트 + PR → develop 머지 |
 
 ---
 

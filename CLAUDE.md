@@ -10,8 +10,8 @@ MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
 ecommerce-msa/
 ├── gateway/          # Spring Cloud Gateway
 ├── auth-service/     # 회원가입/로그인/RBAC
-├── product-service/  # 상품 CRUD + Redis 캐싱
-├── order-service/    # 주문/재고 + Redis Lock
+├── product-service/  # 상품 CRUD + Redis 캐싱 + 재고 차감 (Redis Lock)
+├── order-service/    # 주문 처리 + Kafka 이벤트 발행/구독
 ├── monitoring/       # Actuator 기반 대시보드
 ├── frontend/         # React
 ├── docker/           # Docker Compose

@@ -20,8 +20,8 @@ MSA 기반 이커머스 플랫폼 (포트폴리오 프로젝트)
 |--------|------|------|
 | API Gateway | 8080 | 라우팅, JWT 검증 |
 | Auth Service | 8081 | 회원/인증/RBAC |
-| Product Service | 8082 | 상품 CRUD + Redis 캐싱 |
-| Order Service | 8083 | 주문/재고 + Redis Lock |
+| Product Service | 8082 | 상품 CRUD + Redis 캐싱 + 재고 차감(Redis Lock) |
+| Order Service | 8083 | 주문 처리 + Kafka 이벤트 (Saga Choreography) |
 | Monitoring | 8084 | 헬스체크 대시보드 |
 | Frontend | 3000 | React SPA |
 
