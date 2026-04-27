@@ -1,20 +1,6 @@
 # 네이밍 컨벤션
 
-## 패키지 구조 (서비스별 공통)
-```
-com.eoghks.<service>/
-├── controller/
-├── service/
-├── repository/
-├── domain/          # JPA 엔티티
-├── dto/
-│   ├── request/
-│   └── response/
-├── event/           # Kafka 이벤트
-├── exception/
-├── config/
-└── common/
-```
+> 패키지 구조는 [CLAUDE.md](../CLAUDE.md) 참조
 
 ## 클래스 네이밍
 - Spring 표준 따름 (`<도메인>Controller`, `<도메인>Service`, `<도메인>Repository`, `<대상>Config`, `<대상>Test`)

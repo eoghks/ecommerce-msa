@@ -5,7 +5,7 @@ MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
 - 스택: Java 21, Spring Boot 3.x, Spring Data JPA, React 18, Docker, PostgreSQL 16, Redis 7, Gradle
 - 구조: 모노레포 (서비스별 하위 디렉토리)
 
-## 서비스 구조
+## 모노레포 구조
 ```
 ecommerce-msa/
 ├── gateway/          # Spring Cloud Gateway
@@ -17,6 +17,22 @@ ecommerce-msa/
 ├── docker/           # Docker Compose
 ├── rules/            # 작업 규칙 문서
 └── docs/             # 설계 문서
+```
+
+## 서비스별 패키지 구조 (공통)
+```
+com.eoghks.<service>/
+├── controller/
+├── service/
+├── repository/
+├── domain/          # JPA 엔티티
+├── dto/
+│   ├── request/
+│   └── response/
+├── event/           # Kafka 이벤트
+├── exception/
+├── config/
+└── common/
 ```
 
 ## 작업 규칙
