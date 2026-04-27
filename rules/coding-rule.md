@@ -69,5 +69,10 @@
 - 모든 이벤트에 `correlationId` 포함 → 분산 추적
 - 상세 근거: [docs/decisions/saga-pattern.md](../docs/decisions/saga-pattern.md)
 
+## 테스트
+- 구현 코드와 테스트 코드는 **동시 작성** (구현 후 별도 작성 금지)
+- 커밋 전 전체 테스트 통과 확인 (실패 시 머지 불가)
+- 상세 규칙: [testing-rule.md](testing-rule.md)
+
 ## 파일 생성
 - `.java` `.jsx` `.js` `.xml` 생성 즉시 `git add` 실행
