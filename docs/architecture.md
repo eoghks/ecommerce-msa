@@ -55,7 +55,7 @@
 | `payment-events` | Payment Service (향후) | Order, Product | `PaymentCompleted`, `PaymentFailed` |
 
 - 파티션 키: `correlationId`(주문ID) — 동일 주문 이벤트는 순서 보장
-- 발행: Outbox 패턴으로 DB 트랜잭션 원자성 보장
+- 발행: 토이 단계 `@TransactionalEventListener(AFTER_COMMIT)` / 운영 단계 Outbox 패턴 (ADR-001 참조)
 - 소비: 멱등 처리 (`eventId` 중복 방지) + DLQ
 
 ## 기술 스택

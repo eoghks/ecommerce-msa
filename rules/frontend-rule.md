@@ -52,7 +52,7 @@ frontend/src/
 - **Refresh Token**: `httpOnly + Secure + SameSite=Strict` 쿠키 — JS 접근 불가
 - 새로고침 시 Access 휘발 → 앱 부팅 시 `POST /auth/refresh` 로 메모리 복구
 - **CSRF 정책**: Refresh 가 쿠키 기반이므로
-  - 백엔드: `/auth/refresh` 엔드포인트만 Origin 헤더 검증 ([security-rule.md](../rules/security-rule.md))
+  - 백엔드: `/auth/refresh` 엔드포인트만 Origin 헤더 검증 ([security-rule.md](security-rule.md))
   - 프론트: 명시적 Refresh 호출은 Axios 인터셉터 내부에서만, 외부 노출 안 함
 
 ## API 호출 규칙

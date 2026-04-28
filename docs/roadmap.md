@@ -37,7 +37,7 @@
 | 1 | 회원 엔티티 설계 (JPA), PostgreSQL 연결, Flyway 마이그레이션 |
 | 2 | 회원가입 API (비밀번호 BCrypt 암호화) |
 | 3 | 로그인 API — JWT Access Token 발급 |
-| 4 | Refresh Token 구현 + Redis 저장 / 로그아웃 블랙리스트 처리 |
+| 4 | Refresh Token 구현 + Redis 저장 / 로그아웃 (Refresh 무효화) |
 | 5 | RBAC 권한 구조 (USER/ADMIN) + 테스트 작성 + PR → develop 머지 |
 
 ---

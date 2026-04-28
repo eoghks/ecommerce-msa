@@ -21,7 +21,8 @@
 - Auth Service: 토큰 발급 흐름
 - Gateway: 토큰 검증 흐름
 - Refresh Token 저장 전략 (Redis)
-- 로그아웃 시 블랙리스트 처리
+- 로그아웃은 Refresh Token 무효화 (Access 는 30분 단명이라 별도 무효화 불요)
+- 블랙리스트는 보안 사고 시 강제 무효화 전용
 
 ## 한계 및 향후 개선
 - 토큰 탈취 대응 (재발급 시 Refresh 무효화)
