@@ -40,7 +40,7 @@
 
 | 용도 | Key 패턴 | TTL |
 |------|----------|-----|
-| JWT 블랙리스트 | `blacklist:{token}` | 토큰 만료 시간 |
+| JWT 블랙리스트 (강제 무효화 전용) | `blacklist:{tokenId}` | 토큰 잔여 시간 |
 | Refresh Token | `refresh:{userId}` | 7일 |
 | 상품 목록 캐싱 | `products:{category}` | 10분 |
 | 장바구니 | `cart:{userId}` | 1일 |

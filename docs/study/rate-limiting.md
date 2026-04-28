@@ -65,7 +65,7 @@ spring:
         - id: auth-service
           uri: http://auth-service:8081
           predicates:
-            - Path=/api/auth/**
+            - Path=/api/v1/auth/**
           filters:
             - name: RequestRateLimiter
               args:
@@ -76,7 +76,7 @@ spring:
         - id: product-service
           uri: http://product-service:8082
           predicates:
-            - Path=/api/products/**
+            - Path=/api/v1/products/**
           filters:
             - name: RequestRateLimiter
               args:

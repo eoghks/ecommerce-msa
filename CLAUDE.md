@@ -7,6 +7,11 @@ MSA 기반 이커머스 플랫폼 (이직용 포트폴리오)
 - Infra: PostgreSQL 16, Redis 7, Apache Kafka, Docker
 - 구조: 모노레포 (서비스별 하위 디렉토리)
 
+## 글로벌 규칙 예외 (이 프로젝트)
+- 글로벌 CLAUDE.md 의 **MyBatis / Dao / `#{}` 바인딩** 관련 규칙은 이 프로젝트 미적용 — Spring Data JPA 사용
+- 레이어명: `Dao` 가 아닌 **`Repository`**
+- `.jsp` 미사용 — `.tsx` `.ts` 사용 (TypeScript)
+
 ## 모노레포 구조
 ```
 ecommerce-msa/
@@ -14,11 +19,13 @@ ecommerce-msa/
 ├── auth-service/     # 회원가입/로그인/RBAC
 ├── product-service/  # 상품 CRUD + Redis 캐싱 + 재고 차감 (Redis Lock)
 ├── order-service/    # 주문 처리 + Kafka 이벤트 발행/구독
-├── monitoring/       # Actuator 기반 대시보드
-├── frontend/         # React
+├── monitoring/       # Actuator + Prometheus + Grafana 대시보드
+├── common/           # 공용 모듈 (ProblemDetail, 이벤트 베이스, MDC 필터)
+├── frontend/         # React + TypeScript
 ├── docker/           # Docker Compose
 ├── rules/            # 작업 규칙 문서
-└── docs/             # 설계 문서
+├── docs/             # 설계 문서
+└── .github/          # PR 템플릿, 워크플로
 ```
 
 ## 서비스별 패키지 구조 (공통)

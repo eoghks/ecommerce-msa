@@ -5,15 +5,15 @@
 
 ---
 
-## Auth Service `/api/auth`
+## Auth Service `/api/v1/auth`
 
 | Method | URL | 설명 | 인증 | 성공 Status |
 |--------|-----|------|------|-------------|
-| POST | `/api/auth/signup` | 회원가입 | 불필요 | `201 Created` |
-| POST | `/api/auth/login` | 로그인 (JWT 발급) | 불필요 | `200 OK` |
-| POST | `/api/auth/logout` | 로그아웃 (토큰 블랙리스트) | 필요 | `204 No Content` |
-| GET | `/api/auth/me` | 내 정보 조회 | 필요 | `200 OK` |
-| POST | `/api/auth/refresh` | Access Token 재발급 | Refresh 토큰 | `200 OK` |
+| POST | `/api/v1/auth/signup` | 회원가입 | 불필요 | `201 Created` |
+| POST | `/api/v1/auth/login` | 로그인 (JWT 발급) | 불필요 | `200 OK` |
+| POST | `/api/v1/auth/logout` | 로그아웃 (Refresh Token 무효화) | 필요 | `204 No Content` |
+| GET | `/api/v1/auth/me` | 내 정보 조회 | 필요 | `200 OK` |
+| POST | `/api/v1/auth/refresh` | Access Token 재발급 | Refresh 토큰 | `200 OK` |
 
 ### 주요 에러
 | Status | 상황 |
@@ -24,15 +24,15 @@
 
 ---
 
-## Product Service `/api/products`
+## Product Service `/api/v1/products`
 
 | Method | URL | 설명 | 인증 | 성공 Status |
 |--------|-----|------|------|-------------|
-| GET | `/api/products` | 상품 목록 (캐싱) | 불필요 | `200 OK` |
-| GET | `/api/products/{id}` | 상품 상세 | 불필요 | `200 OK` |
-| POST | `/api/products` | 상품 등록 | ADMIN | `201 Created` |
-| PATCH | `/api/products/{id}` | 상품 부분 수정 | ADMIN | `200 OK` |
-| DELETE | `/api/products/{id}` | 상품 삭제 | ADMIN | `204 No Content` |
+| GET | `/api/v1/products` | 상품 목록 (캐싱) | 불필요 | `200 OK` |
+| GET | `/api/v1/products/{id}` | 상품 상세 | 불필요 | `200 OK` |
+| POST | `/api/v1/products` | 상품 등록 | ADMIN | `201 Created` |
+| PATCH | `/api/v1/products/{id}` | 상품 부분 수정 | ADMIN | `200 OK` |
+| DELETE | `/api/v1/products/{id}` | 상품 삭제 | ADMIN | `204 No Content` |
 
 ### 주요 에러
 | Status | 상황 |
@@ -44,14 +44,14 @@
 
 ---
 
-## Order Service `/api/orders`
+## Order Service `/api/v1/orders`
 
 | Method | URL | 설명 | 인증 | 성공 Status |
 |--------|-----|------|------|-------------|
-| POST | `/api/orders` | 주문 생성 | USER | `201 Created` |
-| GET | `/api/orders` | 내 주문 목록 | USER | `200 OK` |
-| GET | `/api/orders/{id}` | 주문 상세 | USER | `200 OK` |
-| PATCH | `/api/orders/{id}/cancel` | 주문 취소 | USER | `200 OK` |
+| POST | `/api/v1/orders` | 주문 생성 | USER | `201 Created` |
+| GET | `/api/v1/orders` | 내 주문 목록 | USER | `200 OK` |
+| GET | `/api/v1/orders/{id}` | 주문 상세 | USER | `200 OK` |
+| PATCH | `/api/v1/orders/{id}/cancel` | 주문 취소 | USER | `200 OK` |
 
 ### 주요 에러
 | Status | 상황 |
@@ -82,7 +82,7 @@ HTTP Status Code 로 상태 표현, 응답 바디는 리소스만 포함.
 **`201 Created` — 생성**
 ```
 HTTP/1.1 201 Created
-Location: /api/products/1
+Location: /api/v1/products/1
 
 {
   "id": 1,
@@ -107,7 +107,7 @@ Content-Type: application/problem+json
   "title": "재고 부족",
   "status": 409,
   "detail": "상품 ID 5의 재고가 부족합니다",
-  "instance": "/api/orders"
+  "instance": "/api/v1/orders"
 }
 ```
 
@@ -121,7 +121,7 @@ Content-Type: application/problem+json
   "title": "Bad Request",
   "status": 400,
   "detail": "입력값 검증 실패",
-  "instance": "/api/auth/signup",
+  "instance": "/api/v1/auth/signup",
   "errors": [
     { "field": "email", "message": "이메일 형식이 올바르지 않습니다" },
     { "field": "password", "message": "비밀번호는 8자 이상이어야 합니다" }

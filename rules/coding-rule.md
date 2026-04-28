@@ -87,15 +87,18 @@
 - `X-Request-ID` 자동 부여 → MDC
 
 ## MSA 서비스 간 통신
-- `OpenFeign` (`RestTemplate` 지양)
-- Resilience4j: 타임아웃 / 재시도 / 서킷브레이커
+- 기본 통신은 **Kafka 이벤트** (Choreography Saga)
+- 동기 호출이 필요한 경우(예: 상품 상세 조회, Auth 토큰 검증)에 한해 **OpenFeign** 사용 (`RestTemplate` 지양)
+- 동기 호출엔 **Resilience4j**: 타임아웃 / 재시도 / 서킷브레이커
 - 서비스 간 호출도 인증 필수 — [security-rule.md](security-rule.md)
 
 ## 분산 트랜잭션
-- 서비스 경계는 **Saga (Choreography, 이벤트 기반)** + **Apache Kafka**
-- 이벤트 발행: **Outbox 패턴** (DB 트랜잭션 원자성)
-- 이벤트 소비: 멱등 처리 (`eventId` 중복 방지)
-- `correlationId` 분산 추적
+- 서비스 경계는 **Saga (Choreography, 이벤트 기반)** + **Apache Kafka** [토이 필수]
+- 이벤트 발행 [토이 필수]:
+  - 토이 단계: `@TransactionalEventListener(AFTER_COMMIT)` 단순 적용
+  - 운영 단계: **Outbox 패턴** (CDC 또는 polling) [운영]
+- 이벤트 소비: 멱등 처리 (`eventId` 중복 방지) [토이 필수]
+- `correlationId` 분산 추적 [토이 필수]
 - 컨슈머 그룹 / DLT 네이밍 → [naming-convention.md](naming-convention.md)
 - 상세: [docs/decisions/ADR-001-saga-pattern.md](../docs/decisions/ADR-001-saga-pattern.md)
 

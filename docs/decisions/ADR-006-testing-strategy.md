@@ -1,44 +1,34 @@
-# 테스트 전략
+# ADR-006: 테스트 전략
 
-> **상태**: 🔲 템플릿 — Week 5~6 (전체 테스트 정비 시 작성)
+## Status
+🔲 템플릿 — Week 5~6 (전체 테스트 정비 시 작성)
+
+## Date
+TBD
 
 ---
 
-## 배경
-- 테스트 피라미드 — 단위 / 통합 / E2E 비율
-- MSA 환경에서 통합 테스트의 어려움
+> 테스트 작성 기준·도구·커버리지 등 상세 규칙은 [`rules/testing-rule.md`](../../rules/testing-rule.md) 가 단일 출처(SoT). 이 ADR 은 **선택의 근거**만 기록.
 
-## 레이어별 전략
-| 레이어 | 도구 | 범위 | 비율 목표 |
-|--------|------|------|----------|
-| Service (단위) | JUnit 5 + Mockito | 비즈니스 로직 | 70% |
-| Repository (슬라이스) | `@DataJpaTest` + H2 | 쿼리 검증 | 15% |
-| Controller (슬라이스) | `@WebMvcTest` + MockMvc | 요청/응답 | 10% |
-| 통합 (E2E) | `@SpringBootTest` + Testcontainers | 핵심 시나리오 | 5% |
+## Context
+- 1인 토이 프로젝트 + MSA + Saga 환경에서 어떤 테스트 전략으로 가야 하는가
+- 단위/슬라이스/통합/계약/성능 중 어디에 시간 투자할지
 
-## 핵심 시나리오 통합 테스트
-- 회원가입 → 로그인 → 상품 조회 → 주문 생성 → 재고 확인
-- Kafka 이벤트 흐름 검증 (`@EmbeddedKafka` 또는 Testcontainers Kafka)
-- Saga 보상 트랜잭션 (재고 부족 시 주문 취소)
+## Decision
+- TBD (Week 5~6 작성)
 
-## 외부 의존성 처리
-- DB: Testcontainers PostgreSQL
-- Kafka: Testcontainers Kafka 또는 `@EmbeddedKafka`
-- Redis: Testcontainers Redis
+## Considered Options
+- A. 단위 테스트 비중 극대화 (90%+) — 빠른 피드백, 적은 통합 신뢰
+- B. 테스트 피라미드 70/20/10 (테이블링 표준) — 균형
+- C. 통합 테스트 비중 확대 — 신뢰성↑, 속도↓
 
-## 픽스처 / 데이터
-- 공통 픽스처는 `fixture/` 패키지에 관리
-- 테스트 데이터는 메서드별로 격리
+## Consequences
+- TBD
 
-## 커버리지 목표
-- 핵심 도메인 (Service): 80% 이상
-- 전체: 70% 이상
-- JaCoCo 리포트로 측정
-
-## 한계 및 향후 개선
-- E2E는 빠른 피드백 어려워서 핵심만 유지
-- Contract 테스트 (Pact) 도입 검토
-- 성능 테스트 (k6 / JMeter) 별도 단계
+## Limitations & Future Work
+- 계약 테스트 (Pact / Spring Cloud Contract) — [운영]
+- 성능 테스트 (k6) — [운영]
+- Mutation Testing (PIT) — 차별화 가능
 
 ## 면접 답변 시나리오
 > Q: 테스트는 어떻게 작성했나요?
@@ -47,5 +37,5 @@
 > Q: MSA 통합 테스트는 어떻게 했나요?
 > A:
 
-> Q: Testcontainers는 왜 사용했나요?
+> Q: 왜 이런 비율로 테스트를 작성했나요?
 > A:

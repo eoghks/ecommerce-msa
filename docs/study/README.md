@@ -12,6 +12,7 @@
 |------|------|------|
 | [rate-limiting.md](rate-limiting.md) | Spring Cloud Gateway + Redis Token Bucket | 보류 |
 | [response-header-security.md](response-header-security.md) | CSP, HSTS 등 보안 헤더 | 보류 |
+| [cicd.md](cicd.md) | GitHub Actions 단계별 학습 가이드 | 학습 중 |
 
 ## 작성 형식
 - 왜 보류했는지 명시

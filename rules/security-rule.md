@@ -4,8 +4,8 @@
 - JWT 기반 (Access + Refresh Token)
 - 알고리즘: **RS256 (비대칭)** — 공개키만 Gateway/서비스에 배포, 개인키는 Auth Service만 보유
 - Access Token 30분 / Refresh Token 7일 (Redis 저장)
-- **Refresh Token Rotation** — 재발급 시마다 새 Refresh 발급, 이전 토큰 무효화
-- **Reuse Detection** — 사용된 Refresh 재사용 감지 시 토큰 패밀리 전체 폐기
+- **Refresh Token Rotation** — 재발급 시마다 새 Refresh 발급, 이전 토큰 무효화 [토이 필수]
+- **Reuse Detection** — 사용된 Refresh 재사용 감지 시 토큰 패밀리 전체 폐기 [운영]
 - 단명 Access Token(30분)이라 일반 로그아웃은 Refresh 무효화로 충분
 - 로그인 실패 응답은 **이메일/비밀번호 구분 없이 통일** (사용자 enumeration 차단)
 - API Gateway에서 JWT 서명 검증 후 라우팅
@@ -17,7 +17,7 @@
 ## 서비스 간 통신 보안 [토이 필수]
 - 내부 호출도 인증 필수 — Gateway 우회 차단
 - 토이: 내부 JWT (Gateway 가 사용자 JWT → 내부 토큰 변환)
-- 운영: mTLS — [docs/study/](../docs/study/) 추가 예정 [운영]
+- 운영: mTLS (향후 도입 검토) [운영]
 
 ## Spring Security
 - Security Filter Chain은 서비스별 독립 구성

@@ -101,10 +101,12 @@
 - 파티션 키: `correlationId`(주문ID) → 같은 주문 이벤트는 동일 파티션 → 순서 보장
 
 ### 이벤트 발행
-- `@TransactionalEventListener(AFTER_COMMIT)` 으로 DB 커밋 이후 발행
-- **Outbox 패턴 권장** — DB 트랜잭션과 이벤트 발행 원자성 보장
+- **토이 단계 [필수]**: `@TransactionalEventListener(AFTER_COMMIT)` 으로 DB 커밋 이후 발행
+  - 단순하지만 발행 직전 장애 시 이벤트 유실 가능 → 토이 트래픽 환경에선 허용 가능
+- **운영 단계 [학습]**: **Outbox 패턴** — DB 트랜잭션과 이벤트 발행 원자성 보장
   - 이벤트를 `outbox` 테이블에 INSERT (같은 트랜잭션)
-  - 별도 Polling/CDC 가 outbox → Kafka 로 전송
+  - 별도 Polling 또는 CDC(Debezium) 가 outbox → Kafka 로 전송
+  - 시간 여유 시 Week 6 적용 검토
 
 ### 이벤트 소비
 - 멱등(idempotent) 처리 필수 — `eventId` 중복 처리 방지 (`processed_events` 테이블 활용)
