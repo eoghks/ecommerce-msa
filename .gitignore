@@ -1,7 +1,8 @@
 # Java / Spring Boot
 *.class
-*.jar
 *.war
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
 target/
 build/
 .gradle/

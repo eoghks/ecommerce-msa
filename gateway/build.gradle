@@ -1,0 +1,12 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    // Week 2: RSA 공개키 JWT 검증에 사용
+    implementation 'com.nimbusds:nimbus-jose-jwt:9.40'
+
+    testImplementation 'io.projectreactor:reactor-test'
+}
