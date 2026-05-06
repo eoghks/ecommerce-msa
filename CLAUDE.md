@@ -44,6 +44,19 @@ com.eoghks.<service>/
 └── common/
 ```
 
+## 작업 워크플로우 (필수)
+기능 구현 전 반드시 아래 순서를 따른다. **컨펌 없이 코드 작성 금지.**
+
+```
+1. 설계 문서 작성 (docs/services/<service>/<파일>.md)
+2. 사용자 컨펌 대기
+3. 컨펌 후 → feature 브랜치 생성 → 구현 → 테스트 → develop 머지
+```
+
+- 서비스 문서는 해당 주차 코딩 시작 전에 생성 (Week 2 시작 전 auth/, Week 3 시작 전 product/ 등)
+- 설계 변경 발생 시 코드보다 문서 먼저 수정 → 재컨펌 후 반영
+- 문서 작성 규칙: [docs-rule.md](rules/docs-rule.md)
+
 ## 작업 규칙
 모든 규칙은 `rules/` 폴더에서 관리합니다.
 
@@ -57,6 +70,7 @@ com.eoghks.<service>/
 | [pr-rule.md](rules/pr-rule.md) | PR 템플릿, 라벨, CI 게이트 |
 | [frontend-rule.md](rules/frontend-rule.md) | React 컴포넌트, TanStack Query, 토큰 처리 |
 | [ops-rule.md](rules/ops-rule.md) | 환경 분리, Docker, CI/CD, 모니터링 |
+| [docs-rule.md](rules/docs-rule.md) | 서비스 문서 작성 가이드, 템플릿, 인덱스 관리 |
 
 ## 교차 주제 (여러 규칙 참조)
 | 주제 | 관련 규칙 |
