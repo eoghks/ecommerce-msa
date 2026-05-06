@@ -2,6 +2,11 @@ plugins {
     id 'org.springframework.boot'
 }
 
+bootRun {
+    jvmArgs '-Dfile.encoding=UTF-8'
+    jvmArgs '-Dstdout.encoding=UTF-8'
+}
+
 test {
     environment 'DOCKER_HOST', 'tcp://localhost:2375'
     environment 'DOCKER_API_VERSION', '1.41'

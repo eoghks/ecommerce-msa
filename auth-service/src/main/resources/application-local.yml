@@ -1,7 +1,7 @@
 spring:
   jpa:
     hibernate:
-      ddl-auto: create   # 로컬 전용 — 서버 기동 시 테이블 재생성
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
