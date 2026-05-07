@@ -81,21 +81,62 @@ curl -s -X POST http://localhost:8080/api/v1/auth/logout \
 
 ## 아키텍처
 
+### 로그인 플로우
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway (8080)
+    participant A as Auth Service (8081)
+    participant DB as PostgreSQL
+    participant R as Redis
+
+    C->>G: POST /api/v1/auth/login
+    G->>A: 화이트리스트 통과 (토큰 검증 없이 전달)
+    A->>DB: 이메일로 사용자 조회
+    DB-->>A: User 엔티티
+    A->>A: BCrypt 비밀번호 검증
+    A->>A: JwtProvider.issueAccessToken() - RS256 서명
+    A->>A: JwtProvider.issueRefreshToken() - UUID 생성
+    A->>R: SET refresh:{uuid} = userId (TTL 7일)
+    A-->>G: 200 { accessToken, refreshToken, expiresIn }
+    G-->>C: 200 { accessToken, refreshToken, expiresIn }
 ```
-Client
-  │
-  ▼
-API Gateway (8080)
-  │  화이트리스트: /signup /login /refresh /logout → 토큰 검증 없이 통과
-  │  그 외 경로 → Authorization: Bearer <token> 필수
-  ▼
-Auth Service (8081)
-  ├── AuthController
-  ├── AuthService
-  │     ├── BCryptPasswordEncoder (비밀번호 해싱)
-  │     ├── JwtProvider (RS256 토큰 발급·검증)
-  │     └── RefreshTokenRepository (Redis)
-  └── UserRepository (PostgreSQL)
+
+### 토큰 갱신 플로우 (Rotation)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway (8080)
+    participant A as Auth Service (8081)
+    participant R as Redis
+
+    Note over C: accessToken 만료 → 401 감지
+    C->>G: POST /api/v1/auth/refresh { refreshToken }
+    G->>A: 화이트리스트 통과
+    A->>R: GET refresh:{refreshToken} → userId
+    R-->>A: userId
+    A->>R: DEL refresh:{oldToken} (기존 토큰 삭제)
+    A->>A: 새 accessToken + refreshToken 발급
+    A->>R: SET refresh:{newToken} = userId (TTL 7일 갱신)
+    A-->>C: 200 { accessToken, refreshToken }
+    Note over C: 새 토큰으로 원래 요청 재시도
+```
+
+### 보호된 API 요청 플로우
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as API Gateway (8080)
+    participant S as Other Service
+
+    C->>G: GET /api/v1/products (Authorization: Bearer accessToken)
+    G->>G: JwtAuthenticationFilter - 헤더 존재 확인
+    Note over G: Week 2 Day 5: RSA 공개키로 서명 검증 예정
+    G->>S: 요청 전달 (X-User-Id, X-User-Role 헤더 주입 예정)
+    S-->>C: 200 응답
 ```
 
 ## JWT 설계
