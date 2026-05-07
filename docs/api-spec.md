@@ -11,9 +11,8 @@
 |--------|-----|------|------|-------------|
 | POST | `/api/v1/auth/signup` | 회원가입 | 불필요 | `201 Created` |
 | POST | `/api/v1/auth/login` | 로그인 (JWT 발급) | 불필요 | `200 OK` |
-| POST | `/api/v1/auth/logout` | 로그아웃 (Refresh Token 무효화) | 필요 | `204 No Content` |
-| GET | `/api/v1/auth/me` | 내 정보 조회 | 필요 | `200 OK` |
-| POST | `/api/v1/auth/refresh` | Access Token 재발급 | Refresh 토큰 | `200 OK` |
+| POST | `/api/v1/auth/logout` | 로그아웃 (Refresh Token 무효화) | 불필요 | `204 No Content` |
+| POST | `/api/v1/auth/refresh` | Access Token 재발급 | 불필요 | `200 OK` |
 
 ### 주요 에러
 | Status | 상황 |

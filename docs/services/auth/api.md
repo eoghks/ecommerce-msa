@@ -1,13 +1,13 @@
 # Auth Service API
 
 Base URL: `/api/v1/auth`  
-인증 불필요 경로 (Gateway 화이트리스트): `/api/v1/auth/**`
+인증 불필요 경로 (Gateway 화이트리스트): `/login`, `/signup`, `/refresh`, `/logout`
 
 ---
 
 ## 회원가입
 
-### `POST /api/v1/auth/register`
+### `POST /api/v1/auth/signup`
 
 **Request**
 ```json
@@ -52,11 +52,14 @@ Base URL: `/api/v1/auth`
 ```json
 {
   "accessToken": "eyJhbGci...",
+  "refreshToken": "550e8400-e29b-41d4-a716-446655440000",
   "tokenType": "Bearer",
-  "expiresIn": 1800
+  "expiresIn": 3600000
 }
 ```
-- Refresh Token은 `Set-Cookie: refreshToken=...; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`
+
+> `expiresIn` 단위: 밀리초 (3600000 = 1시간)  
+> Refresh Token은 Response Body로 반환 (쿠키 미사용)
 
 **Error**
 | 상태코드 | 사유 |
@@ -70,18 +73,23 @@ Base URL: `/api/v1/auth`
 ### `POST /api/v1/auth/refresh`
 
 **Request**
-- Body 없음
-- Cookie: `refreshToken=<token>` (자동 전송)
+```json
+{
+  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
 
 **Response** `200 OK`
 ```json
 {
   "accessToken": "eyJhbGci...",
+  "refreshToken": "새로운-uuid",
   "tokenType": "Bearer",
-  "expiresIn": 1800
+  "expiresIn": 3600000
 }
 ```
-- 신규 Refresh Token `Set-Cookie` 재발급 (Rotation)
+
+> Refresh Token Rotation: 요청 시 기존 토큰 Redis에서 삭제 후 신규 토큰 발급
 
 **Error**
 | 상태코드 | 사유 |
@@ -95,29 +103,33 @@ Base URL: `/api/v1/auth`
 ### `POST /api/v1/auth/logout`
 
 **Request**
-- Header: `Authorization: Bearer <accessToken>`
-- Cookie: `refreshToken=<token>`
+```json
+{
+  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
 
 **Response** `204 No Content`
-- Redis에서 Refresh Token 삭제
-- `Set-Cookie: refreshToken=; Max-Age=0` (쿠키 즉시 만료)
+
+> Redis에서 Refresh Token 삭제
 
 ---
 
-## 내 정보 조회
+## JWT 구조
 
-### `GET /api/v1/auth/me`
+| 항목 | 값 |
+|------|-----|
+| 알고리즘 | RS256 (RSA 비대칭키) |
+| Access Token 유효시간 | 1시간 (3600000ms) |
+| Refresh Token 유효시간 | 7일 |
+| 키 생성 시점 | 서비스 기동 시 `@PostConstruct` (메모리) |
 
-**Request**
-- Header: `Authorization: Bearer <accessToken>`
-- Gateway가 `X-User-Id`, `X-User-Role` 헤더 주입
-
-**Response** `200 OK`
+**Claims**
 ```json
 {
-  "id": 1,
-  "email": "user@example.com",
-  "name": "홍길동",
-  "role": "USER"
+  "sub": "1",
+  "role": "USER",
+  "iat": 1234567890,
+  "exp": 1234571490
 }
 ```
