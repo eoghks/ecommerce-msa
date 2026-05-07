@@ -1,5 +1,7 @@
 package com.ecommerce.auth.controller;
 
+import com.ecommerce.auth.dto.LoginRequest;
+import com.ecommerce.auth.dto.LoginResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.service.AuthService;
@@ -26,5 +28,10 @@ public class AuthController {
         return ResponseEntity
                 .created(URI.create("/api/v1/auth/" + response.getId()))
                 .body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 }
