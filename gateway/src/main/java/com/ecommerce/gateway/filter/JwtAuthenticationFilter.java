@@ -29,7 +29,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     // 인증 불필요 경로 (화이트리스트)
     private static final List<String> WHITE_LIST = List.of(
             "/api/v1/auth/login",
-            "/api/v1/auth/register",
+            "/api/v1/auth/signup",
             "/api/v1/auth/refresh",
             "/actuator"
     );
