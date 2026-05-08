@@ -44,6 +44,21 @@ com.eoghks.<service>/
 └── common/
 ```
 
+## Rules 파일 로드 규칙 (필수)
+작업 시작 전 아래 매핑에 따라 관련 rules 파일을 **반드시 먼저 읽는다.**
+
+| 작업 유형 | 읽어야 할 rules 파일 |
+|----------|-------------------|
+| 코드 구현 | `rules/coding-rule.md`, `rules/naming-convention.md` |
+| 보안 관련 구현 | `rules/security-rule.md` |
+| 테스트 작성 / 테스트 결과 문서화 | `rules/testing-rule.md` |
+| Git 커밋 / 브랜치 / PR | `rules/git-convention.md`, `rules/pr-rule.md` |
+| 문서 작성 / 이력 관리 | `rules/docs-rule.md` |
+| 프론트엔드 작업 | `rules/frontend-rule.md` |
+| Docker / CI / 배포 | `rules/ops-rule.md` |
+
+---
+
 ## 작업 워크플로우 (필수)
 기능 구현 전 반드시 아래 순서를 따른다. **컨펌 없이 코드 작성 금지.**
 
