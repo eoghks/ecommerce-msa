@@ -13,9 +13,20 @@ import java.security.interfaces.RSAPublicKey;
 
 /**
  * Auth Service JWKS 엔드포인트에서 RSA 공개키를 fetch·캐싱.
- * - 기동 시 1회 로드 (@PostConstruct)
- * - CR-03: 주기적 갱신 (@Scheduled) — auth-service 재시작 후 키 변경 대응
- * - MD-04: volatile 필드로 멀티스레드 가시성 보장
+ *
+ * [왜 @Scheduled가 필요한가]
+ * 현재 auth-service는 기동 시마다 RSA 키를 새로 생성한다 (JwtProvider.@PostConstruct).
+ * auth-service가 재시작되면 새 키로 발급된 토큰을 Gateway가 가진 옛날 공개키로 검증 → 401 발생.
+ * @Scheduled(5분)로 주기적으로 공개키를 재fetch하여 최대 5분 내 자동 복구.
+ *
+ * [근본 해결책]
+ * auth-service RSA 키를 외부(K8s Secret / Vault)에서 고정 PEM으로 주입하면
+ * 재시작해도 키가 바뀌지 않으므로 @Scheduled 불필요.
+ * → docs/tradeoffs/CR-01-rsa-key-inmemory.md 참고
+ *
+ * [volatile 이유]
+ * @Scheduled(스케줄러 스레드)가 publicKey를 갱신할 때 요청 처리 스레드가
+ * CPU 캐시의 옛날 값을 읽지 않도록 메인 메모리 직접 읽기/쓰기 보장.
  */
 @Slf4j
 @Component
