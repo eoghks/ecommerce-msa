@@ -52,8 +52,8 @@
 - `order_item` (테이블) ↔ `OrderItem` (Entity) ↔ `orderItems` (컬렉션 필드)
 
 ## Redis
-- 키 네임스페이스: `<service>:<domain>:<식별자>`
-- 예: `auth:refresh:{userId}`, `product:cache:{productId}`, `order:idempotency:{key}`
+- 키 네임스페이스: `<domain>:<식별자>` (서비스별 DB가 분리되어 있으므로 service prefix 생략)
+- 예: `refresh:{refreshToken}`, `product:cache:{productId}`, `order:idempotency:{key}`
 - TTL 명시 필수 (영구 보관 키는 별도 정책)
 
 ## Kafka
@@ -61,6 +61,22 @@
 - DLT 토픽: `<원토픽>.DLT` (`order-events.DLT`)
 - 컨슈머 그룹: `<service>-<topic>-consumer` (`product-order-events-consumer`)
 - 이벤트 클래스: 위 클래스 규칙 참조
+
+### Kafka 이벤트 공통 필드
+모든 이벤트 클래스는 아래 필드를 반드시 포함한다 (`common` 모듈 `BaseEvent` 상속).
+
+| 필드명 | 타입 | 설명 |
+|--------|------|------|
+| `eventId` | `UUID` | 멱등 처리용 고유 식별자 — 동일 eventId 재수신 시 무시 |
+| `correlationId` | `UUID` | Saga 분산 추적용 — 최초 주문 생성 시 발급, 전 이벤트에 전파 |
+| `occurredAt` | `Instant` | 이벤트 발생 시각 |
+| `version` | `int` | 스키마 버전 (기본 1) — 필드 추가/변경 시 증가 |
+
+### Kafka 이벤트 스키마 진화 규칙
+- **필드 추가**: 기존 컨슈머가 무시할 수 있도록 항상 Optional(nullable)로 추가
+- **필드 삭제/타입 변경**: 신규 이벤트 클래스 버전 도입 (v2), 과도기 동안 양쪽 버전 소비
+- **필드명 변경 금지** — 삭제 + 신규 필드 추가로 처리
+- DLT 컨슈머도 페이로드 변경 시 동기 수정 필수
 
 ## 로그 / MDC
 - MDC 키: `requestId`, `userId`, `correlationId` (이벤트 추적용)

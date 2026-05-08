@@ -28,6 +28,21 @@ ecommerce-msa/
 └── .github/          # PR 템플릿, 워크플로
 ```
 
+## 서비스 포트
+
+| 서비스 | 포트 |
+|--------|------|
+| gateway | 8080 |
+| auth-service | 8081 |
+| product-service | 8082 |
+| order-service | 8083 |
+| monitoring | 8084 |
+| frontend (dev) | 3000 |
+| PostgreSQL | 5433 (Docker host) |
+| Redis | 6379 |
+| Kafka | 9092 |
+| Kafka UI | 8085 |
+
 ## 서비스별 패키지 구조 (공통)
 ```
 com.eoghks.<service>/
