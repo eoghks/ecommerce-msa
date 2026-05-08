@@ -29,7 +29,7 @@ JWT는 무상태(Stateless)로 Gateway가 토큰만으로 검증 가능하므로
 |------|------------|--------------|----------------|
 | 키 종류 | 단일 Secret Key | Private Key + Public Key | Private Key + Public Key |
 | MSA 검증 분산 | Secret Key를 모든 서비스가 알아야 함 ❌ | Public Key만 배포하면 됨 ✅ | Public Key만 배포하면 됨 ✅ |
-| 서명 성능 | 빠름 | RS256보다 느림 | RS256보다 빠름 |
+| 서명 성능 | 가장 빠름 (단순 HMAC 연산) | 느림 (RSA 연산 무거움) | RS256보다 빠름 (타원곡선 연산 효율적) |
 | 키 크기 | 작음 | 2048bit (큼) | 256bit (작음) |
 | 라이브러리 지원 | 광범위 | 광범위 | 상대적으로 적음 |
 
