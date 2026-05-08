@@ -83,5 +83,11 @@
 - **Mutation Testing (PIT)** — 테스트 품질 검증
 - **SonarQube** Quality Gate — CI 게이팅
 
+## 테스트 결과 문서화 (`docs/test/`)
+- 테스트 진행 시 반드시 결과 문서 작성: `docs/test/YYYY-MM-DD-{slug}.md`
+- 파일 형식: `테스트 환경 · 테스트 항목별 요청/응답/결과 · 미통과 항목 원인 분석 + 수정 내용 + 재테스트 결과`
+- `docs/test/OVERVIEW.md`에 날짜·테스트 종류·대상 서비스·결과 요약 한 줄 추가
+- 미통과 → 수정 → 재통과 흐름은 동일 문서 내에서 추적 (별도 파일 금지)
+
 ## 상세 전략
 - [docs/decisions/ADR-006-testing-strategy.md](../docs/decisions/ADR-006-testing-strategy.md) (Week 5~6 작성)

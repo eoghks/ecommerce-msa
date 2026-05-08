@@ -117,3 +117,18 @@ docs/services/<service>/
 - 새 기능 구현 시 `docs/index.md` 크로스 레퍼런스 테이블에 행 추가
 - 형식: `기능명 | 구현 파일 | 서비스 문서 | 관련 규칙`
 - 파일 경로는 레포 루트 기준 상대경로 사용
+
+---
+
+## 이력 문서 관리 규칙
+
+### 리팩토링 이력 (`docs/refactor-history/`)
+- 리팩토링 작업 후 반드시 날짜별 파일 생성: `docs/refactor-history/YYYY-MM-DD.md`
+- 파일 형식: `날짜 · 대상 서비스 · 항목/원인/수정 내용` 표 형식
+- `OVERVIEW.md`에 날짜·대상 서비스 한 줄 추가
+
+### 트레이드오프 (`docs/tradeoffs/`)
+- 의도적으로 스킵한 기술 부채는 주제별 파일로 분리: `{ID}-{slug}.md`
+- 파일 형식: `현재 구현 · 문제점 · 운영 수준 해결책 · 포트폴리오 선택 이유 · 면접 답변 포인트`
+- `OVERVIEW.md`에 ID·주제·대상 서비스 한 줄 추가
+- ID 심각도 코드: CR(Critical) · HR(High) · MD(Medium) · LW(Low), 뒤 숫자는 같은 등급 내 순서
