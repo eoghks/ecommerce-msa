@@ -39,5 +39,5 @@
 - [x] Redis Refresh Token 저장·검증·무효화 (`RefreshTokenRepository`)
 - [x] Spring Security 설정 (STATELESS, CSRF disable)
 - [x] Gateway JWT 화이트리스트 필터 (`JwtAuthenticationFilter`)
-- [ ] Gateway JWT 서명 검증 완성 (Week 2 Day 5)
+- [x] Gateway JWT 서명 검증 완성 (Week 2 Day 5)
 - [ ] `/api/v1/auth/me` 내 정보 조회 API

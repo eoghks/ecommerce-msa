@@ -15,7 +15,7 @@
   "sub": "1",
   "role": "USER",
   "iat": 1700000000,
-  "exp": 1700001800
+  "exp": 1700003600
 }
 ```
 
@@ -31,11 +31,11 @@ Client → POST /api/v1/auth/login
       AuthService
         1. DB에서 User 조회 (email)
         2. BCrypt 비밀번호 검증
-        3. Access Token 발급 (RS256, 30분)
+        3. Access Token 발급 (RS256, 1시간)
         4. Refresh Token 발급 (UUID, 7일)
-        5. Redis 저장: auth:refresh:{userId} = refreshToken (TTL 7일)
+        5. Redis 저장: refresh:{refreshToken} = userId (TTL 7일)
            ↓
-      응답: Access Token (body) + Refresh Token (HttpOnly Cookie)
+      응답: Access Token + Refresh Token (모두 Response Body)
 ```
 
 ---
@@ -43,17 +43,17 @@ Client → POST /api/v1/auth/login
 ## 토큰 갱신 흐름 (Rotation)
 
 ```
-Client → POST /api/v1/auth/refresh (Cookie: refreshToken)
+Client → POST /api/v1/auth/refresh (Body: { "refreshToken": "..." })
            ↓
       AuthController
            ↓
       AuthService
-        1. Cookie에서 Refresh Token 추출
-        2. Redis 조회: auth:refresh:{userId} 존재 여부 확인
-        3. 일치하면 → 신규 Access Token + 신규 Refresh Token 발급
+        1. Request Body에서 Refresh Token 추출
+        2. Redis 조회: refresh:{refreshToken} → userId 조회
+        3. userId로 User 조회 후 신규 Access Token + 신규 Refresh Token 발급
         4. Redis 업데이트: 기존 토큰 삭제 + 신규 토큰 저장
            ↓
-      응답: 신규 Access Token (body) + 신규 Refresh Token (Cookie)
+      응답: 신규 Access Token + 신규 Refresh Token (모두 Response Body)
 ```
 
 ---
@@ -61,16 +61,15 @@ Client → POST /api/v1/auth/refresh (Cookie: refreshToken)
 ## 로그아웃 흐름
 
 ```
-Client → POST /api/v1/auth/logout
+Client → POST /api/v1/auth/logout (Body: { "refreshToken": "..." })
            ↓
       AuthService
-        1. Redis에서 auth:refresh:{userId} 삭제
-        2. Cookie 만료 (Max-Age=0)
+        1. Redis에서 refresh:{refreshToken} 삭제
            ↓
       응답: 204 No Content
 ```
 
-> Access Token은 블랙리스트 미사용 — 만료(30분)까지 유효  
+> Access Token은 블랙리스트 미사용 — 만료(1시간)까지 유효  
 > 강제 무효화가 필요한 경우에만 블랙리스트 [운영]
 
 ---

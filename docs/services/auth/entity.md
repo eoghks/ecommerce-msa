@@ -26,11 +26,11 @@
 
 | Key | Value | TTL |
 |-----|-------|-----|
-| `auth:refresh:{userId}` | Refresh Token (String) | 7일 |
+| `refresh:{refreshToken}` | userId (String) | 7일 |
 
 ### 정책
-- 로그인 시 신규 발급 → 기존 토큰 덮어쓰기 (단일 세션)
-- `/auth/refresh` 호출 시 Rotation — 기존 토큰 삭제 + 신규 토큰 저장
+- 로그인 시 신규 발급 → `refresh:{refreshToken}` = userId 저장
+- `/auth/refresh` 호출 시 Rotation — 기존 키 삭제 + 신규 키 저장
 - `/auth/logout` 호출 시 해당 키 삭제 → 토큰 무효화
 - 만료된 키는 Redis TTL이 자동 삭제
 
