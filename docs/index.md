@@ -24,11 +24,21 @@
 ## Auth Service
 
 > 문서 위치: `docs/services/auth/`  
-> 구현 예정: Week 2
+> 구현 완료: Week 2 ✅
 
 | 기능 | 구현 파일 | 서비스 문서 | 관련 규칙 |
 |------|---------|-----------|---------|
-| (Week 2 구현 후 추가) | | | |
+| 회원가입 | `auth-service/src/.../service/AuthService.java` | `docs/services/auth/api.md` | security-rule.md |
+| 로그인 + JWT 발급 | `auth-service/src/.../service/AuthService.java` | `docs/services/auth/flow.md` | security-rule.md |
+| Refresh Token 갱신 (Rotation) | `auth-service/src/.../service/AuthService.java` | `docs/services/auth/flow.md` | security-rule.md |
+| 로그아웃 (Refresh 무효화) | `auth-service/src/.../service/AuthService.java` | `docs/services/auth/flow.md` | security-rule.md |
+| RSA 키 생성 + JWT RS256 서명 | `auth-service/src/.../jwt/JwtProvider.java` | `docs/decisions/ADR-002-jwt-design.md` | security-rule.md |
+| JWKS 엔드포인트 | `auth-service/src/.../controller/AuthController.java` | `docs/services/auth/api.md` | security-rule.md |
+| Redis Refresh Token 저장 | `auth-service/src/.../repository/RefreshTokenRepository.java` | `docs/services/auth/entity.md` | security-rule.md |
+| ADMIN 시드 계정 초기화 | `auth-service/src/.../config/DataInitializer.java` | `docs/tradeoffs/LW-04-role-management.md` | security-rule.md |
+| Gateway 공개키 fetch·캐싱 | `gateway/src/.../client/JwksClient.java` | `docs/services/auth/flow.md` | security-rule.md |
+| Gateway JWT 서명 검증 + 헤더 주입 | `gateway/src/.../filter/JwtAuthenticationFilter.java` | `docs/services/auth/flow.md` | security-rule.md |
+| Gateway SecurityContext 등록 | `gateway/src/.../filter/JwtAuthenticationFilter.java` | `docs/decisions/ADR-002-jwt-design.md` | security-rule.md |
 
 ---
 
