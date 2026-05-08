@@ -12,6 +12,10 @@ import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -91,8 +95,16 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     .header(HEADER_USER_ROLE, role)
                     .build();
 
+            // SecurityContext 등록 — Spring Security(actuator 권한 체크 등)가 role을 인식하도록
+            Authentication auth = new UsernamePasswordAuthenticationToken(
+                    userId,
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+            );
+
             log.debug("JWT 검증 성공: userId={}, role={}, path={}", userId, role, path);
-            return chain.filter(exchange.mutate().request(mutated).build());
+            return chain.filter(exchange.mutate().request(mutated).build())
+                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
 
         } catch (Exception e) {
             log.warn("JWT 검증 실패: {}", e.getMessage());

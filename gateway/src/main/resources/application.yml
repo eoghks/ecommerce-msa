@@ -35,6 +35,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized  # LW-04: 운영 내부 정보 노출 방지
+      roles: ADMIN                   # ADMIN 역할 보유자만 상세 노출 (일반 USER 토큰 차단)
 
 auth:
   jwks-url: ${AUTH_SERVICE_URL:http://localhost:8081}/api/v1/auth/.well-known/jwks.json
