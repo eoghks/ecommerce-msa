@@ -36,6 +36,9 @@ management:
     health:
       show-details: always
 
+auth:
+  jwks-url: ${AUTH_SERVICE_URL:http://localhost:8081}/api/v1/auth/.well-known/jwks.json
+
 logging:
   level:
     com.ecommerce: INFO

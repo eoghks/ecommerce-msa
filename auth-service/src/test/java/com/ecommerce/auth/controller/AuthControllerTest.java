@@ -3,6 +3,7 @@ package com.ecommerce.auth.controller;
 import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.service.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +37,9 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private JwtProvider jwtProvider;
 
     @Test
     @DisplayName("회원가입 성공 - 201 반환")
