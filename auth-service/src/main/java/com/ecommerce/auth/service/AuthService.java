@@ -71,7 +71,7 @@ public class AuthService {
         refreshTokenRepository.save(newRefreshToken, userId, jwtProvider.getRefreshTokenTtl());
 
         String newAccessToken = jwtProvider.issueAccessToken(userId, user.getRole().name());
-        return new RefreshResponse(newAccessToken, jwtProvider.getAccessTokenExpiryMs());
+        return new RefreshResponse(newAccessToken, newRefreshToken, jwtProvider.getAccessTokenExpiryMs());
     }
 
     public void logout(String refreshToken) {
