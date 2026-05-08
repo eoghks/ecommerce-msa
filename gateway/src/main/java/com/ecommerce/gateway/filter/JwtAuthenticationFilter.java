@@ -25,15 +25,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String BEARER_PREFIX    = "Bearer ";
+    private static final String HEADER_USER_ID   = "X-User-Id";
+    private static final String HEADER_USER_ROLE = "X-User-Role";
 
+    // logout: refresh token이 인증 수단이므로 whitelist 유지 (설계상 의도)
     private static final List<String> WHITE_LIST = List.of(
             "/api/v1/auth/login",
             "/api/v1/auth/signup",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout",
             "/api/v1/auth/.well-known",
-            "/actuator"
+            "/actuator/"
     );
 
     private final JwksClient jwksClient;
@@ -61,25 +64,31 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String token = authHeader.substring(BEARER_PREFIX.length());
         try {
             SignedJWT jwt = SignedJWT.parse(token);
-            RSASSAVerifier verifier = new RSASSAVerifier(publicKey);
-
-            if (!jwt.verify(verifier)) {
+            if (!jwt.verify(new RSASSAVerifier(publicKey))) {
                 log.warn("JWT 서명 검증 실패: path={}", path);
                 return onUnauthorized(exchange);
             }
 
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            if (claims.getExpirationTime().before(new Date())) {
-                log.warn("JWT 만료: path={}", path);
+
+            // HR-02: exp 클레임 null 방어
+            Date expiry = claims.getExpirationTime();
+            if (expiry == null || expiry.before(new Date())) {
+                log.warn("JWT 만료 또는 exp 클레임 없음: path={}", path);
                 return onUnauthorized(exchange);
             }
 
             String userId = claims.getSubject();
             String role   = claims.getStringClaim("role");
 
+            // HR-04: 클라이언트 위조 헤더 제거 후 재설정
             ServerHttpRequest mutated = exchange.getRequest().mutate()
-                    .header("X-User-Id",   userId)
-                    .header("X-User-Role", role)
+                    .headers(h -> {
+                        h.remove(HEADER_USER_ID);
+                        h.remove(HEADER_USER_ROLE);
+                    })
+                    .header(HEADER_USER_ID,   userId)
+                    .header(HEADER_USER_ROLE, role)
                     .build();
 
             log.debug("JWT 검증 성공: userId={}, role={}, path={}", userId, role, path);

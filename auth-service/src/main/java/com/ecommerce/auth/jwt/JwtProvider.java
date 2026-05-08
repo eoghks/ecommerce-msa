@@ -68,7 +68,9 @@ public class JwtProvider {
             if (!jwt.verify(verifier)) {
                 throw new IllegalArgumentException("JWT 서명이 유효하지 않습니다.");
             }
-            if (jwt.getJWTClaimsSet().getExpirationTime().before(new Date())) {
+            // HR-02: exp 클레임 null 방어
+            Date expiry = jwt.getJWTClaimsSet().getExpirationTime();
+            if (expiry == null || expiry.before(new Date())) {
                 throw new IllegalArgumentException("만료된 토큰입니다.");
             }
             return jwt.getJWTClaimsSet();
@@ -90,7 +92,8 @@ public class JwtProvider {
         }
     }
 
-    // 하위 호환 유지
+    // MD-05: 내부 코드베이스 미사용 — 향후 제거 예정
+    @Deprecated(since = "Week2", forRemoval = true)
     public String issue(Long userId, String role) {
         return issueAccessToken(userId, role);
     }

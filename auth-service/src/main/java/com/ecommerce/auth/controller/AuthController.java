@@ -6,12 +6,7 @@ import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
-import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.service.AuthService;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.jwk.KeyUse;
-import com.nimbusds.jose.jwk.RSAKey;
-import com.nimbusds.jose.jwk.JWKSet;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +25,6 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
-    private final JwtProvider jwtProvider;
 
     @PostMapping("/signup")
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
@@ -56,13 +50,9 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    // MD-01: JWK 조립 로직은 AuthService에 위임
     @GetMapping("/.well-known/jwks.json")
     public ResponseEntity<Map<String, Object>> jwks() {
-        RSAKey rsaKey = new RSAKey.Builder(jwtProvider.getPublicKey())
-                .keyID("auth-key")
-                .algorithm(JWSAlgorithm.RS256)
-                .keyUse(KeyUse.SIGNATURE)
-                .build();
-        return ResponseEntity.ok(new JWKSet(rsaKey).toJSONObject());
+        return ResponseEntity.ok(authService.getJwks());
     }
 }
