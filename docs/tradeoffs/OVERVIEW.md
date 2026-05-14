@@ -11,3 +11,4 @@
 | CR-02 | Refresh Token Rotation TOCTOU | auth-service | 동시 요청 시나리오 없는 로컬 환경 — Redis Lua 구현 시 테스트 복잡도 급증 | [CR-02-refresh-toctou.md](./CR-02-refresh-toctou.md) |
 | MD-03 | DB 자격증명 yml 기본값 노출 | auth-service | 로컬 전용 계정 — `.env` 추가 시 Docker Compose·Spring Boot 양쪽 설정 변경 필요 | [MD-03-db-credentials.md](./MD-03-db-credentials.md) |
 | LW-04 | Role 관리 API 미구현 | auth-service | ADMIN이 USER → ADMIN 승격하는 API 없음 — 관리자 대시보드 구현 시 자연스럽게 추가 예정 | [LW-04-role-management.md](./LW-04-role-management.md) |
+| MD-05 | 서비스 내부망 격리 미적용 | 전체 서비스 | docker-compose 서비스 컨테이너 미정의 — Week 6 컨테이너 추가 시 ports 미노출로 해결 예정 | [MD-05-internal-network-isolation.md](./MD-05-internal-network-isolation.md) |
