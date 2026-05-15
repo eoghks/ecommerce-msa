@@ -26,17 +26,54 @@ services:
       - ecommerce-net
 
   # ───────────────────────────────────────────────
-  # Redis — 캐시 + 세션 + Lock
+  # Redis — 서비스별 인스턴스 분리
+  # auth  : Refresh Token 세션 → volatile-lru (TTL 있는 키만 삭제)
+  # product: 상품 상세 캐시   → allkeys-lru (전체 키 LRU 삭제)
+  # order  : 분산락 + 캐시    → volatile-lru (락 키 보호)
   # ───────────────────────────────────────────────
-  redis:
+  redis-auth:
     image: redis:7.2-alpine
-    container_name: ecommerce-redis
+    container_name: ecommerce-redis-auth
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
+      - redis-auth-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecommerce-net
+
+  redis-product:
+    image: redis:7.2-alpine
+    container_name: ecommerce-redis-product
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-product-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecommerce-net
+
+  redis-order:
+    image: redis:7.2-alpine
+    container_name: ecommerce-redis-order
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-order-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -122,7 +159,9 @@ services:
 
 volumes:
   postgres-data:
-  redis-data:
+  redis-auth-data:
+  redis-product-data:
+  redis-order-data:
   zookeeper-data:
   zookeeper-log:
   kafka-data:

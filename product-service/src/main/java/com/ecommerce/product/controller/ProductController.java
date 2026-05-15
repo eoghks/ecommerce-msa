@@ -1,6 +1,7 @@
 package com.ecommerce.product.controller;
 
 import com.ecommerce.product.dto.request.CreateProductRequest;
+import com.ecommerce.product.dto.request.ProductSearchRequest;
 import com.ecommerce.product.dto.request.UpdateProductRequest;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
@@ -66,7 +67,9 @@ public class ProductController {
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return ResponseEntity.ok(productService.findProducts(categoryId, keyword, pageable));
+        return ResponseEntity.ok(productService.findProducts(
+                new ProductSearchRequest(categoryId, keyword, pageable)
+        ));
     }
 
     /** 상품 상세 조회 */

@@ -3,6 +3,7 @@ package com.ecommerce.product.service;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.dto.request.CreateProductRequest;
+import com.ecommerce.product.dto.request.ProductSearchRequest;
 import com.ecommerce.product.dto.request.UpdateProductRequest;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
@@ -13,7 +14,6 @@ import com.ecommerce.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,8 +74,8 @@ public class ProductService {
 
     /** 상품 목록 조회 (카테고리 + 키워드 필터) */
     @Transactional(readOnly = true)
-    public Page<ProductSummaryResponse> findProducts(Long categoryId, String keyword, Pageable pageable) {
-        return productRepository.findAllWithFilter(categoryId, keyword, pageable)
+    public Page<ProductSummaryResponse> findProducts(ProductSearchRequest request) {
+        return productRepository.findAllWithFilter(request.categoryId(), request.keyword(), request.pageable())
                 .map(ProductSummaryResponse::from);
     }
 
@@ -84,9 +84,10 @@ public class ProductService {
     public ProductResponse getProduct(Long id) {
         String cacheKey = CACHE_DETAIL_PREFIX + id;
 
-        // 캐시 조회
+        // 캐시 조회 — 히트 시 TTL 연장 (자주 조회되는 상품 캐시 유지)
         ProductResponse cached = (ProductResponse) redisTemplate.opsForValue().get(cacheKey);
         if (cached != null) {
+            redisTemplate.expire(cacheKey, CACHE_TTL);
             log.debug("상품 상세 캐시 히트. id={}", id);
             return cached;
         }
