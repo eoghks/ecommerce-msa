@@ -2,4 +2,6 @@
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // AuthorizationDeniedException 핸들링용 (Spring Security 6.x)
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
 }
