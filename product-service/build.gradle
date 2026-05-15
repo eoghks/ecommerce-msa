@@ -2,6 +2,14 @@ plugins {
     id 'org.springframework.boot'
 }
 
+test {
+    environment 'DOCKER_HOST', 'tcp://localhost:2375'
+    environment 'DOCKER_API_VERSION', '1.41'
+    jvmArgs '-DdockerHost=tcp://localhost:2375'
+    jvmArgs '-Dapi.version=1.41'
+    jvmArgs '-DDOCKER_API_VERSION=1.41'
+}
+
 apply from: rootProject.file('gradle/querydsl.gradle')
 
 dependencies {
@@ -22,6 +30,4 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
-    // @DataJpaTest H2 인메모리 DB
-    testImplementation 'com.h2database:h2'
 }

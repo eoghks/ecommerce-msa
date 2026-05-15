@@ -36,5 +36,10 @@ subprojects {
 
     test {
         useJUnitPlatform()
+        // Docker Desktop 29.x — v1.40 미만 API 400 반환, OS 환경변수로 설정해야 docker-java가 인식
+        environment 'DOCKER_HOST', 'tcp://localhost:2375'
+        environment 'DOCKER_API_VERSION', '1.41'
+        environment 'TESTCONTAINERS_RYUK_DISABLED', 'true'
+        jvmArgs '-DDOCKER_API_VERSION=1.41'
     }
 }
