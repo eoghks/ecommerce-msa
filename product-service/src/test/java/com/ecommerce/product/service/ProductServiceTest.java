@@ -11,6 +11,8 @@ import com.ecommerce.product.exception.CategoryNotFoundException;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,8 +47,9 @@ class ProductServiceTest {
 
     @Mock private ProductRepository productRepository;
     @Mock private CategoryRepository categoryRepository;
-    @Mock private RedisTemplate<String, Object> redisTemplate;
-    @Mock private ValueOperations<String, Object> valueOperations;
+    @Mock private RedisTemplate<String, String> redisTemplate;
+    @Mock private ValueOperations<String, String> valueOperations;
+    @Mock private ObjectMapper redisObjectMapper;
 
     @InjectMocks private ProductService productService;
 
@@ -159,10 +162,11 @@ class ProductServiceTest {
 
     @Test
     @DisplayName("상품 상세 조회 — 캐시 히트")
-    void getProduct_cacheHit() {
+    void getProduct_cacheHit() throws JsonProcessingException {
         ProductResponse cached = ProductResponse.from(product);
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
-        given(valueOperations.get("product:detail:1")).willReturn(cached);
+        given(valueOperations.get("product:detail:1")).willReturn("{\"id\":1}");
+        given(redisObjectMapper.readValue("{\"id\":1}", ProductResponse.class)).willReturn(cached);
 
         ProductResponse response = productService.getProduct(1L);
 
@@ -175,16 +179,17 @@ class ProductServiceTest {
 
     @Test
     @DisplayName("상품 상세 조회 — 캐시 미스 → DB 조회 후 캐시 저장")
-    void getProduct_cacheMiss() {
+    void getProduct_cacheMiss() throws JsonProcessingException {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get("product:detail:1")).willReturn(null);
         given(productRepository.findById(1L)).willReturn(Optional.of(product));
+        given(redisObjectMapper.writeValueAsString(any(ProductResponse.class))).willReturn("{\"id\":1}");
 
         ProductResponse response = productService.getProduct(1L);
 
         assertThat(response.name()).isEqualTo("테스트 상품");
         verify(productRepository).findById(1L);
-        verify(valueOperations).set(eq("product:detail:1"), any(ProductResponse.class), any(Duration.class));
+        verify(valueOperations).set(eq("product:detail:1"), eq("{\"id\":1}"), any(Duration.class));
     }
 
     @Test

@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductControllerE2ETest {
 
     @Autowired private TestRestTemplate restTemplate;
-    @Autowired private RedisTemplate<String, Object> redisTemplate;
+    @Autowired private RedisTemplate<String, String> redisTemplate;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Long categoryId;
@@ -149,7 +149,7 @@ class ProductControllerE2ETest {
         assertThat(response.getBody().name()).isEqualTo("E2E_갤럭시 S24");
 
         // 캐시 저장 확인
-        Object cached = redisTemplate.opsForValue().get("product:detail:" + productId);
+        String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNotNull();
     }
 
@@ -166,7 +166,7 @@ class ProductControllerE2ETest {
         assertThat(response.getBody().name()).isEqualTo("E2E_갤럭시 S24");
 
         // 캐시 여전히 존재 확인
-        Object cached = redisTemplate.opsForValue().get("product:detail:" + productId);
+        String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNotNull();
     }
 
@@ -237,7 +237,7 @@ class ProductControllerE2ETest {
         assertThat(response.getBody().price()).isEqualTo(1_500_000L);
 
         // 수정 후 캐시 무효화 확인
-        Object cached = redisTemplate.opsForValue().get("product:detail:" + productId);
+        String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNull();
     }
 

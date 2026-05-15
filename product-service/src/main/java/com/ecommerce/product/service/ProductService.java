@@ -11,6 +11,8 @@ import com.ecommerce.product.exception.CategoryNotFoundException;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,7 +32,8 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper redisObjectMapper;
 
     /** 상품 등록 (ADMIN) */
     @Transactional
@@ -85,18 +88,36 @@ public class ProductService {
         String cacheKey = CACHE_DETAIL_PREFIX + id;
 
         // 캐시 조회 — 히트 시 TTL 연장 (자주 조회되는 상품 캐시 유지)
-        ProductResponse cached = (ProductResponse) redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
+        String cachedJson = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedJson != null) {
             redisTemplate.expire(cacheKey, CACHE_TTL);
             log.debug("상품 상세 캐시 히트. id={}", id);
-            return cached;
+            return deserialize(cachedJson);
         }
 
         // DB 조회 후 캐시 저장
         ProductResponse response = ProductResponse.from(loadProduct(id));
-        redisTemplate.opsForValue().set(cacheKey, response, CACHE_TTL);
+        redisTemplate.opsForValue().set(cacheKey, serialize(response), CACHE_TTL);
         log.debug("상품 상세 캐시 저장. id={}", id);
         return response;
+    }
+
+    private String serialize(ProductResponse response) {
+        try {
+            return redisObjectMapper.writeValueAsString(response);
+        } catch (JsonProcessingException e) {
+            // DTO 직렬화 실패 — 프로그래밍 오류
+            throw new IllegalStateException("상품 캐시 직렬화 실패. id=" + response.id(), e);
+        }
+    }
+
+    private ProductResponse deserialize(String json) {
+        try {
+            return redisObjectMapper.readValue(json, ProductResponse.class);
+        } catch (JsonProcessingException e) {
+            // 캐시 데이터 손상 — 로그 후 캐시 미스로 처리하려면 null 반환도 가능
+            throw new IllegalStateException("상품 캐시 역직렬화 실패.", e);
+        }
     }
 
     // ── private helpers ──────────────────────────────────────────
