@@ -8,6 +8,9 @@ import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.exception.DuplicateEmailException;
+import com.ecommerce.auth.exception.InvalidCredentialsException;
+import com.ecommerce.auth.exception.InvalidTokenException;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.repository.RefreshTokenRepository;
 import com.ecommerce.auth.repository.UserRepository;
@@ -36,7 +39,7 @@ public class AuthService {
     @Transactional
     public SignupResponse signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new DuplicateEmailException(request.getEmail());
         }
         User user = User.builder()
                 .email(request.getEmail())
@@ -51,10 +54,10 @@ public class AuthService {
     @Transactional
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다."));
+                .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw new InvalidCredentialsException();
         }
 
         String accessToken  = jwtProvider.issueAccessToken(user.getId(), user.getRole().name());
@@ -68,10 +71,10 @@ public class AuthService {
     @Transactional
     public RefreshResponse refresh(RefreshRequest request) {
         Long userId = refreshTokenRepository.findUserIdByToken(request.getRefreshToken())
-                .orElseThrow(() -> new IllegalArgumentException("유효하지 않거나 만료된 Refresh Token입니다."));
+                .orElseThrow(() -> new InvalidTokenException("유효하지 않거나 만료된 Refresh Token입니다."));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new InvalidTokenException("토큰에 해당하는 사용자를 찾을 수 없습니다."));
 
         // Refresh Token Rotation
         refreshTokenRepository.delete(request.getRefreshToken());

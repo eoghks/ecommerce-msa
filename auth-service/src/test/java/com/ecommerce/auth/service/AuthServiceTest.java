@@ -4,6 +4,7 @@ import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.exception.DuplicateEmailException;
 import com.ecommerce.auth.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,7 @@ class AuthServiceTest {
         given(userRepository.existsByEmail("dup@example.com")).willReturn(true);
 
         assertThatThrownBy(() -> authService.signup(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("이미 사용 중인 이메일입니다.");
+                .isInstanceOf(DuplicateEmailException.class)
+                .hasMessage("이미 사용 중인 이메일입니다: dup@example.com");
     }
 }
