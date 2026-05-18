@@ -7,11 +7,26 @@
 > 목록 캐시는 조건 조합이 무한대라 캐시 히트율이 낮고 관리 복잡도만 높아 제외.
 > 메인 페이지 베스트/추천 상품 등 고정 목록 캐시는 추후 버전에서 추가 예정.
 
+### Redis 인스턴스 분리
+
+서비스별 Redis 인스턴스를 분리하여 장애 격리 및 eviction 정책을 독립적으로 적용.
+
+| 서비스 | 포트 | maxmemory | maxmemory-policy | 이유 |
+|--------|------|-----------|-----------------|------|
+| auth-service | 6379 | 128mb | `volatile-lru` | Refresh Token 보호 (TTL 있는 키만 삭제) |
+| product-service | 6380 | 256mb | `allkeys-lru` | 캐시 용도, 전체 키 LRU 삭제 적합 |
+| order-service | 6381 | 128mb | `volatile-lru` | 분산락 키 보호 |
+
+> `allkeys-lru` vs `volatile-lru`: auth/order는 세션·락 데이터가 날아가면 안 되므로 TTL 없는 키는 삭제하지 않는 `volatile-lru` 적용.
+
 ### 캐시 키 & TTL
 
 | 키 패턴 | 저장 값 | TTL | 무효화 트리거 |
 |---------|---------|-----|--------------|
-| `product:detail:{productId}` | 상품 상세 JSON | 10분 | 해당 상품 수정/삭제 |
+| `product:detail:{productId}` | 상품 상세 JSON | 10분 (조회 시 리셋) | 해당 상품 수정/삭제 |
+
+> 조회할 때마다 TTL을 10분 리셋하여 자주 조회되는 인기 상품은 캐시에서 유지.  
+> `allkeys-lru` 정책과 조합되어 인기 상품은 메모리 부족 시에도 삭제 후순위가 됨.
 
 ### 조회 흐름
 
@@ -19,7 +34,7 @@
 클라이언트 GET /api/v1/products/{id}
   └─▶ ProductService.getProduct()
         ├─▶ Redis GET product:detail:{id}
-        │     ├─ HIT  → JSON 반환
+        │     ├─ HIT  → TTL 10분 리셋 → JSON 반환
         │     └─ MISS → DB 조회 → Redis SET (TTL 10분) → 반환
 ```
 
@@ -34,8 +49,11 @@
 
 ### 직렬화
 
-- `RedisTemplate<String, Object>` + `GenericJackson2JsonRedisSerializer`
-- 역직렬화 시 타입 정보(`@class`) 포함하여 저장
+- `RedisTemplate<String, String>` + 전용 `ObjectMapper` 빈
+- 값은 `ObjectMapper.writeValueAsString(ProductResponse)` → 순수 JSON 문자열로 저장
+- 역직렬화는 `ObjectMapper.readValue(json, ProductResponse.class)` 명시적 타입 지정
+- `JavaTimeModule` 등록으로 `LocalDateTime` 직렬화 지원
+- `GenericJackson2JsonRedisSerializer` 미사용 이유: `@class` 타입 정보가 JSON에 삽입되어 패키지 이름 변경 시 역직렬화 실패, 보안 위험(`DefaultTyping`) 존재
 
 ---
 

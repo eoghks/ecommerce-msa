@@ -4,6 +4,7 @@ import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
+import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.repository.RefreshTokenRepository;
 import com.ecommerce.auth.repository.UserRepository;
@@ -75,7 +76,7 @@ class AuthServiceLoginTest {
         given(userRepository.findByEmail("none@example.com")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(req))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
     }
 
@@ -89,7 +90,7 @@ class AuthServiceLoginTest {
         given(passwordEncoder.matches("wrongpw", "hashed")).willReturn(false);
 
         assertThatThrownBy(() -> authService.login(req))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
     }
 }

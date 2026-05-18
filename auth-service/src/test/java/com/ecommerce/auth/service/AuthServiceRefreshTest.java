@@ -4,6 +4,7 @@ import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
+import com.ecommerce.auth.exception.InvalidTokenException;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.repository.RefreshTokenRepository;
 import com.ecommerce.auth.repository.UserRepository;
@@ -67,7 +68,7 @@ class AuthServiceRefreshTest {
         given(refreshTokenRepository.findUserIdByToken("invalid-token")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh(makeRefreshRequest("invalid-token")))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InvalidTokenException.class)
                 .hasMessage("유효하지 않거나 만료된 Refresh Token입니다.");
     }
 

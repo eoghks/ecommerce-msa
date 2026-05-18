@@ -20,6 +20,7 @@
 - **RBAC**: USER / ADMIN 두 가지 역할
 - **BCrypt**: 비밀번호 해싱 (Spring Security `PasswordEncoder`)
 - **Flyway**: DB 마이그레이션 (`V1__init_schema.sql`)
+- **커스텀 예외**: `DuplicateEmailException` → 409, `InvalidCredentialsException` → 401, `InvalidTokenException` → 401 (`AuthExceptionHandler` 처리)
 
 ## Redis 저장 구조
 

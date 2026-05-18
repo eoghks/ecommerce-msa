@@ -16,8 +16,8 @@ spring:
         format_sql: false
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_PRODUCT_HOST:localhost}
+      port: ${REDIS_PRODUCT_PORT:6380}
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
     consumer:

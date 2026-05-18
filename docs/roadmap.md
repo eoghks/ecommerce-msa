@@ -94,6 +94,32 @@
 
 ---
 
+---
+
+## Version 2 — Auth Service 기능 확장 (7주 이후)
+
+> 7주 완성 후 추가 개발 예정. auth-service 사용자 셀프 서비스 기능.
+
+| 기능 | 설명 | 비고 |
+|------|------|------|
+| 내 정보 조회 | `GET /api/v1/users/me` — X-User-Id 헤더로 본인 조회 | |
+| 비밀번호 변경 | `PATCH /api/v1/users/me/password` — 현재 비밀번호 확인 후 변경 | BCrypt 재암호화 |
+| 회원 정보 수정 | `PATCH /api/v1/users/me` — 이름 등 수정 | |
+| 회원 탈퇴 | `DELETE /api/v1/users/me` — 소프트 삭제 (`deleted_at`) | |
+| 내 주문 내역 | `GET /api/v1/users/me/orders` — Order Service 연동 | OpenFeign |
+
+### 구현 시 작업 목록
+
+- [ ] auth-service `RoleHeaderAuthenticationFilter` 추가 (product-service와 동일 패턴)
+- [ ] `SecurityConfig` 인증 필요 엔드포인트 설정
+- [ ] `UserController` — `/api/v1/users/me` 엔드포인트 추가
+- [ ] `UserService` — 비밀번호 변경 시 현재 비밀번호 검증 로직
+- [ ] `User` 엔티티 — `deleted_at` 필드 추가 (소프트 삭제)
+- [ ] Flyway V2 마이그레이션 — `deleted_at` 컬럼 추가
+- [ ] Gateway 라우팅 — `/api/v1/users/**` 추가
+
+---
+
 ## 기술 스택 확정
 | 항목 | 선택 |
 |------|------|
