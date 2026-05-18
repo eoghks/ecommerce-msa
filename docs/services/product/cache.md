@@ -49,8 +49,11 @@
 
 ### 직렬화
 
-- `RedisTemplate<String, Object>` + `GenericJackson2JsonRedisSerializer`
-- 역직렬화 시 타입 정보(`@class`) 포함하여 저장
+- `RedisTemplate<String, String>` + 전용 `ObjectMapper` 빈
+- 값은 `ObjectMapper.writeValueAsString(ProductResponse)` → 순수 JSON 문자열로 저장
+- 역직렬화는 `ObjectMapper.readValue(json, ProductResponse.class)` 명시적 타입 지정
+- `JavaTimeModule` 등록으로 `LocalDateTime` 직렬화 지원
+- `GenericJackson2JsonRedisSerializer` 미사용 이유: `@class` 타입 정보가 JSON에 삽입되어 패키지 이름 변경 시 역직렬화 실패, 보안 위험(`DefaultTyping`) 존재
 
 ---
 
