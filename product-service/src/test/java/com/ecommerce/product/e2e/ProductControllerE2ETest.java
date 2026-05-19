@@ -22,30 +22,48 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Product API E2E 테스트
- * — 실행 중인 docker-compose 서비스(PostgreSQL:5433, Redis:6379)에 직접 연결
- * — 사전 조건: docker-compose up 상태 필요
+ * — Testcontainers(PostgreSQL + Redis) static 초기화로 CI/로컬 모두 동작
+ * — static{} 블록에서 컨테이너를 먼저 기동 → @DynamicPropertySource 평가 시점에 포트 확정
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:postgresql://localhost:5433/product_db",
-        "spring.datasource.username=eoghks",
-        "spring.datasource.password=eoghks_local",
-        "spring.data.redis.host=localhost",
-        "spring.data.redis.port=6379",
         "spring.flyway.enabled=true",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration"
 })
 @DisplayName("Product API E2E 테스트")
 class ProductControllerE2ETest {
+
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    static final GenericContainer<?> redis = new GenericContainer<>("redis:7.2-alpine")
+            .withExposedPorts(6379);
+
+    // Spring 컨텍스트 로딩 전에 컨테이너 기동 — @DynamicPropertySource 평가 시 포트 사용 가능
+    static {
+        postgres.start();
+        redis.start();
+    }
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+    }
 
     @Autowired private TestRestTemplate restTemplate;
     @Autowired private RedisTemplate<String, String> redisTemplate;
@@ -59,8 +77,7 @@ class ProductControllerE2ETest {
         // Redis 잔류 캐시 정리
         redisTemplate.getConnectionFactory().getConnection().flushDb();
 
-        // 기존 테스트 데이터 정리 후 카테고리 삽입
-        jdbcTemplate.update("DELETE FROM product WHERE name LIKE 'E2E_%'");
+        // 카테고리 삽입
         jdbcTemplate.update("DELETE FROM category WHERE name = 'E2E_전자기기'");
         jdbcTemplate.update(
                 "INSERT INTO category (name, created_at, updated_at) VALUES (?, NOW(), NOW())",
@@ -148,7 +165,6 @@ class ProductControllerE2ETest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().name()).isEqualTo("E2E_갤럭시 S24");
 
-        // 캐시 저장 확인
         String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNotNull();
     }
@@ -165,7 +181,6 @@ class ProductControllerE2ETest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().name()).isEqualTo("E2E_갤럭시 S24");
 
-        // 캐시 여전히 존재 확인
         String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNotNull();
     }
@@ -236,7 +251,6 @@ class ProductControllerE2ETest {
         assertThat(response.getBody().name()).isEqualTo("E2E_갤럭시 S24 Ultra");
         assertThat(response.getBody().price()).isEqualTo(1_500_000L);
 
-        // 수정 후 캐시 무효화 확인
         String cached = redisTemplate.opsForValue().get("product:detail:" + productId);
         assertThat(cached).isNull();
     }
@@ -257,7 +271,6 @@ class ProductControllerE2ETest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        // 삭제 후 조회 시 404
         ResponseEntity<Void> getResponse = restTemplate.getForEntity(
                 "/api/v1/products/" + productId, Void.class);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
