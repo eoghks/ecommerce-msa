@@ -8,6 +8,7 @@ import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderCreatedEvent;
 import com.ecommerce.order.event.OrderEventPublisher;
 import com.ecommerce.order.event.OrderItemPayload;
+import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,5 +70,29 @@ public class OrderService {
                 savedOrder.getId(), userId, totalPrice);
 
         return OrderResponse.from(savedOrder);
+    }
+
+    /**
+     * 주문 확정 — stock.decreased 이벤트 수신 시 호출 (Saga 보상 완료).
+     * PENDING → CONFIRMED
+     */
+    @Transactional
+    public void confirmOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        order.confirm();
+        log.info("주문 확정 완료. orderId={}", orderId);
+    }
+
+    /**
+     * 주문 취소 — stock.decrease.failed 이벤트 수신 시 호출 (Saga 보상 트랜잭션).
+     * PENDING → CANCELLED
+     */
+    @Transactional
+    public void cancelOrder(Long orderId, String reason) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        order.cancel();
+        log.warn("주문 취소 처리. orderId={}, reason={}", orderId, reason);
     }
 }
