@@ -91,15 +91,17 @@ public class StockDecreaseService {
     }
 
     /**
-     * 실제 재고 차감 — 트랜잭션 내에서 수행.
-     * 재고 부족 시 IllegalStateException 발생 → 호출부에서 보상 처리.
+     * 실제 재고 차감 + 명시적 save.
+     * 자기 호출(self-invocation)로 @Transactional AOP 프록시 미적용 문제를 피하기 위해
+     * dirty check 대신 productRepository.save() 명시 호출.
+     * SimpleJpaRepository.save()는 자체 @Transactional을 가지므로 트랜잭션 내에서 merge/flush.
      */
-    @Transactional
     protected void doDecreaseStock(OrderCreatedPayload payload) {
         for (OrderCreatedPayload.Item item : payload.items()) {
             com.ecommerce.product.domain.Product product = productRepository.findById(item.productId())
                     .orElseThrow(() -> new ProductNotFoundException(item.productId()));
             product.decreaseStock(item.quantity());  // 재고 부족 시 IllegalStateException
+            productRepository.save(product);         // 명시적 저장 (detached entity merge)
         }
         log.info("재고 차감 완료. orderId={}", payload.orderId());
     }
