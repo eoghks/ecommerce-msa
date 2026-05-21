@@ -22,6 +22,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Product API E2E 테스트
  * — 실행 중인 docker-compose 서비스(PostgreSQL:5433, Redis:6379)에 직접 연결
  * — 사전 조건: docker-compose up 상태 필요
+ * — 실행 방법: ./gradlew :product-service:test -De2e=true
  */
+@EnabledIfSystemProperty(named = "e2e", matches = "true")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

@@ -64,13 +64,33 @@ public class Order {
         }
     }
 
-    // 주문 확정 — 재고 차감 완료 이벤트 수신 시 호출
+    /**
+     * 주문 확정 — 재고 차감 완료 이벤트 수신 시 호출.
+     * 멱등 처리: 이미 CONFIRMED 이면 skip (Kafka at-least-once 재전달 대응)
+     */
     public void confirm() {
+        if (this.status == OrderStatus.CONFIRMED) {
+            return;
+        }
+        if (this.status != OrderStatus.PENDING) {
+            throw new IllegalStateException(
+                    "확정할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
         this.status = OrderStatus.CONFIRMED;
     }
 
-    // 주문 취소 — 재고 부족 또는 사용자 요청 시 호출
+    /**
+     * 주문 취소 — 재고 부족 또는 사용자 요청 시 호출.
+     * 멱등 처리: 이미 CANCELLED 이면 skip
+     */
     public void cancel() {
+        if (this.status == OrderStatus.CANCELLED) {
+            return;
+        }
+        if (this.status == OrderStatus.CONFIRMED) {
+            throw new IllegalStateException(
+                    "이미 확정된 주문은 취소할 수 없습니다.");
+        }
         this.status = OrderStatus.CANCELLED;
     }
 

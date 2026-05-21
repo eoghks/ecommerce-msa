@@ -24,14 +24,26 @@ public class StockEventPublisher {
     /** 재고 차감 성공 — Order Service 주문 CONFIRMED 트리거 */
     public void publishStockDecreased(Long orderId) {
         StockDecreasedEvent event = new StockDecreasedEvent(orderId);
-        kafkaTemplate.send(stockDecreasedTopic, String.valueOf(orderId), event);
-        log.info("재고 차감 성공 이벤트 발행. orderId={}", orderId);
+        kafkaTemplate.send(stockDecreasedTopic, String.valueOf(orderId), event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("StockDecreasedEvent 발행 실패. orderId={}", orderId, ex);
+                    } else {
+                        log.info("재고 차감 성공 이벤트 발행. orderId={}", orderId);
+                    }
+                });
     }
 
     /** 재고 차감 실패 — Order Service 주문 CANCELLED 트리거 (보상 트랜잭션) */
     public void publishStockDecreaseFailed(Long orderId, String reason) {
         StockDecreaseFailedEvent event = new StockDecreaseFailedEvent(orderId, reason);
-        kafkaTemplate.send(stockDecreaseFailedTopic, String.valueOf(orderId), event);
-        log.warn("재고 차감 실패 이벤트 발행. orderId={}, reason={}", orderId, reason);
+        kafkaTemplate.send(stockDecreaseFailedTopic, String.valueOf(orderId), event)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("StockDecreaseFailedEvent 발행 실패. orderId={}", orderId, ex);
+                    } else {
+                        log.warn("재고 차감 실패 이벤트 발행. orderId={}, reason={}", orderId, reason);
+                    }
+                });
     }
 }

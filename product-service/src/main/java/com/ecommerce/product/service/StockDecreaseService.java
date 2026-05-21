@@ -2,29 +2,28 @@ package com.ecommerce.product.service;
 
 import com.ecommerce.product.event.OrderCreatedPayload;
 import com.ecommerce.product.event.StockEventPublisher;
-import com.ecommerce.product.exception.ProductNotFoundException;
-import com.ecommerce.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 재고 차감 서비스.
+ * 재고 차감 서비스 — Redis 분산 락 + 멱등성 체크 오케스트레이션.
  *
  * Redis Lock 전략:
  *   - 락 키: "stock:lock:order:{orderId}" — 동일 주문 이벤트 중복 처리 방지
- *   - 멱등성 키: "stock:processed:{orderId}" — at-least-once 재전달 시 중복 차감 방지
+ *   - 멱등성 키: "stock:processed:{orderId}" — 차감 성공 확정 후 설정 (H-02 수정)
  *
- * 면접 포인트:
- *   - 재고는 상품별 락이 이상적이나, 동일 orderId 중복 처리 방지가 핵심이므로 orderId 기준 락 사용
- *   - 상품별 동시 차감 경쟁은 DB 트랜잭션 + 낙관적 락 or 비관적 락으로 추가 대응 가능
+ * C-02 수정: doDecreaseStock() 을 StockDecreaseTransactionService(별도 Bean)로 분리
+ *   → Spring AOP 프록시를 통해 호출되어 @Transactional 정상 적용
+ *
+ * H-02 수정: 멱등성 키를 재고 차감 성공 후에 설정
+ *   → JVM 크래시 등 중간 실패 시 키 잔류로 인한 영구 skip 방지
  */
 @Slf4j
 @Service
@@ -37,19 +36,24 @@ public class StockDecreaseService {
     private static final long   LOCK_LEASE_SECONDS   = 10L;
     private static final Duration PROCESSED_TTL      = Duration.ofDays(1);
 
-    private final ProductRepository    productRepository;
-    private final RedisTemplate<String, String> redisTemplate;
-    private final RedissonClient       redissonClient;
-    private final StockEventPublisher  stockEventPublisher;
+    private final RedisTemplate<String, String>       redisTemplate;
+    private final RedissonClient                      redissonClient;
+    private final StockEventPublisher                 stockEventPublisher;
+    private final StockDecreaseTransactionService     stockDecreaseTransactionService;
 
     /**
-     * Redis 분산 락 + 멱등성 체크 후 재고 차감.
-     * 성공 시 stock.decreased, 실패 시 stock.decrease.failed 발행.
+     * Redis 분산 락 → 재고 차감 → 멱등성 키 설정 → 결과 이벤트 발행.
      */
     public void decreaseStock(OrderCreatedPayload payload) {
-        Long orderId  = payload.orderId();
+        Long   orderId      = payload.orderId();
         String lockKey      = LOCK_KEY_PREFIX + orderId;
         String processedKey = PROCESSED_KEY_PREFIX + orderId;
+
+        // 이미 처리된 주문이면 skip (락 없이 빠른 체크)
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(processedKey))) {
+            log.info("이미 처리된 주문 이벤트 — skip. orderId={}", orderId);
+            return;
+        }
 
         RLock lock = redissonClient.getLock(lockKey);
         try {
@@ -58,26 +62,25 @@ public class StockDecreaseService {
                 throw new IllegalStateException("재고 락 획득 실패. orderId=" + orderId);
             }
 
-            // 멱등성 체크 — 이미 처리된 주문이면 skip
-            Boolean isNew = redisTemplate.opsForValue()
-                    .setIfAbsent(processedKey, "1", PROCESSED_TTL);
-            if (Boolean.FALSE.equals(isNew)) {
-                log.info("이미 처리된 주문 이벤트 — skip. orderId={}", orderId);
+            // 락 내부에서 이중 체크 — 경쟁 조건 방지
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(processedKey))) {
+                log.info("이미 처리된 주문 이벤트 (락 내부 체크) — skip. orderId={}", orderId);
                 return;
             }
 
-            // 실제 재고 차감
-            doDecreaseStock(payload);
+            // 재고 차감 (별도 Bean 호출 → @Transactional 정상 적용)
+            stockDecreaseTransactionService.decreaseStock(payload);
+
+            // 차감 성공 후 멱등성 키 설정 (H-02: 성공 확정 후 설정)
+            redisTemplate.opsForValue().set(processedKey, "1", PROCESSED_TTL);
 
         } catch (IllegalStateException ex) {
             // 재고 부족 or 락 실패 — 보상 이벤트 발행
-            redisTemplate.delete(processedKey);  // 처리 실패 시 멱등성 키 제거 (재시도 허용)
             stockEventPublisher.publishStockDecreaseFailed(orderId, ex.getMessage());
             return;
 
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            redisTemplate.delete(processedKey);
             stockEventPublisher.publishStockDecreaseFailed(orderId, "락 대기 중 인터럽트 발생");
             return;
 
@@ -88,21 +91,5 @@ public class StockDecreaseService {
         }
 
         stockEventPublisher.publishStockDecreased(orderId);
-    }
-
-    /**
-     * 실제 재고 차감 + 명시적 save.
-     * 자기 호출(self-invocation)로 @Transactional AOP 프록시 미적용 문제를 피하기 위해
-     * dirty check 대신 productRepository.save() 명시 호출.
-     * SimpleJpaRepository.save()는 자체 @Transactional을 가지므로 트랜잭션 내에서 merge/flush.
-     */
-    protected void doDecreaseStock(OrderCreatedPayload payload) {
-        for (OrderCreatedPayload.Item item : payload.items()) {
-            com.ecommerce.product.domain.Product product = productRepository.findById(item.productId())
-                    .orElseThrow(() -> new ProductNotFoundException(item.productId()));
-            product.decreaseStock(item.quantity());  // 재고 부족 시 IllegalStateException
-            productRepository.save(product);         // 명시적 저장 (detached entity merge)
-        }
-        log.info("재고 차감 완료. orderId={}", payload.orderId());
     }
 }

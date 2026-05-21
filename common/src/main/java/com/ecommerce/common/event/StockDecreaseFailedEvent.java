@@ -1,5 +1,7 @@
 package com.ecommerce.common.event;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 /**
@@ -18,10 +20,13 @@ public class StockDecreaseFailedEvent extends BaseEvent {
         this.reason  = reason;
     }
 
-    /** Jackson 역직렬화용 기본 생성자 */
-    protected StockDecreaseFailedEvent() {
+    /** Jackson 역직렬화용 — @JsonCreator로 null orderId 방지 */
+    @JsonCreator
+    protected StockDecreaseFailedEvent(@JsonProperty("orderId") Long orderId,
+                                       @JsonProperty("reason") String reason,
+                                       @JsonProperty("eventType") String ignored) {
         super("STOCK_DECREASE_FAILED");
-        this.orderId = null;
-        this.reason  = null;
+        this.orderId = orderId;
+        this.reason  = reason;
     }
 }
