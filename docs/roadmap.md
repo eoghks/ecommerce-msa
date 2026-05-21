@@ -55,7 +55,7 @@
 
 ---
 
-## Week 4 — Order Service + Saga (Kafka)
+## Week 4 — Order Service + Saga (Kafka) ✅
 > 브랜치: `feature/order-service`
 
 | Day | 작업 |

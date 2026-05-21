@@ -7,3 +7,4 @@
 | 날짜 | 테스트 종류 | 대상 서비스 | 결과 | 문서 |
 |------|-----------|------------|------|------|
 | 2026-05-08 | 단위 테스트 + API E2E 테스트 | auth-service · gateway | ⚠️ 12건 중 1건 수정 후 통과 | [2026-05-08-week2-api.md](./2026-05-08-week2-api.md) |
+| 2026-05-21 | 단위 테스트 + 통합 테스트 (Saga E2E) | order-service · product-service | ✅ 52건 통과 / 실패 0건 (E2E 10건 skip) | [2026-05-21-week4-order-saga.md](./2026-05-21-week4-order-saga.md) |

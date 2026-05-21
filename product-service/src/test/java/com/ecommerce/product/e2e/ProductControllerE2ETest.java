@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Product API E2E 테스트
  * — Testcontainers(PostgreSQL + Redis) static 초기화로 CI/로컬 모두 동작
- * — static{} 블록에서 컨테이너를 먼저 기동 → @DynamicPropertySource 평가 시점에 포트 확정
+ * — Kafka: dummy bootstrap-servers + auto-startup=false 로 Bean만 생성, 실제 연결 없음
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -41,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestPropertySource(properties = {
         "spring.flyway.enabled=true",
-        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration"
+        "spring.kafka.bootstrap-servers=localhost:19999",
+        "spring.kafka.listener.auto-startup=false"
 })
 @DisplayName("Product API E2E 테스트")
 class ProductControllerE2ETest {

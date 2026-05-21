@@ -7,7 +7,7 @@ import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
-import com.ecommerce.order.event.OrderEventPublisher;
+import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -37,36 +38,32 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    @Mock private OrderRepository   orderRepository;
-    @Mock private ProductClient     productClient;
-    @Mock private OrderEventPublisher eventPublisher;
+    @Mock private OrderRepository          orderRepository;
+    @Mock private ProductClient            productClient;
+    @Mock private ApplicationEventPublisher applicationEventPublisher;
 
     // ── 주문 생성 ──────────────────────────────────────────────────
 
     @Test
-    @DisplayName("주문 생성 — 상품 정보 조회 후 저장 및 이벤트 발행")
+    @DisplayName("주문 생성 — 상품 정보 조회 후 저장 및 ApplicationEvent 발행")
     void createOrder_success() {
-        // given
         Long userId = 1L;
         OrderCreateRequest request = new OrderCreateRequest(
                 List.of(new OrderItemRequest(10L, 2))
         );
-
         ProductClient.ProductInfo productInfo =
                 new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10);
-
         Order savedOrder = buildOrder(userId, 10L, "갤럭시 S24", 1_200_000L, 2);
 
         given(productClient.getProduct(10L)).willReturn(productInfo);
         given(orderRepository.save(any(Order.class))).willReturn(savedOrder);
 
-        // when
         OrderResponse response = orderService.createOrder(userId, request);
 
-        // then
         assertThat(response).isNotNull();
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
-        then(eventPublisher).should(times(1)).publishOrderCreated(any());
+        then(applicationEventPublisher).should(times(1))
+                .publishEvent(any(OrderCreatedApplicationEvent.class));
     }
 
     // ── 주문 확정 ──────────────────────────────────────────────────
@@ -74,14 +71,23 @@ class OrderServiceTest {
     @Test
     @DisplayName("confirmOrder — PENDING → CONFIRMED")
     void confirmOrder_success() {
-        // given
         Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
-        // when
         orderService.confirmOrder(1L);
 
-        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("confirmOrder — 이미 CONFIRMED 면 멱등 처리 (skip)")
+    void confirmOrder_idempotent() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        order.confirm();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        // 두 번 호출해도 예외 없음
+        orderService.confirmOrder(1L);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
     }
 
@@ -104,6 +110,17 @@ class OrderServiceTest {
 
         orderService.cancelOrder(1L, "재고 부족");
 
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("cancelOrder — 이미 CANCELLED 면 멱등 처리 (skip)")
+    void cancelOrder_idempotent() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        order.cancel();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrder(1L, "재고 부족");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
     }
 

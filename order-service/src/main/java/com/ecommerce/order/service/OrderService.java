@@ -5,13 +5,14 @@ import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
+import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.event.OrderCreatedEvent;
-import com.ecommerce.order.event.OrderEventPublisher;
 import com.ecommerce.order.event.OrderItemPayload;
 import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -24,20 +25,54 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final ProductClient productClient;
-    private final OrderEventPublisher eventPublisher;
+    private final OrderRepository        orderRepository;
+    private final ProductClient          productClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
      * 주문 생성.
-     * 1. 각 상품 정보 조회 (가격·상품명 스냅샷)
+     * 1. 상품 정보 조회 — @Transactional 외부에서 HTTP 호출 (DB 커넥션 점유 최소화)
      * 2. Order + OrderItem 저장 (status=PENDING)
-     * 3. OrderCreatedEvent 발행 → Product Service 재고 차감 트리거
+     * 3. ApplicationEvent 등록 → AFTER_COMMIT 시 Kafka 발행 (C-01 수정)
+     */
+    public OrderResponse createOrder(Long userId, OrderCreateRequest request) {
+        // @Transactional 외부에서 상품 조회 — 외부 HTTP 호출 중 DB 커넥션 점유 방지 (M-04)
+        List<OrderItem> items = fetchOrderItems(request);
+        long totalPrice = items.stream().mapToLong(OrderItem::subtotal).sum();
+
+        return saveOrderAndPublishEvent(userId, totalPrice, items);
+    }
+
+    /**
+     * 주문 저장 + ApplicationEvent 등록.
+     * @Transactional 범위를 DB 작업으로만 한정.
      */
     @Transactional
-    public OrderResponse createOrder(Long userId, OrderCreateRequest request) {
-        // 상품 정보 조회 및 OrderItem 생성
-        List<OrderItem> items = request.items().stream()
+    protected OrderResponse saveOrderAndPublishEvent(Long userId, long totalPrice,
+                                                     List<OrderItem> items) {
+        Order order = Order.builder()
+                .userId(userId)
+                .totalPrice(totalPrice)
+                .items(items)
+                .build();
+        Order savedOrder = orderRepository.save(order);
+
+        // ApplicationEvent 등록 — AFTER_COMMIT 시 OrderKafkaEventRelay가 Kafka 발행
+        List<OrderItemPayload> payloads = savedOrder.getItems().stream()
+                .map(item -> new OrderItemPayload(item.getProductId(), item.getQuantity()))
+                .toList();
+        applicationEventPublisher.publishEvent(
+                new OrderCreatedApplicationEvent(
+                        new OrderCreatedEvent(savedOrder.getId(), userId, payloads)));
+
+        log.info("주문 생성 완료. orderId={}, userId={}, totalPrice={}",
+                savedOrder.getId(), userId, totalPrice);
+        return OrderResponse.from(savedOrder);
+    }
+
+    /** 상품 정보 조회 및 OrderItem 생성 — 트랜잭션 외부 실행 */
+    private List<OrderItem> fetchOrderItems(OrderCreateRequest request) {
+        return request.items().stream()
                 .map(itemRequest -> {
                     ProductClient.ProductInfo product =
                             productClient.getProduct(itemRequest.productId());
@@ -49,34 +84,11 @@ public class OrderService {
                             .build();
                 })
                 .toList();
-
-        long totalPrice = items.stream().mapToLong(OrderItem::subtotal).sum();
-
-        Order order = Order.builder()
-                .userId(userId)
-                .totalPrice(totalPrice)
-                .items(items)
-                .build();
-
-        Order savedOrder = orderRepository.save(order);
-
-        // Kafka 이벤트 발행 — Product Service 재고 차감 트리거
-        List<OrderItemPayload> payloads = savedOrder.getItems().stream()
-                .map(item -> new OrderItemPayload(item.getProductId(), item.getQuantity()))
-                .toList();
-
-        eventPublisher.publishOrderCreated(
-                new OrderCreatedEvent(savedOrder.getId(), userId, payloads));
-
-        log.info("주문 생성 완료. orderId={}, userId={}, totalPrice={}",
-                savedOrder.getId(), userId, totalPrice);
-
-        return OrderResponse.from(savedOrder);
     }
 
     /**
-     * 주문 확정 — stock.decreased 이벤트 수신 시 호출 (Saga 보상 완료).
-     * PENDING → CONFIRMED
+     * 주문 확정 — stock.decreased 이벤트 수신 시 호출 (Saga).
+     * 멱등 처리: 이미 CONFIRMED 이면 skip (at-least-once 재전달 대응)
      */
     @Transactional
     public void confirmOrder(Long orderId) {
@@ -88,7 +100,7 @@ public class OrderService {
 
     /**
      * 주문 취소 — stock.decrease.failed 이벤트 수신 시 호출 (Saga 보상 트랜잭션).
-     * PENDING → CANCELLED
+     * 멱등 처리: 이미 CANCELLED 이면 skip
      */
     @Transactional
     public void cancelOrder(Long orderId, String reason) {
