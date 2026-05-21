@@ -3,5 +3,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     // AuthorizationDeniedException 핸들링용 (Spring Security 6.x)
+    // compileOnly는 테스트 런타임 클래스패스 미포함 → testImplementation 병행 선언
     compileOnly 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security'
 }
