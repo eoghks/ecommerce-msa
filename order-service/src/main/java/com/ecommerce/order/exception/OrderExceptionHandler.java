@@ -27,4 +27,13 @@ public class OrderExceptionHandler {
         pd.setType(URI.create(ERROR_TYPE_BASE + "/product-not-found"));
         return pd;
     }
+
+    /** 취소 불가 상태 주문 취소 시도 → 409 Conflict */
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Order State Conflict");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/order-state-conflict"));
+        return pd;
+    }
 }

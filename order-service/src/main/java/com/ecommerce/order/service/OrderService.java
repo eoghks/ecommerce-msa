@@ -12,6 +12,8 @@ import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,5 +96,42 @@ public class OrderService {
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         order.cancel();
         log.warn("주문 취소 처리. orderId={}, reason={}", orderId, reason);
+    }
+
+    /** 내 주문 목록 조회 (페이징) */
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getMyOrders(Long userId, Pageable pageable) {
+        return orderRepository.findByUserId(userId, pageable)
+                .map(OrderResponse::from);
+    }
+
+    /** 주문 상세 조회 — 본인 주문만 허용 */
+    @Transactional(readOnly = true)
+    public OrderResponse getOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderNotFoundException(orderId);  // 타인 주문은 404 처리 (정보 노출 방지)
+        }
+        return OrderResponse.from(order);
+    }
+
+    /**
+     * 사용자 주문 취소 요청 — PENDING 상태만 취소 가능.
+     * CONFIRMED / CANCELLED 상태에서 시도 시 409 Conflict.
+     */
+    @Transactional
+    public void cancelByUser(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderNotFoundException(orderId);
+        }
+        if (!order.isCancellable()) {
+            throw new IllegalStateException(
+                    "취소할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
+        }
+        order.cancel();
+        log.info("사용자 주문 취소. orderId={}, userId={}", orderId, userId);
     }
 }
