@@ -2,18 +2,32 @@ plugins {
     id 'org.springframework.boot'
 }
 
+test {
+    environment 'DOCKER_HOST', 'tcp://localhost:2375'
+    environment 'DOCKER_API_VERSION', '1.41'
+    jvmArgs '-DdockerHost=tcp://localhost:2375'
+    jvmArgs '-Dapi.version=1.41'
+    jvmArgs '-DDOCKER_API_VERSION=1.41'
+}
+
 apply from: rootProject.file('gradle/querydsl.gradle')
 
 dependencies {
     implementation project(':common')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.kafka:spring-kafka'
 
     runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
 
     testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
 }

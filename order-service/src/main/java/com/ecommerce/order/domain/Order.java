@@ -1,0 +1,85 @@
+package com.ecommerce.order.domain;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "orders")   // order는 SQL 예약어
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@EntityListeners(AuditingEntityListener.class)
+public class Order {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // auth-service users.id 참조 — 서비스 간 DB 분리로 FK 제약 없이 저장
+    @Column(nullable = false)
+    private Long userId;
+
+    // OrderStatusConverter autoApply=true 로 자동 변환
+    @Column(nullable = false, length = 20)
+    private OrderStatus status;
+
+    @Column(nullable = false)
+    private Long totalPrice;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
+
+    @CreatedDate
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Builder
+    private Order(Long userId, Long totalPrice, List<OrderItem> items) {
+        this.userId     = userId;
+        this.totalPrice = totalPrice;
+        this.status     = OrderStatus.PENDING;
+        if (items != null) {
+            items.forEach(this::addItem);
+        }
+    }
+
+    // 주문 확정 — 재고 차감 완료 이벤트 수신 시 호출
+    public void confirm() {
+        this.status = OrderStatus.CONFIRMED;
+    }
+
+    // 주문 취소 — 재고 부족 또는 사용자 요청 시 호출
+    public void cancel() {
+        this.status = OrderStatus.CANCELLED;
+    }
+
+    public boolean isCancellable() {
+        return this.status == OrderStatus.PENDING;
+    }
+
+    private void addItem(OrderItem item) {
+        items.add(item);
+        item.assignOrder(this);
+    }
+}

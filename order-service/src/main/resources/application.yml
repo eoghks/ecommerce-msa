@@ -2,17 +2,21 @@ spring:
   application:
     name: order-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/order_db}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/order_db}
     username: ${DB_USERNAME:eoghks}
     password: ${DB_PASSWORD:eoghks_local}
     driver-class-name: org.postgresql.Driver
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   data:
     redis:
       host: ${REDIS_ORDER_HOST:localhost}
