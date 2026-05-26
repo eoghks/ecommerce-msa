@@ -58,4 +58,8 @@ public class User {
         this.name     = name;
         this.role     = role;
     }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

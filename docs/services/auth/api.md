@@ -1,7 +1,8 @@
 # Auth Service API
 
 Base URL: `/api/v1/auth`  
-인증 불필요 경로 (Gateway 화이트리스트): `/login`, `/signup`, `/refresh`, `/logout`
+Gateway 화이트리스트 (JWT 불필요): `/login`, `/signup`, `/refresh`, `/check-email`, `/.well-known/jwks.json`  
+JWT 필요: `/logout`, `/me`, `/change-password`
 
 ---
 
@@ -13,10 +14,12 @@ Base URL: `/api/v1/auth`
 ```json
 {
   "email": "user@example.com",
-  "password": "password123!",
+  "password": "Admin1234!",
   "name": "홍길동"
 }
 ```
+
+> 비밀번호 규칙: 8자 이상, 대문자·소문자·숫자·특수문자 각 1자 이상 포함
 
 **Response** `201 Created`
 ```json
@@ -102,16 +105,73 @@ Base URL: `/api/v1/auth`
 
 ### `POST /api/v1/auth/logout`
 
+> **JWT 필요** — `Authorization: Bearer <accessToken>` 헤더 전송  
+> Gateway가 X-User-Id 주입 → 해당 유저의 모든 Refresh Token Redis에서 삭제
+
+**Request Body** 없음
+
+**Response** `204 No Content`
+
+**Error**
+| 상태코드 | 사유 |
+|---------|------|
+| 401 | Access Token 없음 / 만료 |
+
+---
+
+## 내 정보 조회
+
+### `GET /api/v1/auth/me`
+
+> **JWT 필요** — Gateway가 X-User-Id 헤더 주입
+
+**Response** `200 OK`
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "name": "홍길동",
+  "role": "USER",
+  "createdAt": "2026-05-26T10:00:00"
+}
+```
+
+---
+
+## 비밀번호 변경
+
+### `POST /api/v1/auth/change-password`
+
+> **JWT 필요**  
+> 변경 성공 시 해당 유저의 모든 Refresh Token Redis에서 삭제 (자동 로그아웃 처리)
+
 **Request**
 ```json
 {
-  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
+  "email": "user@example.com",
+  "currentPassword": "Admin1234!",
+  "newPassword": "NewPass5678@"
 }
 ```
 
 **Response** `204 No Content`
 
-> Redis에서 Refresh Token 삭제
+**Error**
+| 상태코드 | 사유 |
+|---------|------|
+| 400 | 새 비밀번호 규칙 미충족 |
+| 401 | 현재 비밀번호 불일치 |
+
+---
+
+## 이메일 중복 확인
+
+### `GET /api/v1/auth/check-email?email={email}`
+
+**Response** `200 OK`
+```json
+{ "available": true }
+```
 
 ---
 

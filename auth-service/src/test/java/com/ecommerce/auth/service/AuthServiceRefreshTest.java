@@ -73,9 +73,9 @@ class AuthServiceRefreshTest {
     }
 
     @Test
-    @DisplayName("로그아웃 시 Refresh Token 삭제")
-    void logout_deletesRefreshToken() {
-        authService.logout("some-refresh-token");
-        then(refreshTokenRepository).should().delete("some-refresh-token");
+    @DisplayName("로그아웃 시 해당 유저의 모든 Refresh Token 삭제")
+    void logout_deletesAllRefreshTokensByUserId() {
+        authService.logout(1L);
+        then(refreshTokenRepository).should().deleteAllByUserId(1L);
     }
 }

@@ -33,12 +33,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final String HEADER_USER_ID   = "X-User-Id";
     private static final String HEADER_USER_ROLE = "X-User-Role";
 
-    // logout: refresh token이 인증 수단이므로 whitelist 유지 (설계상 의도)
+    // logout은 JWT 검증 후 X-User-Id로 Redis 토큰 전체 삭제 — whitelist 제외
     private static final List<String> WHITE_LIST = List.of(
             "/api/v1/auth/login",
             "/api/v1/auth/signup",
             "/api/v1/auth/refresh",
-            "/api/v1/auth/logout",
+            "/api/v1/auth/check-email",
             "/api/v1/auth/.well-known",
             "/actuator/"
     );

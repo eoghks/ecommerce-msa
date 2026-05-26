@@ -56,7 +56,7 @@ class AuthControllerTest {
 
         Map<String, String> body = Map.of(
                 "email", "test@example.com",
-                "password", "password123",
+                "password", "Password123!",
                 "name", "테스터"
         );
 
@@ -74,7 +74,7 @@ class AuthControllerTest {
     @WithMockUser
     void signup_missingEmail_returns400() throws Exception {
         Map<String, String> body = Map.of(
-                "password", "password123",
+                "password", "Password123!",
                 "name", "테스터"
         );
 
@@ -94,7 +94,7 @@ class AuthControllerTest {
 
         Map<String, String> body = Map.of(
                 "email", "dup@example.com",
-                "password", "password123",
+                "password", "Password123!",
                 "name", "중복"
         );
 

@@ -11,14 +11,17 @@
 |--------|-----|------|------|-------------|
 | POST | `/api/v1/auth/signup` | 회원가입 | 불필요 | `201 Created` |
 | POST | `/api/v1/auth/login` | 로그인 (JWT 발급) | 불필요 | `200 OK` |
-| POST | `/api/v1/auth/logout` | 로그아웃 (Refresh Token 무효화) | 불필요 | `204 No Content` |
 | POST | `/api/v1/auth/refresh` | Access Token 재발급 | 불필요 | `200 OK` |
+| GET | `/api/v1/auth/check-email` | 이메일 중복 확인 | 불필요 | `200 OK` |
+| POST | `/api/v1/auth/logout` | 로그아웃 (Redis 전체 삭제) | JWT 필요 | `204 No Content` |
+| GET | `/api/v1/auth/me` | 내 정보 조회 | JWT 필요 | `200 OK` |
+| POST | `/api/v1/auth/change-password` | 비밀번호 변경 | JWT 필요 | `204 No Content` |
 
 ### 주요 에러
 | Status | 상황 |
 |--------|------|
-| `400` | 입력값 검증 실패 (이메일 형식, 비밀번호 길이) |
-| `401` | 로그인 실패 / 토큰 만료 |
+| `400` | 입력값 검증 실패 (이메일 형식, 비밀번호 규칙 — 8자+대소문자+숫자+특수문자) |
+| `401` | 로그인 실패 / 토큰 만료 / 현재 비밀번호 불일치 |
 | `409` | 이메일 중복 |
 
 ---
