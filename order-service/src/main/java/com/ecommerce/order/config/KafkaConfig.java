@@ -1,0 +1,34 @@
+package com.ecommerce.order.config;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
+
+/**
+ * Kafka 에러 처리 설정.
+ * - 재시도: 3회 (1초 간격)
+ * - 최종 실패: Dead Letter Topic (.DLT 접미사) 으로 이동
+ */
+@Slf4j
+@EnableKafka
+@Configuration
+public class KafkaConfig {
+
+    @Bean
+    public DefaultErrorHandler errorHandler(KafkaTemplate<String, Object> kafkaTemplate) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
+                (record, ex) -> {
+                    log.error("Kafka 메시지 처리 최종 실패 → DLT 전송. topic={}, key={}, error={}",
+                            record.topic(), record.key(), ex.getMessage());
+                    return new org.apache.kafka.common.TopicPartition(
+                            record.topic() + ".DLT", record.partition());
+                });
+
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2L));
+    }
+}
