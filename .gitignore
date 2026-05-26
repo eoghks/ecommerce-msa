@@ -32,3 +32,6 @@ docker/volumes/
 # Secrets
 application-secret.yml
 application-prod.yml
+
+# Claude Code IDE 설정
+.claude/
