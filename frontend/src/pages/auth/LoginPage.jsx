@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { login } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
 
@@ -28,10 +28,12 @@ const IconShop = () => (
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const loginStore = useAuthStore((s) => s.login);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [info, setInfo] = useState(location.state?.message || '');
   const [loading, setLoading] = useState(false);
 
   // body 배경을 페이지 배경색으로 통일 — 스크롤 시 흰 배경 노출 방지
@@ -58,8 +60,8 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const res = await login(form.email, form.password);
-      const { accessToken, user } = res.data;
-      loginStore(accessToken, user);
+      const { accessToken } = res.data;
+      loginStore(accessToken);
       navigate('/products');
     } catch (err) {
       const msg = err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.';
@@ -143,6 +145,14 @@ const LoginPage = () => {
             </div>
           </div>
 
+          {/* 안내 메시지 (비밀번호 변경 후 리다이렉트 등) */}
+          {info && (
+            <div style={styles.infoBox}>
+              <span style={styles.errorDot}>●</span>
+              {info}
+            </div>
+          )}
+
           {/* 에러 메시지 */}
           {error && (
             <div style={styles.errorBox}>
@@ -197,6 +207,7 @@ const styles = {
     justifyContent: 'center',
     padding: '24px 16px',
     position: 'relative',
+    overflow: 'hidden', /* 배경 장식 원이 영역 밖으로 삐져나와 스크롤 유발하는 것 차단 */
   },
   bgCircle1: {
     position: 'absolute',
@@ -221,10 +232,10 @@ const styles = {
   card: {
     position: 'relative',
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 480,
     background: '#ffffff',
     borderRadius: 20,
-    padding: '40px 36px',
+    padding: '36px 40px',
     boxShadow: '0 4px 32px rgba(79,70,229,0.10), 0 1px 4px rgba(0,0,0,0.06)',
     border: '1px solid rgba(79,70,229,0.08)',
   },
@@ -232,7 +243,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 28,
+    marginBottom: 20,
   },
   logoIcon: {
     width: 44,
@@ -250,14 +261,14 @@ const styles = {
     letterSpacing: '-0.3px',
   },
   title: {
-    margin: '0 0 6px',
-    fontSize: 26,
+    margin: '0 0 4px',
+    fontSize: 24,
     fontWeight: 700,
     color: '#111827',
     letterSpacing: '-0.5px',
   },
   subtitle: {
-    margin: '0 0 28px',
+    margin: '0 0 20px',
     fontSize: 14,
     color: '#6b7280',
   },
@@ -269,7 +280,7 @@ const styles = {
   field: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 7,
+    gap: 6,
   },
   labelRow: {
     display: 'flex',
@@ -298,6 +309,17 @@ const styles = {
     alignItems: 'center',
     pointerEvents: 'none',
   },
+  infoBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    background: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    borderRadius: 8,
+    fontSize: 13,
+    color: '#16a34a',
+  },
   errorBox: {
     display: 'flex',
     alignItems: 'center',
@@ -315,7 +337,7 @@ const styles = {
   },
   button: {
     marginTop: 4,
-    height: 44,
+    height: 46,
     background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
     color: '#fff',
     border: 'none',

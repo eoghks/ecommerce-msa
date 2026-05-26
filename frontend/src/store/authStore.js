@@ -1,17 +1,42 @@
 import { create } from 'zustand';
 
-const useAuthStore = create((set) => ({
-  user: null,
-  isAuthenticated: !!localStorage.getItem('accessToken'),
+// JWT payload 디코딩 (검증 없이 클레임만 파싱)
+const decodeJwt = (token) => {
+  try {
+    return JSON.parse(atob(token.split('.')[1]));
+  } catch {
+    return null;
+  }
+};
 
-  login: (token, userInfo) => {
+const initAuth = () => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) return { isAuthenticated: false, userId: null, role: null };
+  const claims = decodeJwt(token);
+  if (!claims) return { isAuthenticated: false, userId: null, role: null };
+  return {
+    isAuthenticated: true,
+    userId: claims.sub,
+    role: claims.role,
+  };
+};
+
+const useAuthStore = create((set) => ({
+  ...initAuth(),
+
+  login: (token) => {
     localStorage.setItem('accessToken', token);
-    set({ user: userInfo, isAuthenticated: true });
+    const claims = decodeJwt(token);
+    set({
+      isAuthenticated: true,
+      userId: claims?.sub ?? null,
+      role: claims?.role ?? null,
+    });
   },
 
   logout: () => {
     localStorage.removeItem('accessToken');
-    set({ user: null, isAuthenticated: false });
+    set({ isAuthenticated: false, userId: null, role: null });
   },
 }));
 

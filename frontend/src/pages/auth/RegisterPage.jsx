@@ -118,6 +118,22 @@ const RegisterPage = () => {
       setError('비밀번호는 8자 이상이어야 합니다.');
       return;
     }
+    if (!/[a-z]/.test(form.password)) {
+      setError('비밀번호에 소문자를 포함해야 합니다.');
+      return;
+    }
+    if (!/[A-Z]/.test(form.password)) {
+      setError('비밀번호에 대문자를 포함해야 합니다.');
+      return;
+    }
+    if (!/[0-9]/.test(form.password)) {
+      setError('비밀번호에 숫자를 포함해야 합니다.');
+      return;
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(form.password)) {
+      setError('비밀번호에 특수문자를 포함해야 합니다.');
+      return;
+    }
     if (form.password !== form.passwordConfirm) {
       setError('비밀번호가 일치하지 않습니다.');
       return;
@@ -137,11 +153,11 @@ const RegisterPage = () => {
 
   const inputStyle = (name) => ({
     width: '100%',
-    height: 38,
-    padding: '0 10px 0 36px',
+    height: 44,
+    padding: '0 12px 0 38px',
     border: `1.5px solid ${focusedField === name ? '#4f46e5' : '#e5e7eb'}`,
-    borderRadius: 8,
-    fontSize: 13,
+    borderRadius: 10,
+    fontSize: 14,
     color: '#111827',
     background: '#fff',
     outline: 'none',
@@ -221,7 +237,7 @@ const RegisterPage = () => {
                 {emailCheck.checking ? '확인 중' : emailCheck.available ? '✓ 확인됨' : '중복 확인'}
               </button>
             </div>
-            <div style={{ minHeight: 16 }}>{renderEmailStatus()}</div>
+            {renderEmailStatus()}
           </div>
 
           {/* 비밀번호 */}
@@ -238,6 +254,19 @@ const RegisterPage = () => {
                 style={inputStyle('password')}
                 autoComplete="new-password"
               />
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 4 }}>
+              {[
+                { label: '8자 이상', ok: form.password.length >= 8 },
+                { label: '소문자', ok: /[a-z]/.test(form.password) },
+                { label: '대문자', ok: /[A-Z]/.test(form.password) },
+                { label: '숫자', ok: /[0-9]/.test(form.password) },
+                { label: '특수문자', ok: /[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(form.password) },
+              ].map(({ label, ok }) => (
+                <span key={label} style={{ fontSize: 11, color: ok ? '#22c55e' : '#9ca3af', fontWeight: 500 }}>
+                  {ok ? '✓' : '○'} {label}
+                </span>
+              ))}
             </div>
             {form.password && (
               <div style={styles.strengthRow}>
@@ -313,6 +342,7 @@ const styles = {
     justifyContent: 'center',
     padding: '24px 16px',
     position: 'relative',
+    overflow: 'hidden', /* 배경 장식 원이 영역 밖으로 삐져나와 스크롤 유발하는 것 차단 */
   },
   bgCircle1: {
     position: 'absolute', width: 400, height: 400, borderRadius: '50%',
@@ -325,57 +355,57 @@ const styles = {
     bottom: -80, left: -80, pointerEvents: 'none',
   },
   card: {
-    position: 'relative', width: '100%', maxWidth: 420,
-    background: '#ffffff', borderRadius: 20, padding: '20px 32px',
+    position: 'relative', width: '100%', maxWidth: 480,
+    background: '#ffffff', borderRadius: 20, padding: '36px 40px',
     boxShadow: '0 4px 32px rgba(79,70,229,0.10), 0 1px 4px rgba(0,0,0,0.06)',
     border: '1px solid rgba(79,70,229,0.08)',
   },
-  logo: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 },
+  logo: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 },
   logoIcon: {
-    width: 34, height: 34, background: '#eef2ff', borderRadius: 10,
+    width: 44, height: 44, background: '#eef2ff', borderRadius: 12,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  logoText: { fontSize: 16, fontWeight: 700, color: '#4f46e5', letterSpacing: '-0.3px' },
-  title: { margin: '0 0 2px', fontSize: 20, fontWeight: 700, color: '#111827', letterSpacing: '-0.5px' },
-  subtitle: { margin: '0 0 14px', fontSize: 12, color: '#6b7280' },
-  form: { display: 'flex', flexDirection: 'column', gap: 8 },
-  field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 12, fontWeight: 500, color: '#374151' },
+  logoText: { fontSize: 20, fontWeight: 700, color: '#4f46e5', letterSpacing: '-0.3px' },
+  title: { margin: '0 0 4px', fontSize: 24, fontWeight: 700, color: '#111827', letterSpacing: '-0.5px' },
+  subtitle: { margin: '0 0 20px', fontSize: 14, color: '#6b7280' },
+  form: { display: 'flex', flexDirection: 'column', gap: 14 },
+  field: { display: 'flex', flexDirection: 'column', gap: 6 },
+  label: { fontSize: 13, fontWeight: 500, color: '#374151' },
   inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
-  inputIcon: { position: 'absolute', left: 10, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+  inputIcon: { position: 'absolute', left: 12, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
   emailRow: { display: 'flex', gap: 0 },
   checkBtn: {
-    flexShrink: 0, height: 38, padding: '0 12px',
+    flexShrink: 0, height: 44, padding: '0 16px',
     color: '#fff', border: 'none',
-    borderRadius: '0 8px 8px 0',
-    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    borderRadius: '0 10px 10px 0',
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
     transition: 'background 0.2s, opacity 0.15s',
     whiteSpace: 'nowrap',
   },
-  strengthRow: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 },
+  strengthRow: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 },
   strengthBars: { display: 'flex', gap: 3, flex: 1 },
   strengthBar: { flex: 1, height: 3, borderRadius: 2, transition: 'background 0.2s' },
   errorBox: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '8px 12px', background: '#fef2f2',
-    border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#dc2626',
+    padding: '10px 14px', background: '#fef2f2',
+    border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626',
   },
   errorDot: { fontSize: 6, color: '#ef4444' },
   button: {
-    marginTop: 2, height: 40,
+    marginTop: 4, height: 46,
     background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-    color: '#fff', border: 'none', borderRadius: 8,
-    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+    color: '#fff', border: 'none', borderRadius: 10,
+    fontSize: 15, fontWeight: 600, cursor: 'pointer',
     transition: 'opacity 0.15s', letterSpacing: '0.1px',
   },
   loadingRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   spinner: {
-    width: 13, height: 13,
+    width: 14, height: 14,
     border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
     borderRadius: '50%', display: 'inline-block',
     animation: 'spin 0.7s linear infinite',
   },
-  divider: { display: 'flex', alignItems: 'center', gap: 10, margin: '10px 0 8px' },
+  divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 12px' },
   dividerLine: { flex: 1, height: 1, background: '#e5e7eb', display: 'block' },
   dividerText: { fontSize: 12, color: '#9ca3af', flexShrink: 0, whiteSpace: 'nowrap' },
   footer: { textAlign: 'center', margin: 0 },

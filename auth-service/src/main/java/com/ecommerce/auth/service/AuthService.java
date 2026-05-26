@@ -6,6 +6,8 @@ import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
 import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
+import com.ecommerce.auth.dto.ChangePasswordRequest;
+import com.ecommerce.auth.dto.MeResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.exception.DuplicateEmailException;
@@ -85,8 +87,29 @@ public class AuthService {
         return new RefreshResponse(newAccessToken, newRefreshToken, jwtProvider.getAccessTokenExpiryMs());
     }
 
-    public void logout(String refreshToken) {
-        refreshTokenRepository.delete(refreshToken);
+    public void logout(Long userId) {
+        refreshTokenRepository.deleteAllByUserId(userId);
+    }
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(InvalidCredentialsException::new);
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidCredentialsException();
+        }
+
+        user.changePassword(passwordEncoder.encode(request.getNewPassword()));
+        // 비밀번호 변경 후 모든 Refresh Token 무효화
+        refreshTokenRepository.deleteAllByUserId(user.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public MeResponse getMe(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidTokenException("사용자를 찾을 수 없습니다."));
+        return new MeResponse(user);
     }
 
     @Transactional(readOnly = true)

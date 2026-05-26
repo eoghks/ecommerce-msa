@@ -12,6 +12,7 @@ import OrderPage from './pages/order/OrderPage';
 import OrderListPage from './pages/order/OrderListPage';
 import AdminProductPage from './pages/admin/AdminProductPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
+import MyProfilePage from './pages/my/MyProfilePage';
 
 // 인증 페이지에서는 Navbar 숨김
 const AUTH_PATHS = ['/login', '/register'];
@@ -45,9 +46,10 @@ const App = () => (
               <Route path="/products/:id" element={<ProductDetailPage />} />
 
               {/* 로그인 필요 */}
-              <Route path="/cart"   element={<PrivateRoute><CartPage /></PrivateRoute>} />
-              <Route path="/order"  element={<PrivateRoute><OrderPage /></PrivateRoute>} />
-              <Route path="/orders" element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
+              <Route path="/cart"         element={<PrivateRoute><CartPage /></PrivateRoute>} />
+              <Route path="/order"        element={<PrivateRoute><OrderPage /></PrivateRoute>} />
+              <Route path="/orders"       element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
+              <Route path="/my/profile"   element={<PrivateRoute><MyProfilePage /></PrivateRoute>} />
 
               {/* ADMIN 전용 */}
               <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
