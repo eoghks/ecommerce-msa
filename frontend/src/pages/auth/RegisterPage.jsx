@@ -2,19 +2,70 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../../api/auth';
 
+// 아이콘 컴포넌트
+const IconUser = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const IconEmail = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+  </svg>
+);
+
+const IconLock = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+
+const IconShop = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);
+
+// 비밀번호 강도 계산
+const getPasswordStrength = (pw) => {
+  if (!pw) return { level: 0, label: '', color: '' };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  if (score <= 1) return { level: score, label: '약함', color: '#ef4444' };
+  if (score === 2) return { level: score, label: '보통', color: '#f59e0b' };
+  return { level: score, label: '강함', color: '#22c55e' };
+};
+
 const RegisterPage = () => {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ name: '', email: '', password: '', passwordConfirm: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState('');
 
-  // 입력 값 변경 처리
+  const pwStrength = getPasswordStrength(form.password);
+
   const handleChange = (e) => {
+    setError('');
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // 회원가입 제출
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -23,12 +74,12 @@ const RegisterPage = () => {
       setError('모든 항목을 입력해주세요.');
       return;
     }
-    if (form.password !== form.passwordConfirm) {
-      setError('비밀번호가 일치하지 않습니다.');
-      return;
-    }
     if (form.password.length < 8) {
       setError('비밀번호는 8자 이상이어야 합니다.');
+      return;
+    }
+    if (form.password !== form.passwordConfirm) {
+      setError('비밀번호가 일치하지 않습니다.');
       return;
     }
 
@@ -44,100 +95,212 @@ const RegisterPage = () => {
     }
   };
 
+  // 입력 필드 스타일 (포커스 상태 반영)
+  const inputStyle = (name) => ({
+    width: '100%',
+    height: 44,
+    padding: '0 12px 0 40px',
+    border: `1.5px solid ${focusedField === name ? '#4f46e5' : '#e5e7eb'}`,
+    borderRadius: 10,
+    fontSize: 14,
+    color: '#111827',
+    background: '#fff',
+    outline: 'none',
+    boxSizing: 'border-box',
+    boxShadow: focusedField === name ? '0 0 0 3px rgba(79,70,229,0.12)' : 'none',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+  });
+
+  const fields = [
+    { name: 'name',            icon: <IconUser />,  type: 'text',     placeholder: '이름을 입력하세요',         label: '이름',        autoComplete: 'name' },
+    { name: 'email',           icon: <IconEmail />, type: 'email',    placeholder: '이메일을 입력하세요',       label: '이메일',      autoComplete: 'email' },
+    { name: 'password',        icon: <IconLock />,  type: 'password', placeholder: '8자 이상 입력하세요',       label: '비밀번호',    autoComplete: 'new-password' },
+    { name: 'passwordConfirm', icon: <IconCheck />, type: 'password', placeholder: '비밀번호를 다시 입력하세요', label: '비밀번호 확인', autoComplete: 'new-password' },
+  ];
+
   return (
-    <div style={styles.container}>
+    <div style={styles.page}>
+      {/* 배경 장식 */}
+      <div style={styles.bgCircle1} />
+      <div style={styles.bgCircle2} />
+
       <div style={styles.card}>
-        <h2 style={styles.title}>회원가입</h2>
+        {/* 로고 */}
+        <div style={styles.logo}>
+          <div style={styles.logoIcon}><IconShop /></div>
+          <span style={styles.logoText}>ShopMSA</span>
+        </div>
+
+        <h1 style={styles.title}>시작해볼까요?</h1>
+        <p style={styles.subtitle}>무료 계정을 만들고 쇼핑을 시작하세요</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>이름</label>
-            <input
-              type="text"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              placeholder="이름 입력"
-              style={styles.input}
-              autoComplete="name"
-            />
-          </div>
+          {fields.map(({ name, icon, type, placeholder, label, autoComplete }) => (
+            <div key={name} style={styles.field}>
+              <label style={styles.label}>{label}</label>
+              <div style={styles.inputWrapper}>
+                <span style={styles.inputIcon}>{icon}</span>
+                <input
+                  type={type}
+                  name={name}
+                  value={form[name]}
+                  onChange={handleChange}
+                  onFocus={() => setFocusedField(name)}
+                  onBlur={() => setFocusedField('')}
+                  placeholder={placeholder}
+                  style={inputStyle(name)}
+                  autoComplete={autoComplete}
+                />
+              </div>
 
-          <div style={styles.field}>
-            <label style={styles.label}>이메일</label>
-            <input
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              placeholder="이메일 입력"
-              style={styles.input}
-              autoComplete="email"
-            />
-          </div>
+              {/* 비밀번호 강도 표시 */}
+              {name === 'password' && form.password && (
+                <div style={styles.strengthRow}>
+                  <div style={styles.strengthBars}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        style={{
+                          ...styles.strengthBar,
+                          background: i <= pwStrength.level ? pwStrength.color : '#e5e7eb',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span style={{ fontSize: 11, color: pwStrength.color, fontWeight: 500 }}>
+                    {pwStrength.label}
+                  </span>
+                </div>
+              )}
 
-          <div style={styles.field}>
-            <label style={styles.label}>비밀번호</label>
-            <input
-              type="password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="8자 이상 입력"
-              style={styles.input}
-              autoComplete="new-password"
-            />
-          </div>
+              {/* 비밀번호 일치 여부 */}
+              {name === 'passwordConfirm' && form.passwordConfirm && (
+                <span style={{
+                  fontSize: 11,
+                  color: form.password === form.passwordConfirm ? '#22c55e' : '#ef4444',
+                  fontWeight: 500,
+                }}>
+                  {form.password === form.passwordConfirm ? '✓ 비밀번호가 일치합니다' : '✗ 비밀번호가 일치하지 않습니다'}
+                </span>
+              )}
+            </div>
+          ))}
 
-          <div style={styles.field}>
-            <label style={styles.label}>비밀번호 확인</label>
-            <input
-              type="password"
-              name="passwordConfirm"
-              value={form.passwordConfirm}
-              onChange={handleChange}
-              placeholder="비밀번호 재입력"
-              style={styles.input}
-              autoComplete="new-password"
-            />
-          </div>
+          {/* 에러 메시지 */}
+          {error && (
+            <div style={styles.errorBox}>
+              <span style={styles.errorDot}>●</span>
+              {error}
+            </div>
+          )}
 
-          {error && <p style={styles.error}>{error}</p>}
-
-          <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? '처리 중...' : '회원가입'}
+          {/* 회원가입 버튼 */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...styles.button, opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? (
+              <span style={styles.loadingRow}>
+                <span style={styles.spinner} />
+                처리 중...
+              </span>
+            ) : '회원가입'}
           </button>
         </form>
 
+        {/* 구분선 */}
+        <div style={styles.divider}>
+          <span style={styles.dividerLine} />
+          <span style={styles.dividerText}>이미 계정이 있으신가요?</span>
+          <span style={styles.dividerLine} />
+        </div>
+
         <p style={styles.footer}>
-          이미 계정이 있으신가요?{' '}
-          <Link to="/login" style={styles.link}>로그인</Link>
+          <Link to="/login" style={styles.link}>로그인하러 가기 →</Link>
         </p>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };
 
 const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+  page: {
     minHeight: 'calc(100vh - 56px)',
+    background: '#f5f5ff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '24px 16px',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bgCircle1: {
+    position: 'absolute',
+    width: 400,
+    height: 400,
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)',
+    top: -100,
+    right: -100,
+    pointerEvents: 'none',
+  },
+  bgCircle2: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
+    bottom: -80,
+    left: -80,
+    pointerEvents: 'none',
   },
   card: {
+    position: 'relative',
     width: '100%',
-    maxWidth: 400,
-    padding: '40px 32px',
-    border: '1px solid #e5e7eb',
+    maxWidth: 420,
+    background: '#ffffff',
+    borderRadius: 20,
+    padding: '40px 36px',
+    boxShadow: '0 4px 32px rgba(79,70,229,0.10), 0 1px 4px rgba(0,0,0,0.06)',
+    border: '1px solid rgba(79,70,229,0.08)',
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 28,
+  },
+  logoIcon: {
+    width: 44,
+    height: 44,
+    background: '#eef2ff',
     borderRadius: 12,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: '#4f46e5',
+    letterSpacing: '-0.3px',
   },
   title: {
-    margin: '0 0 24px',
-    fontSize: 24,
+    margin: '0 0 6px',
+    fontSize: 26,
     fontWeight: 700,
-    textAlign: 'center',
+    color: '#111827',
+    letterSpacing: '-0.5px',
+  },
+  subtitle: {
+    margin: '0 0 28px',
+    fontSize: 14,
+    color: '#6b7280',
   },
   form: {
     display: 'flex',
@@ -150,43 +313,109 @@ const styles = {
     gap: 6,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 500,
     color: '#374151',
   },
-  input: {
-    padding: '10px 12px',
-    border: '1px solid #d1d5db',
-    borderRadius: 8,
-    fontSize: 14,
-    outline: 'none',
+  inputWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
   },
-  error: {
-    margin: 0,
+  inputIcon: {
+    position: 'absolute',
+    left: 12,
+    display: 'flex',
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  strengthRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  strengthBars: {
+    display: 'flex',
+    gap: 4,
+    flex: 1,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    transition: 'background 0.2s',
+  },
+  errorBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: 8,
     fontSize: 13,
+    color: '#dc2626',
+  },
+  errorDot: {
+    fontSize: 6,
     color: '#ef4444',
   },
   button: {
-    marginTop: 8,
-    padding: '12px',
-    backgroundColor: '#2563eb',
+    marginTop: 4,
+    height: 44,
+    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
     color: '#fff',
     border: 'none',
-    borderRadius: 8,
+    borderRadius: 10,
     fontSize: 15,
     fontWeight: 600,
     cursor: 'pointer',
+    transition: 'opacity 0.15s',
+    letterSpacing: '0.1px',
+  },
+  loadingRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  spinner: {
+    width: 14,
+    height: 14,
+    border: '2px solid rgba(255,255,255,0.3)',
+    borderTopColor: '#fff',
+    borderRadius: '50%',
+    display: 'inline-block',
+    animation: 'spin 0.7s linear infinite',
+  },
+  divider: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    margin: '24px 0 16px',
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    background: '#e5e7eb',
+    display: 'block',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
   },
   footer: {
-    marginTop: 20,
     textAlign: 'center',
-    fontSize: 14,
-    color: '#6b7280',
+    margin: 0,
   },
   link: {
-    color: '#2563eb',
+    color: '#4f46e5',
+    fontWeight: 600,
     textDecoration: 'none',
-    fontWeight: 500,
+    fontSize: 14,
   },
 };
 
