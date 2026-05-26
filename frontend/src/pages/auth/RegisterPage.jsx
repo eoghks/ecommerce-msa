@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { register } from '../../api/auth';
+import { register, checkEmail } from '../../api/auth';
 
 // 아이콘 컴포넌트
 const IconUser = () => (
@@ -59,11 +59,41 @@ const RegisterPage = () => {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState('');
 
+  // 이메일 중복 체크 상태
+  const [emailCheck, setEmailCheck] = useState({ checked: false, available: false, checking: false });
+
   const pwStrength = getPasswordStrength(form.password);
 
   const handleChange = (e) => {
     setError('');
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    // 이메일 변경 시 중복 체크 초기화
+    if (name === 'email') {
+      setEmailCheck({ checked: false, available: false, checking: false });
+    }
+  };
+
+  // 이메일 중복 체크
+  const handleCheckEmail = async () => {
+    if (!form.email) {
+      setError('이메일을 입력해주세요.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      setError('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+    setEmailCheck((prev) => ({ ...prev, checking: true }));
+    setError('');
+    try {
+      const res = await checkEmail(form.email);
+      setEmailCheck({ checked: true, available: res.data.available, checking: false });
+    } catch {
+      setError('이메일 확인 중 오류가 발생했습니다.');
+      setEmailCheck({ checked: false, available: false, checking: false });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -72,6 +102,10 @@ const RegisterPage = () => {
 
     if (!form.name || !form.email || !form.password || !form.passwordConfirm) {
       setError('모든 항목을 입력해주세요.');
+      return;
+    }
+    if (!emailCheck.checked || !emailCheck.available) {
+      setError('이메일 중복 체크를 완료해주세요.');
       return;
     }
     if (form.password.length < 8) {
@@ -95,7 +129,6 @@ const RegisterPage = () => {
     }
   };
 
-  // 입력 필드 스타일 (포커스 상태 반영)
   const inputStyle = (name) => ({
     width: '100%',
     height: 44,
@@ -111,16 +144,16 @@ const RegisterPage = () => {
     transition: 'border-color 0.15s, box-shadow 0.15s',
   });
 
-  const fields = [
-    { name: 'name',            icon: <IconUser />,  type: 'text',     placeholder: '이름을 입력하세요',         label: '이름',        autoComplete: 'name' },
-    { name: 'email',           icon: <IconEmail />, type: 'email',    placeholder: '이메일을 입력하세요',       label: '이메일',      autoComplete: 'email' },
-    { name: 'password',        icon: <IconLock />,  type: 'password', placeholder: '8자 이상 입력하세요',       label: '비밀번호',    autoComplete: 'new-password' },
-    { name: 'passwordConfirm', icon: <IconCheck />, type: 'password', placeholder: '비밀번호를 다시 입력하세요', label: '비밀번호 확인', autoComplete: 'new-password' },
-  ];
+  // 이메일 중복 체크 결과 표시
+  const renderEmailStatus = () => {
+    if (emailCheck.checking) return <span style={{ fontSize: 11, color: '#6b7280' }}>확인 중...</span>;
+    if (!emailCheck.checked) return null;
+    if (emailCheck.available) return <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 500 }}>✓ 사용 가능한 이메일입니다</span>;
+    return <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 500 }}>✗ 이미 사용 중인 이메일입니다</span>;
+  };
 
   return (
     <div style={styles.page}>
-      {/* 배경 장식 */}
       <div style={styles.bgCircle1} />
       <div style={styles.bgCircle2} />
 
@@ -135,56 +168,104 @@ const RegisterPage = () => {
         <p style={styles.subtitle}>무료 계정을 만들고 쇼핑을 시작하세요</p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {fields.map(({ name, icon, type, placeholder, label, autoComplete }) => (
-            <div key={name} style={styles.field}>
-              <label style={styles.label}>{label}</label>
-              <div style={styles.inputWrapper}>
-                <span style={styles.inputIcon}>{icon}</span>
+
+          {/* 이름 */}
+          <div style={styles.field}>
+            <label style={styles.label}>이름</label>
+            <div style={styles.inputWrapper}>
+              <span style={styles.inputIcon}><IconUser /></span>
+              <input
+                type="text" name="name" value={form.name}
+                onChange={handleChange}
+                onFocus={() => setFocusedField('name')}
+                onBlur={() => setFocusedField('')}
+                placeholder="이름을 입력하세요"
+                style={inputStyle('name')}
+                autoComplete="name"
+              />
+            </div>
+          </div>
+
+          {/* 이메일 + 중복 체크 버튼 */}
+          <div style={styles.field}>
+            <label style={styles.label}>이메일</label>
+            <div style={styles.emailRow}>
+              <div style={{ ...styles.inputWrapper, flex: 1 }}>
+                <span style={styles.inputIcon}><IconEmail /></span>
                 <input
-                  type={type}
-                  name={name}
-                  value={form[name]}
+                  type="email" name="email" value={form.email}
                   onChange={handleChange}
-                  onFocus={() => setFocusedField(name)}
+                  onFocus={() => setFocusedField('email')}
                   onBlur={() => setFocusedField('')}
-                  placeholder={placeholder}
-                  style={inputStyle(name)}
-                  autoComplete={autoComplete}
+                  placeholder="이메일을 입력하세요"
+                  style={{ ...inputStyle('email'), borderRadius: '10px 0 0 10px' }}
+                  autoComplete="email"
                 />
               </div>
-
-              {/* 비밀번호 강도 표시 */}
-              {name === 'password' && form.password && (
-                <div style={styles.strengthRow}>
-                  <div style={styles.strengthBars}>
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        style={{
-                          ...styles.strengthBar,
-                          background: i <= pwStrength.level ? pwStrength.color : '#e5e7eb',
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span style={{ fontSize: 11, color: pwStrength.color, fontWeight: 500 }}>
-                    {pwStrength.label}
-                  </span>
-                </div>
-              )}
-
-              {/* 비밀번호 일치 여부 */}
-              {name === 'passwordConfirm' && form.passwordConfirm && (
-                <span style={{
-                  fontSize: 11,
-                  color: form.password === form.passwordConfirm ? '#22c55e' : '#ef4444',
-                  fontWeight: 500,
-                }}>
-                  {form.password === form.passwordConfirm ? '✓ 비밀번호가 일치합니다' : '✗ 비밀번호가 일치하지 않습니다'}
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={handleCheckEmail}
+                disabled={emailCheck.checking || !form.email}
+                style={{
+                  ...styles.checkBtn,
+                  background: emailCheck.available ? '#22c55e' : '#4f46e5',
+                  opacity: (!form.email || emailCheck.checking) ? 0.5 : 1,
+                }}
+              >
+                {emailCheck.checking ? '확인 중' : emailCheck.available ? '✓ 확인됨' : '중복 확인'}
+              </button>
             </div>
-          ))}
+            <div style={{ minHeight: 16 }}>{renderEmailStatus()}</div>
+          </div>
+
+          {/* 비밀번호 */}
+          <div style={styles.field}>
+            <label style={styles.label}>비밀번호</label>
+            <div style={styles.inputWrapper}>
+              <span style={styles.inputIcon}><IconLock /></span>
+              <input
+                type="password" name="password" value={form.password}
+                onChange={handleChange}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField('')}
+                placeholder="8자 이상 입력하세요"
+                style={inputStyle('password')}
+                autoComplete="new-password"
+              />
+            </div>
+            {form.password && (
+              <div style={styles.strengthRow}>
+                <div style={styles.strengthBars}>
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} style={{ ...styles.strengthBar, background: i <= pwStrength.level ? pwStrength.color : '#e5e7eb' }} />
+                  ))}
+                </div>
+                <span style={{ fontSize: 11, color: pwStrength.color, fontWeight: 500 }}>{pwStrength.label}</span>
+              </div>
+            )}
+          </div>
+
+          {/* 비밀번호 확인 */}
+          <div style={styles.field}>
+            <label style={styles.label}>비밀번호 확인</label>
+            <div style={styles.inputWrapper}>
+              <span style={styles.inputIcon}><IconCheck /></span>
+              <input
+                type="password" name="passwordConfirm" value={form.passwordConfirm}
+                onChange={handleChange}
+                onFocus={() => setFocusedField('passwordConfirm')}
+                onBlur={() => setFocusedField('')}
+                placeholder="비밀번호를 다시 입력하세요"
+                style={inputStyle('passwordConfirm')}
+                autoComplete="new-password"
+              />
+            </div>
+            {form.passwordConfirm && (
+              <span style={{ fontSize: 11, color: form.password === form.passwordConfirm ? '#22c55e' : '#ef4444', fontWeight: 500 }}>
+                {form.password === form.passwordConfirm ? '✓ 비밀번호가 일치합니다' : '✗ 비밀번호가 일치하지 않습니다'}
+              </span>
+            )}
+          </div>
 
           {/* 에러 메시지 */}
           {error && (
@@ -195,35 +276,24 @@ const RegisterPage = () => {
           )}
 
           {/* 회원가입 버튼 */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ ...styles.button, opacity: loading ? 0.7 : 1 }}
-          >
+          <button type="submit" disabled={loading} style={{ ...styles.button, opacity: loading ? 0.7 : 1 }}>
             {loading ? (
-              <span style={styles.loadingRow}>
-                <span style={styles.spinner} />
-                처리 중...
-              </span>
+              <span style={styles.loadingRow}><span style={styles.spinner} />처리 중...</span>
             ) : '회원가입'}
           </button>
         </form>
 
-        {/* 구분선 */}
         <div style={styles.divider}>
           <span style={styles.dividerLine} />
           <span style={styles.dividerText}>이미 계정이 있으신가요?</span>
           <span style={styles.dividerLine} />
         </div>
-
         <p style={styles.footer}>
           <Link to="/login" style={styles.link}>로그인하러 가기 →</Link>
         </p>
       </div>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
@@ -239,183 +309,71 @@ const styles = {
     position: 'relative',
   },
   bgCircle1: {
-    position: 'absolute',
-    width: 400,
-    height: 400,
-    borderRadius: '50%',
+    position: 'absolute', width: 400, height: 400, borderRadius: '50%',
     background: 'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)',
-    top: -100,
-    right: -100,
-    pointerEvents: 'none',
+    top: -100, right: -100, pointerEvents: 'none',
   },
   bgCircle2: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: '50%',
+    position: 'absolute', width: 300, height: 300, borderRadius: '50%',
     background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
-    bottom: -80,
-    left: -80,
-    pointerEvents: 'none',
+    bottom: -80, left: -80, pointerEvents: 'none',
   },
   card: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: 420,
-    background: '#ffffff',
-    borderRadius: 20,
-    padding: '40px 36px',
+    position: 'relative', width: '100%', maxWidth: 420,
+    background: '#ffffff', borderRadius: 20, padding: '40px 36px',
     boxShadow: '0 4px 32px rgba(79,70,229,0.10), 0 1px 4px rgba(0,0,0,0.06)',
     border: '1px solid rgba(79,70,229,0.08)',
   },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 28,
-  },
+  logo: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 },
   logoIcon: {
-    width: 44,
-    height: 44,
-    background: '#eef2ff',
-    borderRadius: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 44, height: 44, background: '#eef2ff', borderRadius: 12,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  logoText: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: '#4f46e5',
-    letterSpacing: '-0.3px',
-  },
-  title: {
-    margin: '0 0 6px',
-    fontSize: 26,
-    fontWeight: 700,
-    color: '#111827',
-    letterSpacing: '-0.5px',
-  },
-  subtitle: {
-    margin: '0 0 28px',
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: 500,
-    color: '#374151',
-  },
-  inputWrapper: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 12,
-    display: 'flex',
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  strengthRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 2,
-  },
-  strengthBars: {
-    display: 'flex',
-    gap: 4,
-    flex: 1,
-  },
-  strengthBar: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-    transition: 'background 0.2s',
-  },
-  errorBox: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '10px 14px',
-    background: '#fef2f2',
-    border: '1px solid #fecaca',
-    borderRadius: 8,
-    fontSize: 13,
-    color: '#dc2626',
-  },
-  errorDot: {
-    fontSize: 6,
-    color: '#ef4444',
-  },
-  button: {
-    marginTop: 4,
-    height: 44,
-    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 10,
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'opacity 0.15s',
-    letterSpacing: '0.1px',
-  },
-  loadingRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  spinner: {
-    width: 14,
-    height: 14,
-    border: '2px solid rgba(255,255,255,0.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    display: 'inline-block',
-    animation: 'spin 0.7s linear infinite',
-  },
-  divider: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    margin: '24px 0 16px',
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    background: '#e5e7eb',
-    display: 'block',
-  },
-  dividerText: {
-    fontSize: 12,
-    color: '#9ca3af',
-    flexShrink: 0,
+  logoText: { fontSize: 20, fontWeight: 700, color: '#4f46e5', letterSpacing: '-0.3px' },
+  title: { margin: '0 0 6px', fontSize: 26, fontWeight: 700, color: '#111827', letterSpacing: '-0.5px' },
+  subtitle: { margin: '0 0 28px', fontSize: 14, color: '#6b7280' },
+  form: { display: 'flex', flexDirection: 'column', gap: 16 },
+  field: { display: 'flex', flexDirection: 'column', gap: 6 },
+  label: { fontSize: 13, fontWeight: 500, color: '#374151' },
+  inputWrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
+  inputIcon: { position: 'absolute', left: 12, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+  emailRow: { display: 'flex', gap: 0 },
+  checkBtn: {
+    flexShrink: 0, height: 44, padding: '0 14px',
+    color: '#fff', border: 'none',
+    borderRadius: '0 10px 10px 0',
+    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    transition: 'background 0.2s, opacity 0.15s',
     whiteSpace: 'nowrap',
   },
-  footer: {
-    textAlign: 'center',
-    margin: 0,
+  strengthRow: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 },
+  strengthBars: { display: 'flex', gap: 4, flex: 1 },
+  strengthBar: { flex: 1, height: 3, borderRadius: 2, transition: 'background 0.2s' },
+  errorBox: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '10px 14px', background: '#fef2f2',
+    border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626',
   },
-  link: {
-    color: '#4f46e5',
-    fontWeight: 600,
-    textDecoration: 'none',
-    fontSize: 14,
+  errorDot: { fontSize: 6, color: '#ef4444' },
+  button: {
+    marginTop: 4, height: 44,
+    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+    color: '#fff', border: 'none', borderRadius: 10,
+    fontSize: 15, fontWeight: 600, cursor: 'pointer',
+    transition: 'opacity 0.15s', letterSpacing: '0.1px',
   },
+  loadingRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  spinner: {
+    width: 14, height: 14,
+    border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+    borderRadius: '50%', display: 'inline-block',
+    animation: 'spin 0.7s linear infinite',
+  },
+  divider: { display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0 16px' },
+  dividerLine: { flex: 1, height: 1, background: '#e5e7eb', display: 'block' },
+  dividerText: { fontSize: 12, color: '#9ca3af', flexShrink: 0, whiteSpace: 'nowrap' },
+  footer: { textAlign: 'center', margin: 0 },
+  link: { color: '#4f46e5', fontWeight: 600, textDecoration: 'none', fontSize: 14 },
 };
 
 export default RegisterPage;

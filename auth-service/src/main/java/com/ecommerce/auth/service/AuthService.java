@@ -89,6 +89,11 @@ public class AuthService {
         refreshTokenRepository.delete(refreshToken);
     }
 
+    @Transactional(readOnly = true)
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
     // MD-01: Controller 대신 Service에서 JWK 조립
     public Map<String, Object> getJwks() {
         RSAKey rsaKey = new RSAKey.Builder(jwtProvider.getPublicKey())
