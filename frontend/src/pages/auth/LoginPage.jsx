@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { login } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
@@ -33,6 +33,12 @@ const LoginPage = () => {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // body 배경을 페이지 배경색으로 통일 — 스크롤 시 흰 배경 노출 방지
+  useEffect(() => {
+    document.body.style.background = '#f5f5ff';
+    return () => { document.body.style.background = ''; };
+  }, []);
   const [focusedField, setFocusedField] = useState('');
 
   const handleChange = (e) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register, checkEmail } from '../../api/auth';
 
@@ -58,6 +58,12 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState('');
+
+  // body 배경을 페이지 배경색으로 통일 — 스크롤 시 흰 배경 노출 방지
+  useEffect(() => {
+    document.body.style.background = '#f5f5ff';
+    return () => { document.body.style.background = ''; };
+  }, []);
 
   // 이메일 중복 체크 상태
   const [emailCheck, setEmailCheck] = useState({ checked: false, available: false, checking: false });
