@@ -16,25 +16,31 @@ import AdminOrderPage from './pages/admin/AdminOrderPage';
 const App = () => (
   <BrowserRouter>
     <Navbar />
-    <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
-      <Routes>
-        {/* 공개 */}
-        <Route path="/"             element={<ProductListPage />} />
-        <Route path="/login"        element={<LoginPage />} />
-        <Route path="/register"     element={<RegisterPage />} />
-        <Route path="/products"     element={<ProductListPage />} />
-        <Route path="/products/:id" element={<ProductDetailPage />} />
+    <Routes>
+      {/* 인증 페이지 — 풀 페이지 레이아웃 (컨테이너 없음) */}
+      <Route path="/login"    element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-        {/* 로그인 필요 */}
-        <Route path="/cart"   element={<PrivateRoute><CartPage /></PrivateRoute>} />
-        <Route path="/order"  element={<PrivateRoute><OrderPage /></PrivateRoute>} />
-        <Route path="/orders" element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
+      {/* 일반 페이지 — 1200px 컨테이너 */}
+      <Route path="/*" element={
+        <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+          <Routes>
+            <Route path="/"             element={<ProductListPage />} />
+            <Route path="/products"     element={<ProductListPage />} />
+            <Route path="/products/:id" element={<ProductDetailPage />} />
 
-        {/* ADMIN 전용 */}
-        <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
-        <Route path="/admin/orders" element={<AdminRoute><AdminOrderPage /></AdminRoute>} />
-      </Routes>
-    </main>
+            {/* 로그인 필요 */}
+            <Route path="/cart"   element={<PrivateRoute><CartPage /></PrivateRoute>} />
+            <Route path="/order"  element={<PrivateRoute><OrderPage /></PrivateRoute>} />
+            <Route path="/orders" element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
+
+            {/* ADMIN 전용 */}
+            <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
+            <Route path="/admin/orders" element={<AdminRoute><AdminOrderPage /></AdminRoute>} />
+          </Routes>
+        </main>
+      } />
+    </Routes>
   </BrowserRouter>
 );
 

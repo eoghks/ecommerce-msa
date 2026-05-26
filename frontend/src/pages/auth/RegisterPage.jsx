@@ -237,7 +237,6 @@ const styles = {
     justifyContent: 'center',
     padding: '24px 16px',
     position: 'relative',
-    overflow: 'hidden',
   },
   bgCircle1: {
     position: 'absolute',
