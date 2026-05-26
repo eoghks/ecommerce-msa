@@ -184,7 +184,7 @@ const LoginPage = () => {
 
 const styles = {
   page: {
-    minHeight: 'calc(100vh - 56px)',
+    minHeight: '100vh',
     background: '#f5f5ff',
     display: 'flex',
     alignItems: 'center',
