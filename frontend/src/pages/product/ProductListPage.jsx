@@ -13,6 +13,7 @@ const ProductCard = ({ product }) => {
   const { isAuthenticated } = useAuthStore();
   const addItem = useCartStore((s) => s.addItem);
   const [added, setAdded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const handleAddCart = (e) => {
     e.preventDefault();
@@ -32,13 +33,21 @@ const ProductCard = ({ product }) => {
         style={{ border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
 
         {/* 이미지 영역 */}
-        <div className="relative w-full aspect-square bg-gray-50 overflow-hidden">
+        <div className="relative w-full aspect-square bg-gray-100 overflow-hidden">
+          {/* 로딩 중 shimmer 스켈레톤 */}
+          {!imgLoaded && product.imageUrl && (
+            <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100"
+              style={{ backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
+          )}
+
           {product.imageUrl ? (
             <img
               src={product.imageUrl}
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+              style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
