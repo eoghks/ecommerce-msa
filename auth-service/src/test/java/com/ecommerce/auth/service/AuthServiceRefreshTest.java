@@ -53,7 +53,7 @@ class AuthServiceRefreshTest {
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(jwtProvider.issueRefreshToken()).willReturn("new-refresh-token");
         given(jwtProvider.getRefreshTokenTtl()).willReturn(Duration.ofDays(7));
-        given(jwtProvider.issueAccessToken(1L, "USER")).willReturn("new-access-token");
+        given(jwtProvider.issueAccessToken(1L, "USER", false)).willReturn("new-access-token");
         given(jwtProvider.getAccessTokenExpiryMs()).willReturn(3600000L);
 
         RefreshResponse response = authService.refresh(makeRefreshRequest(oldRefresh));

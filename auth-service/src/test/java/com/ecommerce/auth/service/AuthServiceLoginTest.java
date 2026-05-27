@@ -56,7 +56,7 @@ class AuthServiceLoginTest {
 
         given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(user));
         given(passwordEncoder.matches("password123", "hashed")).willReturn(true);
-        given(jwtProvider.issueAccessToken(1L, "USER")).willReturn("access.token");
+        given(jwtProvider.issueAccessToken(1L, "USER", false)).willReturn("access.token");
         given(jwtProvider.issueRefreshToken()).willReturn("refresh-uuid");
         given(jwtProvider.getRefreshTokenTtl()).willReturn(Duration.ofDays(7));
         given(jwtProvider.getAccessTokenExpiryMs()).willReturn(3600000L);
