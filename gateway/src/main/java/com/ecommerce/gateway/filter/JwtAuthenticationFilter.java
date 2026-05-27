@@ -41,9 +41,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/check-email",
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/.well-known",
-            "/api/v1/products",       // 상품 목록/상세 조회는 비인증 허용
-            "/api/v1/categories",     // 카테고리 조회는 비인증 허용
             "/actuator/"
+    );
+
+    // 토큰 없이도 접근 허용 (있으면 검증 후 헤더 주입)
+    private static final List<String> OPTIONAL_AUTH_LIST = List.of(
+            "/api/v1/products",
+            "/api/v1/categories"
     );
 
     private final JwksClient jwksClient;
@@ -57,7 +61,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        boolean isOptional = isOptionalAuth(path);
+
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+            if (isOptional) {
+                // 토큰 없어도 통과 (비로그인 상품 조회 허용)
+                return chain.filter(exchange);
+            }
             log.warn("인증 헤더 없음: path={}", path);
             return onUnauthorized(exchange);
         }
@@ -117,6 +127,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private boolean isWhitelisted(String path) {
         return WHITE_LIST.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isOptionalAuth(String path) {
+        return OPTIONAL_AUTH_LIST.stream().anyMatch(path::startsWith);
     }
 
     private Mono<Void> onUnauthorized(ServerWebExchange exchange) {
