@@ -32,68 +32,70 @@ const ProductCard = ({ product }) => {
       <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-200 hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] hover:-translate-y-0.5"
         style={{ border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
 
-        {/* 이미지 영역 */}
-        <div className="relative w-full aspect-square bg-gray-100 overflow-hidden">
-          {/* 로딩 중 shimmer 스켈레톤 */}
-          {!imgLoaded && product.imageUrl && (
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100"
-              style={{ backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
-          )}
+        {/* 이미지 영역 — padding-top:100% 로 1:1 비율 완전 고정 (이미지 로드 전후 크기 불변) */}
+        <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingTop: '100%' }}>
+          <div className="absolute inset-0">
+            {/* 로딩 중 shimmer 스켈레톤 */}
+            {!imgLoaded && product.imageUrl && (
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100"
+                style={{ backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite linear' }} />
+            )}
 
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-              onLoad={() => setImgLoaded(true)}
-              style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            </div>
-          )}
-
-          {/* 품절 배지 */}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <span className="bg-white/90 text-gray-700 text-xs font-bold px-3 py-1 rounded-full">품절</span>
-            </div>
-          )}
-
-          {/* 장바구니 버튼 — hover 시 표시 */}
-          {product.stock > 0 && (
-            <button
-              onClick={handleAddCart}
-              className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-200 border-none shadow-lg"
-              style={{
-                background: added
-                  ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                  : 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-                transform: 'translateY(4px)',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(4px)')}
-              title="장바구니 담기"
-            >
-              {added ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <polyline points="20 6 9 17 4 12"/>
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+                onLoad={() => setImgLoaded(true)}
+                style={{ opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.35s ease' }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
                 </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-              )}
-            </button>
-          )}
-        </div>
+              </div>
+            )}
+
+            {/* 품절 배지 */}
+            {product.stock === 0 && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <span className="bg-white/90 text-gray-700 text-xs font-bold px-3 py-1 rounded-full">품절</span>
+              </div>
+            )}
+
+            {/* 장바구니 버튼 — hover 시 표시 */}
+            {product.stock > 0 && (
+              <button
+                onClick={handleAddCart}
+                className="absolute bottom-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-200 border-none shadow-lg"
+                style={{
+                  background: added
+                    ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                    : 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                  transform: 'translateY(4px)',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(4px)')}
+                title="장바구니 담기"
+              >
+                {added ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>{/* absolute inset-0 닫기 */}
+        </div>{/* padding-top 래퍼 닫기 */}
 
         {/* 텍스트 영역 */}
         <div className="p-3.5 flex flex-col gap-1 flex-1">
