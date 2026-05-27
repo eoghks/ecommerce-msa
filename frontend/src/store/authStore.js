@@ -11,13 +11,14 @@ const decodeJwt = (token) => {
 
 const initAuth = () => {
   const token = localStorage.getItem('accessToken');
-  if (!token) return { isAuthenticated: false, userId: null, role: null };
+  if (!token) return { isAuthenticated: false, userId: null, role: null, pwdChangeRequired: false };
   const claims = decodeJwt(token);
-  if (!claims) return { isAuthenticated: false, userId: null, role: null };
+  if (!claims) return { isAuthenticated: false, userId: null, role: null, pwdChangeRequired: false };
   return {
     isAuthenticated: true,
     userId: claims.sub,
     role: claims.role,
+    pwdChangeRequired: claims.pwdChangeRequired ?? false,
   };
 };
 
@@ -31,12 +32,13 @@ const useAuthStore = create((set) => ({
       isAuthenticated: true,
       userId: claims?.sub ?? null,
       role: claims?.role ?? null,
+      pwdChangeRequired: claims?.pwdChangeRequired ?? false,
     });
   },
 
   logout: () => {
     localStorage.removeItem('accessToken');
-    set({ isAuthenticated: false, userId: null, role: null });
+    set({ isAuthenticated: false, userId: null, role: null, pwdChangeRequired: false });
   },
 }));
 

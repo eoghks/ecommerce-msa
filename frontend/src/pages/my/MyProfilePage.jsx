@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getMe, changePassword } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
 
-// 비밀번호 강도 계산 (RegisterPage와 동일 로직)
 const getPasswordStrength = (pw) => {
   if (!pw) return { level: 0, label: '', color: '' };
   let score = 0;
@@ -18,13 +17,14 @@ const getPasswordStrength = (pw) => {
 
 const MyProfilePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout: clearAuth } = useAuthStore();
+
+  const forceChange = location.state?.forceChange ?? false;
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // 비밀번호 변경 폼 열림 상태 (기본 접힘)
-  const [pwOpen, setPwOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(forceChange);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
@@ -43,27 +43,16 @@ const MyProfilePage = () => {
 
   const handlePwToggle = () => {
     setPwOpen((v) => !v);
-    // 닫을 때 폼 초기화
-    if (pwOpen) {
-      setPwForm({ current: '', next: '', confirm: '' });
-      setPwError('');
-    }
+    if (pwOpen) { setPwForm({ current: '', next: '', confirm: '' }); setPwError(''); }
   };
 
   const handlePwSubmit = async (e) => {
     e.preventDefault();
     setPwError('');
-    if (!pwForm.current || !pwForm.next || !pwForm.confirm) {
-      setPwError('모든 항목을 입력해주세요.');
-      return;
-    }
-    if (pwForm.next !== pwForm.confirm) {
-      setPwError('새 비밀번호가 일치하지 않습니다.');
-      return;
-    }
+    if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError('모든 항목을 입력해주세요.'); return; }
+    if (pwForm.next !== pwForm.confirm) { setPwError('새 비밀번호가 일치하지 않습니다.'); return; }
     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]).{8,}$/.test(pwForm.next)) {
-      setPwError('새 비밀번호는 8자 이상, 대/소문자·숫자·특수문자를 포함해야 합니다.');
-      return;
+      setPwError('새 비밀번호는 8자 이상, 대/소문자·숫자·특수문자를 포함해야 합니다.'); return;
     }
     setPwLoading(true);
     try {
@@ -85,128 +74,125 @@ const MyProfilePage = () => {
   const getInitial = (name) => (name ? name.charAt(0).toUpperCase() : '?');
 
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
-      <div style={{ width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#4f46e5', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="flex justify-center items-center h-[300px]">
+      <div className="w-7 h-7 rounded-full animate-spin border-[3px] border-gray-200 border-t-brand-600" />
     </div>
   );
 
   return (
-    <div style={styles.page}>
+    <div className="max-w-[560px] mx-auto mt-6 sm:mt-10 px-4 flex flex-col gap-4 pb-10">
 
-      {/* 프로필 헤더 — 계정 정보 통합 */}
-      <div style={styles.headerCard}>
-        <div style={styles.avatar}>{getInitial(profile?.name)}</div>
+      {/* 강제 변경 배너 */}
+      {forceChange && (
+        <div className="force-banner">
+          <span className="text-xl shrink-0">⚠️</span>
+          <div>
+            <strong>임시 비밀번호로 로그인되었습니다.</strong><br />
+            <span className="text-[13px]">보안을 위해 아래에서 비밀번호를 변경해주세요.</span>
+          </div>
+        </div>
+      )}
 
-        <div style={styles.headerInfo}>
-          <div style={styles.headerTop}>
-            <span style={styles.profileName}>{profile?.name || '-'}</span>
-            <span style={{
-              ...styles.roleBadge,
-              background: profile?.role === 'ADMIN' ? '#fef3c7' : '#eef2ff',
-              color: profile?.role === 'ADMIN' ? '#d97706' : '#4f46e5',
-            }}>
+      {/* 프로필 헤더 */}
+      <div className="card flex items-center gap-4 sm:gap-5">
+        <div className="w-[52px] h-[52px] sm:w-[60px] sm:h-[60px] rounded-full shrink-0 flex items-center justify-center text-white text-xl sm:text-2xl font-bold"
+          style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)' }}>
+          {getInitial(profile?.name)}
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-base sm:text-[18px] font-bold text-gray-900">{profile?.name || '-'}</span>
+            <span className="px-2.5 py-[3px] rounded-full text-[11px] font-semibold"
+              style={{
+                background: profile?.role === 'ADMIN' ? '#fef3c7' : '#eef2ff',
+                color: profile?.role === 'ADMIN' ? '#d97706' : '#4f46e5',
+              }}>
               {profile?.role}
             </span>
           </div>
-          <div style={styles.profileEmail}>{profile?.email}</div>
-          <div style={styles.profileJoined}>가입일 · {formatDate(profile?.createdAt)}</div>
+          <div className="text-[13px] text-gray-500 truncate">{profile?.email}</div>
+          <div className="text-[12px] text-gray-400 mt-0.5">가입일 · {formatDate(profile?.createdAt)}</div>
         </div>
       </div>
 
       {/* 보안 카드 */}
-      <div style={styles.card}>
-        {/* 헤더 행 — 항상 표시 */}
-        <div style={styles.secHeader}>
+      <div className="card">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div style={styles.sectionTitle}>보안</div>
-            <div style={styles.sectionDesc}>비밀번호를 정기적으로 변경하면 계정을 안전하게 보호할 수 있습니다.</div>
+            <div className="text-[15px] font-bold text-gray-900 mb-1">보안</div>
+            <div className="text-[13px] text-gray-500 hidden sm:block">비밀번호를 정기적으로 변경하면 계정을 안전하게 보호할 수 있습니다.</div>
           </div>
-          <button onClick={handlePwToggle} style={{ ...styles.toggleBtn, ...(pwOpen ? styles.toggleBtnActive : {}) }}>
+          <button onClick={handlePwToggle}
+            className="shrink-0 h-[34px] px-3 sm:px-4 text-[13px] font-medium rounded-lg transition-colors duration-150 whitespace-nowrap"
+            style={pwOpen
+              ? { background: 'transparent', border: '1.5px solid #e5e7eb', color: '#6b7280' }
+              : { background: 'transparent', border: '1.5px solid #4f46e5', color: '#4f46e5' }}>
             {pwOpen ? '취소' : '비밀번호 변경'}
           </button>
         </div>
 
-        {/* 비밀번호 폼 — 토글로 표시 */}
         {pwOpen && (
-          <div style={styles.pwSection}>
-            <div style={styles.divider} />
-            <form onSubmit={handlePwSubmit} style={styles.pwForm}>
-
+          <div>
+            <div className="h-px bg-gray-100 my-5" />
+            <form onSubmit={handlePwSubmit} className="flex flex-col gap-3.5">
               {/* 현재 비밀번호 */}
-              <div style={styles.field}>
-                <label style={styles.fieldLabel}>현재 비밀번호</label>
-                <input
-                  type="password" name="current"
-                  value={pwForm.current} onChange={handlePwChange}
-                  placeholder="현재 비밀번호 입력" style={styles.input}
-                  autoComplete="current-password"
-                />
+              <div className="flex flex-col gap-1.5">
+                <label className="field-label">현재 비밀번호</label>
+                <input type="password" name="current" value={pwForm.current} onChange={handlePwChange}
+                  placeholder="현재 비밀번호 입력"
+                  className="input-field pl-3" autoComplete="current-password" />
               </div>
 
-              {/* 새 비밀번호 — 조건 + 강도 바 포함 */}
-              <div style={styles.field}>
-                <label style={styles.fieldLabel}>새 비밀번호</label>
-                <input
-                  type="password" name="next"
-                  value={pwForm.next} onChange={handlePwChange}
-                  placeholder="8자 이상, 대/소문자·숫자·특수문자 포함" style={styles.input}
-                  autoComplete="new-password"
-                />
-                {/* 조건 표시 — 항상 노출 (RegisterPage와 동일) */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', marginTop: 4 }}>
+              {/* 새 비밀번호 */}
+              <div className="flex flex-col gap-1.5">
+                <label className="field-label">새 비밀번호</label>
+                <input type="password" name="next" value={pwForm.next} onChange={handlePwChange}
+                  placeholder="8자 이상, 대/소문자·숫자·특수문자 포함"
+                  className="input-field pl-3" autoComplete="new-password" />
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                   {[
-                    { label: '8자 이상',  ok: pwForm.next.length >= 8 },
-                    { label: '소문자',    ok: /[a-z]/.test(pwForm.next) },
-                    { label: '대문자',    ok: /[A-Z]/.test(pwForm.next) },
-                    { label: '숫자',      ok: /[0-9]/.test(pwForm.next) },
-                    { label: '특수문자',  ok: /[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(pwForm.next) },
+                    { label: '8자 이상', ok: pwForm.next.length >= 8 },
+                    { label: '소문자', ok: /[a-z]/.test(pwForm.next) },
+                    { label: '대문자', ok: /[A-Z]/.test(pwForm.next) },
+                    { label: '숫자', ok: /[0-9]/.test(pwForm.next) },
+                    { label: '특수문자', ok: /[!@#$%^&*()_+\-=\[\]{}|;':",./<>?]/.test(pwForm.next) },
                   ].map(({ label, ok }) => (
-                    <span key={label} style={{ fontSize: 11, color: ok ? '#22c55e' : '#9ca3af', fontWeight: 500 }}>
+                    <span key={label} className={`text-[11px] font-medium ${ok ? 'text-green-500' : 'text-gray-400'}`}>
                       {ok ? '✓' : '○'} {label}
                     </span>
                   ))}
                 </div>
-                {/* 강도 바 — 입력 시에만 */}
                 {pwForm.next && (() => {
                   const s = getPasswordStrength(pwForm.next);
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                      <div style={{ display: 'flex', gap: 3, flex: 1 }}>
-                        {[1, 2, 3, 4].map((i) => (
-                          <div key={i} style={{
-                            flex: 1, height: 4, borderRadius: 2,
-                            background: i <= s.level ? s.color : '#e5e7eb',
-                            transition: 'background 0.2s',
-                          }} />
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div className="flex gap-1 flex-1">
+                        {[1,2,3,4].map((i) => (
+                          <div key={i} className="flex-1 h-1 rounded-sm transition-all duration-200"
+                            style={{ background: i <= s.level ? s.color : '#e5e7eb' }} />
                         ))}
                       </div>
-                      <span style={{ fontSize: 11, color: s.color, fontWeight: 500, minWidth: 24 }}>{s.label}</span>
+                      <span className="text-[11px] font-medium min-w-[24px]" style={{ color: s.color }}>{s.label}</span>
                     </div>
                   );
                 })()}
               </div>
 
               {/* 새 비밀번호 확인 */}
-              <div style={styles.field}>
-                <label style={styles.fieldLabel}>새 비밀번호 확인</label>
-                <input
-                  type="password" name="confirm"
-                  value={pwForm.confirm} onChange={handlePwChange}
-                  placeholder="새 비밀번호 재입력" style={styles.input}
-                  autoComplete="new-password"
-                />
+              <div className="flex flex-col gap-1.5">
+                <label className="field-label">새 비밀번호 확인</label>
+                <input type="password" name="confirm" value={pwForm.confirm} onChange={handlePwChange}
+                  placeholder="새 비밀번호 재입력"
+                  className="input-field pl-3" autoComplete="new-password" />
               </div>
 
-              {pwError && (
-                <div style={styles.errorBox}>
-                  <span style={{ fontSize: 6, color: '#ef4444' }}>●</span> {pwError}
-                </div>
-              )}
+              {pwError && <div className="error-box"><span className="text-[6px] text-red-400">●</span> {pwError}</div>}
 
-              <div style={styles.pwFooter}>
-                <span style={styles.notice}>변경 후 보안을 위해 자동 로그아웃됩니다.</span>
-                <button type="submit" disabled={pwLoading} style={{ ...styles.submitBtn, opacity: pwLoading ? 0.7 : 1 }}>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-[11px] text-gray-400">변경 후 보안을 위해 자동 로그아웃됩니다.</span>
+                <button type="submit" disabled={pwLoading}
+                  className="h-10 px-5 text-white text-sm font-semibold rounded-[10px] border-none disabled:opacity-70 transition-opacity shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' }}>
                   {pwLoading ? '변경 중...' : '변경 완료'}
                 </button>
               </div>
@@ -216,81 +202,6 @@ const MyProfilePage = () => {
       </div>
     </div>
   );
-};
-
-const styles = {
-  page: { maxWidth: 560, margin: '40px auto', padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 },
-
-  /* 헤더 카드 */
-  headerCard: {
-    display: 'flex', alignItems: 'center', gap: 20,
-    background: '#fff', borderRadius: 16, padding: '24px 28px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.07)', border: '1px solid #e5e7eb',
-  },
-  avatar: {
-    width: 60, height: 60, borderRadius: '50%', flexShrink: 0,
-    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-    color: '#fff', fontSize: 24, fontWeight: 700,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  headerInfo:  { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 },
-  headerTop:   { display: 'flex', alignItems: 'center', gap: 10 },
-  profileName: { fontSize: 18, fontWeight: 700, color: '#111827' },
-  roleBadge: {
-    padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-  },
-  profileEmail:  { fontSize: 13, color: '#6b7280' },
-  profileJoined: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-
-  /* 보안 카드 */
-  card: {
-    background: '#fff', borderRadius: 16, padding: '24px 28px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.07)', border: '1px solid #e5e7eb',
-  },
-  secHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 4 },
-  sectionDesc:  { fontSize: 13, color: '#6b7280' },
-
-  /* 토글 버튼 */
-  toggleBtn: {
-    flexShrink: 0,
-    height: 34, padding: '0 16px',
-    background: 'transparent', border: '1.5px solid #4f46e5',
-    borderRadius: 8, fontSize: 13, fontWeight: 500,
-    color: '#4f46e5', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'background 0.15s, color 0.15s',
-  },
-  toggleBtnActive: {
-    border: '1.5px solid #e5e7eb',
-    color: '#6b7280',
-  },
-
-  /* 비밀번호 폼 */
-  divider:   { height: 1, background: '#f3f4f6', margin: '20px 0' },
-  pwSection: {},
-  pwForm:    { display: 'flex', flexDirection: 'column', gap: 14 },
-  field:     { display: 'flex', flexDirection: 'column', gap: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: 500, color: '#374151' },
-  input: {
-    height: 44, padding: '0 14px',
-    border: '1.5px solid #e5e7eb', borderRadius: 10,
-    fontSize: 14, outline: 'none', boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-  },
-  errorBox: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '10px 14px', background: '#fef2f2',
-    border: '1px solid #fecaca', borderRadius: 8,
-    fontSize: 13, color: '#dc2626',
-  },
-  pwFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  notice:   { fontSize: 11, color: '#9ca3af' },
-  submitBtn: {
-    height: 40, padding: '0 20px',
-    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
-    color: '#fff', border: 'none', borderRadius: 10,
-    fontSize: 14, fontWeight: 600, cursor: 'pointer',
-  },
 };
 
 export default MyProfilePage;

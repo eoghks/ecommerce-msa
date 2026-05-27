@@ -25,6 +25,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.kafka:spring-kafka'
     // Week 2: RSA256 JWT 발급·검증
     implementation 'com.nimbusds:nimbus-jose-jwt:9.40'

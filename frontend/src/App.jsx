@@ -5,6 +5,7 @@ import AdminRoute from './components/common/AdminRoute';
 
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ProductListPage from './pages/product/ProductListPage';
 import ProductDetailPage from './pages/product/ProductDetailPage';
 import CartPage from './pages/order/CartPage';
@@ -15,7 +16,7 @@ import AdminOrderPage from './pages/admin/AdminOrderPage';
 import MyProfilePage from './pages/my/MyProfilePage';
 
 // 인증 페이지에서는 Navbar 숨김
-const AUTH_PATHS = ['/login', '/register'];
+const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
 
 const Layout = ({ children }) => {
   const { pathname } = useLocation();
@@ -34,8 +35,9 @@ const App = () => (
     <Layout>
       <Routes>
         {/* 인증 페이지 — 풀 페이지, 네비바 없음 */}
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login"            element={<LoginPage />} />
+        <Route path="/register"         element={<RegisterPage />} />
+        <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
 
         {/* 일반 페이지 — 1200px 컨테이너 */}
         <Route path="/*" element={

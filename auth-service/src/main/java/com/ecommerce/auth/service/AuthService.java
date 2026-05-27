@@ -7,6 +7,8 @@ import com.ecommerce.auth.dto.LoginResponse;
 import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
 import com.ecommerce.auth.dto.ChangePasswordRequest;
+import com.ecommerce.auth.dto.ForgotPasswordRequest;
+import com.ecommerce.auth.dto.ForgotPasswordResponse;
 import com.ecommerce.auth.dto.MeResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
@@ -21,10 +23,15 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -33,10 +40,22 @@ public class AuthService {
 
     private static final String JWT_KEY_ID = "auth-key";
 
+    // 임시 비밀번호 생성용 문자셋
+    private static final String PW_UPPER  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String PW_LOWER  = "abcdefghijklmnopqrstuvwxyz";
+    private static final String PW_DIGITS = "0123456789";
+    private static final String PW_SPEC   = "!@#$%^&*";
+    private static final String PW_ALL    = PW_UPPER + PW_LOWER + PW_DIGITS + PW_SPEC;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MailService mailService;
+
+    // dev: true (응답 바디에 임시 비밀번호 포함), prod: false
+    @Value("${app.mail.expose-temp-password:true}")
+    private boolean exposeTempPassword;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -62,7 +81,9 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        String accessToken  = jwtProvider.issueAccessToken(user.getId(), user.getRole().name());
+        // 임시 비밀번호 로그인 시 pwdChangeRequired 클레임을 true로 발급
+        String accessToken  = jwtProvider.issueAccessToken(
+                user.getId(), user.getRole().name(), user.isPasswordChangeRequired());
         String refreshToken = jwtProvider.issueRefreshToken();
         refreshTokenRepository.save(refreshToken, user.getId(), jwtProvider.getRefreshTokenTtl());
 
@@ -83,7 +104,8 @@ public class AuthService {
         String newRefreshToken = jwtProvider.issueRefreshToken();
         refreshTokenRepository.save(newRefreshToken, userId, jwtProvider.getRefreshTokenTtl());
 
-        String newAccessToken = jwtProvider.issueAccessToken(userId, user.getRole().name());
+        String newAccessToken = jwtProvider.issueAccessToken(
+                userId, user.getRole().name(), user.isPasswordChangeRequired());
         return new RefreshResponse(newAccessToken, newRefreshToken, jwtProvider.getAccessTokenExpiryMs());
     }
 
@@ -103,6 +125,24 @@ public class AuthService {
         user.changePassword(passwordEncoder.encode(request.getNewPassword()));
         // 비밀번호 변경 후 모든 Refresh Token 무효화
         refreshTokenRepository.deleteAllByUserId(user.getId());
+    }
+
+    @Transactional
+    public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new InvalidCredentialsException("등록되지 않은 이메일입니다."));
+
+        String tempPassword = generateTempPassword();
+        user.applyTempPassword(passwordEncoder.encode(tempPassword));
+
+        // 기존 Refresh Token 전체 무효화 (보안)
+        refreshTokenRepository.deleteAllByUserId(user.getId());
+
+        mailService.sendTempPassword(user.getEmail(), tempPassword);
+
+        // prod: null 반환 (이메일로만 전달), dev: 응답 바디에 포함
+        String exposed = exposeTempPassword ? tempPassword : null;
+        return new ForgotPasswordResponse("임시 비밀번호가 발급되었습니다.", exposed);
     }
 
     @Transactional(readOnly = true)
@@ -125,5 +165,30 @@ public class AuthService {
                 .keyUse(KeyUse.SIGNATURE)
                 .build();
         return new JWKSet(rsaKey).toJSONObject();
+    }
+
+    /**
+     * 복잡도 조건을 만족하는 10자리 임시 비밀번호 생성.
+     * 대문자·소문자·숫자·특수문자 각 1개 이상 보장.
+     */
+    private String generateTempPassword() {
+        SecureRandom random = new SecureRandom();
+        List<Character> chars = new ArrayList<>();
+
+        // 카테고리별 최소 1개 보장
+        chars.add(PW_UPPER.charAt(random.nextInt(PW_UPPER.length())));
+        chars.add(PW_LOWER.charAt(random.nextInt(PW_LOWER.length())));
+        chars.add(PW_DIGITS.charAt(random.nextInt(PW_DIGITS.length())));
+        chars.add(PW_SPEC.charAt(random.nextInt(PW_SPEC.length())));
+
+        // 나머지 6자리 무작위
+        for (int i = 4; i < 10; i++) {
+            chars.add(PW_ALL.charAt(random.nextInt(PW_ALL.length())));
+        }
+
+        Collections.shuffle(chars, random);
+        StringBuilder sb = new StringBuilder(10);
+        for (char c : chars) sb.append(c);
+        return sb.toString();
     }
 }

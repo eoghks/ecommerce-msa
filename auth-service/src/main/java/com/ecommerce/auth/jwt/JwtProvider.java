@@ -44,12 +44,17 @@ public class JwtProvider {
     }
 
     public String issueAccessToken(Long userId, String role) {
+        return issueAccessToken(userId, role, false);
+    }
+
+    public String issueAccessToken(Long userId, String role, boolean passwordChangeRequired) {
         Date now    = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpiryMs);
 
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(String.valueOf(userId))
                 .claim("role", role)
+                .claim("pwdChangeRequired", passwordChangeRequired)
                 .issueTime(now)
                 .expirationTime(expiry)
                 .build();

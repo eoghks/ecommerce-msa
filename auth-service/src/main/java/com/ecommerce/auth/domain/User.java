@@ -51,6 +51,10 @@ public class User {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    // 임시 비밀번호 발급 후 강제 변경 여부
+    @Column(nullable = false)
+    private boolean passwordChangeRequired = false;
+
     @Builder
     private User(String email, String password, String name, Role role) {
         this.email    = email;
@@ -61,5 +65,12 @@ public class User {
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
+        this.passwordChangeRequired = false;
+    }
+
+    // 임시 비밀번호 적용 — 다음 로그인 시 비밀번호 변경 강제
+    public void applyTempPassword(String encodedPassword) {
+        this.password = encodedPassword;
+        this.passwordChangeRequired = true;
     }
 }
