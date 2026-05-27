@@ -41,6 +41,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/check-email",
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/.well-known",
+            "/api/v1/products",       // 상품 목록/상세 조회는 비인증 허용
+            "/api/v1/categories",     // 카테고리 조회는 비인증 허용
             "/actuator/"
     );
 
