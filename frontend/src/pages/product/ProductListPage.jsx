@@ -290,22 +290,20 @@ const ProductListPage = () => {
         </div>
       )}
 
-      {/* 로딩 */}
-      {loading && (
-        <div className="flex justify-center items-center py-24">
-          <div className="w-7 h-7 rounded-full animate-spin border-[3px] border-gray-200 border-t-brand-600" />
-        </div>
-      )}
-
       {/* 에러 */}
-      {error && (
-        <div className="error-box">{error}</div>
-      )}
+      {error && <div className="error-box">{error}</div>}
 
-      {/* 상품 그리드 */}
-      {!loading && !error && (
+      {/* 상품 그리드 — 로딩 중에도 이전 데이터 유지 (레이아웃 시프트 방지) */}
+      {!error && (
         <>
-          {products.length === 0 ? (
+          {/* 첫 로딩 스피너 (products가 아직 없을 때만) */}
+          {loading && products.length === 0 && (
+            <div className="flex justify-center items-center py-24">
+              <div className="w-7 h-7 rounded-full animate-spin border-[3px] border-gray-200 border-t-brand-600" />
+            </div>
+          )}
+
+          {!loading && products.length === 0 && (
             <div className="flex flex-col items-center gap-3 py-24 text-gray-400">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -320,13 +318,18 @@ const ProductListPage = () => {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          )}
+
+          {products.length > 0 && (
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity duration-150"
+              style={{ opacity: loading ? 0.5 : 1 }}
+            >
               {products.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           )}
 
-          <Pagination page={page} totalPages={totalPages} onChange={handlePage} />
+          {!loading && <Pagination page={page} totalPages={totalPages} onChange={handlePage} />}
         </>
       )}
     </div>
