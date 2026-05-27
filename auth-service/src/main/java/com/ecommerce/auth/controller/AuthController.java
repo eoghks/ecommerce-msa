@@ -1,6 +1,8 @@
 package com.ecommerce.auth.controller;
 
 import com.ecommerce.auth.dto.ChangePasswordRequest;
+import com.ecommerce.auth.dto.ForgotPasswordRequest;
+import com.ecommerce.auth.dto.ForgotPasswordResponse;
 import com.ecommerce.auth.dto.MeResponse;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
@@ -65,6 +67,12 @@ public class AuthController {
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(request);
         return ResponseEntity.noContent().build();
+    }
+
+    // 비밀번호 찾기 — 임시 비밀번호 발급 (비인증 공개 엔드포인트)
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ForgotPasswordResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.forgotPassword(request));
     }
 
     // 이메일 중복 체크 — 비인증 공개 엔드포인트

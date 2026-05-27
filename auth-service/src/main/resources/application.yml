@@ -29,6 +29,25 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+  # 이메일 설정 — 기본값은 빈 문자열 (dev 환경에서는 실제 발송 안 함)
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# 개발 환경: 임시 비밀번호를 응답으로 반환 (이메일 미발송)
+# 운영 환경(prod profile): 이메일 발송 후 응답에서 임시 비밀번호 제거
+app:
+  mail:
+    expose-temp-password: true   # prod profile에서 false로 override
+
 server:
   port: 8081
   servlet:
@@ -47,3 +66,17 @@ logging:
     console: UTF-8
   level:
     com.ecommerce: INFO
+
+---
+# profile이 prod인 경우 아래로 변경
+spring:
+  config:
+    activate:
+      on-profile: prod
+  mail:
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+
+app:
+  mail:
+    expose-temp-password: false

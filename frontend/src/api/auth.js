@@ -17,3 +17,6 @@ export const changePassword = (email, currentPassword, newPassword) =>
 
 export const getMe = () =>
   api.get('/api/v1/auth/me');
+
+export const forgotPassword = (email) =>
+  api.post('/api/v1/auth/forgot-password', { email });

@@ -1,39 +1,191 @@
-/* ecommerce-msa 글로벌 리셋 */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== BASE ===== */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #111827;
+    background: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  input, textarea, select {
+    font-family: inherit;
+  }
 }
 
-html, body {
-  width: 100%;
-  min-height: 100vh;
-  overflow-x: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px;
-  color: #111827;
-  background: #ffffff;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ===== COMPONENTS ===== */
+@layer components {
+
+  /* 인증 페이지 배경 */
+  .auth-page {
+    @apply min-h-screen bg-[#f5f5ff] flex items-center justify-center px-4 py-8 relative overflow-hidden;
+  }
+
+  /* 인증 카드 — 모바일: 패딩 작게, sm 이상: 넉넉하게 */
+  .auth-card {
+    @apply relative w-full max-w-[480px] bg-white rounded-[20px] px-6 py-8 sm:px-10 sm:py-9;
+    box-shadow: 0 4px 32px rgba(79,70,229,0.10), 0 1px 4px rgba(0,0,0,0.06);
+    border: 1px solid rgba(79,70,229,0.08);
+  }
+
+  /* 배경 장식 원 */
+  .auth-bg-circle-1 {
+    @apply absolute w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] rounded-full pointer-events-none;
+    background: radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%);
+    top: -80px; right: -80px;
+  }
+  .auth-bg-circle-2 {
+    @apply absolute w-[200px] h-[200px] sm:w-[300px] sm:h-[300px] rounded-full pointer-events-none;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+    bottom: -60px; left: -60px;
+  }
+
+  /* 로고 */
+  .auth-logo {
+    @apply flex items-center gap-2.5 mb-5;
+  }
+  .auth-logo-icon {
+    @apply w-11 h-11 bg-brand-50 rounded-xl flex items-center justify-center;
+  }
+  .auth-logo-text {
+    @apply text-xl font-bold text-brand-600;
+    letter-spacing: -0.3px;
+  }
+
+  /* 폼 공통 */
+  .auth-title {
+    @apply text-xl sm:text-2xl font-bold text-gray-900 mb-1;
+    letter-spacing: -0.5px;
+  }
+  .auth-subtitle {
+    @apply text-sm text-gray-500 mb-5;
+  }
+
+  /* 입력 필드 래퍼 */
+  .input-wrapper {
+    @apply relative flex items-center;
+  }
+  .input-icon {
+    @apply absolute left-3 flex items-center pointer-events-none;
+  }
+
+  /* 기본 인풋 */
+  .input-field {
+    @apply w-full h-11 pl-10 pr-3 text-sm text-gray-900 bg-white rounded-[10px] outline-none transition-all duration-150;
+    border: 1.5px solid #e5e7eb;
+  }
+  .input-field:focus {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+  }
+
+  /* 필드 레이블 */
+  .field-label {
+    @apply text-[13px] font-medium text-gray-700;
+  }
+
+  /* 주요 버튼 */
+  .btn-primary {
+    @apply w-full h-[46px] text-white font-semibold text-[15px] rounded-[10px] border-none transition-opacity duration-150 tracking-wide;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  }
+  .btn-primary:disabled {
+    @apply opacity-70;
+  }
+
+  /* 아웃라인 버튼 */
+  .btn-outline {
+    @apply h-[34px] px-3.5 bg-transparent text-[13px] font-medium text-gray-700 rounded-lg transition-colors duration-150;
+    border: 1.5px solid #e5e7eb;
+  }
+
+  /* 브랜드 아웃라인 버튼 */
+  .btn-brand-outline {
+    @apply inline-flex items-center h-[34px] px-3.5 text-[13px] font-medium text-brand-600 rounded-lg no-underline transition-colors duration-150;
+    border: 1.5px solid #4f46e5;
+  }
+
+  /* 브랜드 채우기 버튼 */
+  .btn-brand-fill {
+    @apply inline-flex items-center h-[34px] px-3.5 bg-brand-600 text-[13px] font-medium text-white rounded-lg no-underline;
+    border: 1.5px solid #4f46e5;
+  }
+
+  /* 에러 박스 */
+  .error-box {
+    @apply flex items-center gap-1.5 px-3.5 py-2.5 bg-red-50 text-[13px] text-red-600 rounded-lg;
+    border: 1px solid #fecaca;
+  }
+
+  /* 인포 박스 */
+  .info-box {
+    @apply flex items-center gap-1.5 px-3.5 py-2.5 bg-green-50 text-[13px] text-green-600 rounded-lg;
+    border: 1px solid #bbf7d0;
+  }
+
+  /* 일반 카드 */
+  .card {
+    @apply bg-white rounded-2xl p-5 sm:p-7;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    border: 1px solid #e5e7eb;
+  }
+
+  /* 로딩 스피너 */
+  .spinner {
+    @apply inline-block w-3.5 h-3.5 rounded-full animate-spin;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+  }
+
+  /* 구분선 */
+  .divider {
+    @apply flex items-center gap-3 my-6;
+  }
+  .divider-line {
+    @apply flex-1 h-px bg-gray-200 block;
+  }
+  .divider-text {
+    @apply text-xs text-gray-400 shrink-0 whitespace-nowrap;
+  }
+
+  /* 강제 변경 배너 */
+  .force-banner {
+    @apply flex items-start gap-3 px-4 py-3.5 sm:px-[18px] rounded-xl text-amber-800;
+    background: #fffbeb;
+    border: 1.5px solid #fcd34d;
+    line-height: 1.5;
+  }
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-button {
-  cursor: pointer;
-  font-family: inherit;
-}
-
-input, textarea, select {
-  font-family: inherit;
+/* ===== 키프레임 ===== */
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
