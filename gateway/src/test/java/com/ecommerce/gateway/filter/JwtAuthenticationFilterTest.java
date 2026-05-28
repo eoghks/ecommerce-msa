@@ -68,25 +68,35 @@ class JwtAuthenticationFilterTest {
     // ── 헤더 검증 ──────────────────────────────────────────
 
     @Test
-    @DisplayName("Authorization 헤더 없으면 401 반환")
+    @DisplayName("인증 필수 경로에서 Authorization 헤더 없으면 401 반환")
     void no_auth_header_returns_401() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/products").build());
+                MockServerHttpRequest.get("/api/v1/orders").build());
 
         StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
-    @DisplayName("Bearer 접두사 없으면 401 반환")
+    @DisplayName("인증 필수 경로에서 Bearer 접두사 없으면 401 반환")
     void invalid_token_format_returns_401() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/v1/products")
+                MockServerHttpRequest.get("/api/v1/orders")
                         .header(HttpHeaders.AUTHORIZATION, "InvalidToken abc")
                         .build());
 
         StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("선택 인증 경로(상품 목록)는 토큰 없이 통과")
+    void optional_auth_path_passes_without_token() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/products").build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
     // ── RSA 서명 검증 ──────────────────────────────────────────

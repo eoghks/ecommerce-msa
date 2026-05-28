@@ -14,18 +14,19 @@ import java.security.interfaces.RSAPublicKey;
 /**
  * Auth Service JWKS 엔드포인트에서 RSA 공개키를 fetch·캐싱.
  *
- * [왜 @Scheduled가 필요한가]
- * 현재 auth-service는 기동 시마다 RSA 키를 새로 생성한다 (JwtProvider.@PostConstruct).
- * auth-service가 재시작되면 새 키로 발급된 토큰을 Gateway가 가진 옛날 공개키로 검증 → 401 발생.
- * @Scheduled(5분)로 주기적으로 공개키를 재fetch하여 최대 5분 내 자동 복구.
+ * [기동 순서 문제 해결]
+ * Gateway가 Auth-service보다 먼저 뜨면 @PostConstruct 시점에 JWKS 로드 실패 → publicKey == null.
+ * 이를 해결하기 위해 두 단계 스케줄러를 운영한다:
+ *   1) fastRecovery: 5초 간격 — publicKey가 null인 동안만 재시도. Auth-service 기동 후 즉시 복구.
+ *   2) refreshPublicKey: 5분 간격 — 정상 운영 중 키 교체(auth-service 재시작) 대응.
  *
  * [근본 해결책]
  * auth-service RSA 키를 외부(K8s Secret / Vault)에서 고정 PEM으로 주입하면
- * 재시작해도 키가 바뀌지 않으므로 @Scheduled 불필요.
+ * 재시작해도 키가 바뀌지 않으므로 두 스케줄러 모두 불필요.
  * → docs/tradeoffs/CR-01-rsa-key-inmemory.md 참고
  *
  * [volatile 이유]
- * @Scheduled(스케줄러 스레드)가 publicKey를 갱신할 때 요청 처리 스레드가
+ * 스케줄러 스레드가 publicKey를 갱신할 때 요청 처리 스레드가
  * CPU 캐시의 옛날 값을 읽지 않도록 메인 메모리 직접 읽기/쓰기 보장.
  */
 @Slf4j
@@ -38,7 +39,7 @@ public class JwksClient {
     @Value("${auth.jwks-url:http://localhost:8081/api/v1/auth/.well-known/jwks.json}")
     private String jwksUrl;
 
-    // MD-04: volatile — @Scheduled 갱신 시 가시성 보장
+    // MD-04: volatile — 스케줄러 스레드 갱신 시 가시성 보장
     private volatile RSAPublicKey publicKey;
 
     private final WebClient webClient = WebClient.create();
@@ -48,7 +49,20 @@ public class JwksClient {
         refreshPublicKey();
     }
 
-    // CR-03: 주기적 공개키 갱신 (기본 5분, 환경변수로 조정 가능)
+    /**
+     * 빠른 복구 스케줄러 — publicKey가 null인 동안 5초마다 재시도.
+     * Auth-service가 늦게 기동되어 초기 로드가 실패한 경우 자동 복구.
+     * publicKey가 정상이면 즉시 반환하므로 오버헤드 없음.
+     */
+    @Scheduled(fixedDelay = 5000)
+    public void fastRecovery() {
+        if (publicKey == null) {
+            log.info("공개키 미로드 상태 — 빠른 복구 재시도 중");
+            refreshPublicKey();
+        }
+    }
+
+    // CR-03: 주기적 공개키 갱신 — auth-service 재시작 시 키 교체 대응 (기본 5분)
     @Scheduled(fixedDelayString = "${auth.jwks-refresh-interval-ms:300000}")
     public void refreshPublicKey() {
         for (int attempt = 1; attempt <= MAX_RETRY; attempt++) {

@@ -39,9 +39,9 @@ const App = () => (
         <Route path="/register"         element={<RegisterPage />} />
         <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
 
-        {/* 일반 페이지 — 1200px 컨테이너 */}
+        {/* 일반 페이지 — 1600px 컨테이너 */}
         <Route path="/*" element={
-          <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+          <main style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px', width: '100%' }}>
             <Routes>
               <Route path="/"             element={<ProductListPage />} />
               <Route path="/products"     element={<ProductListPage />} />

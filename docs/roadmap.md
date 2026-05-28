@@ -127,6 +127,78 @@
 
 ---
 
+## Backlog — 추후 구현 예정
+
+> 7주 로드맵 완료 후 우선순위에 따라 순차 진행.
+
+---
+
+### B-01. 판매자(SELLER) 역할 및 판매 플로우
+
+**개요**: USER → 판매자 신청 → 전화번호 인증 → SELLER 승격 → 상품 등록/판매/정산
+
+**구현 범위**
+
+| 단계 | 내용 |
+|------|------|
+| 판매자 신청 | 내 정보 화면에서 "판매자 신청" 버튼 → 전화번호 입력 → SMS 인증번호 발송 |
+| 본인 인증 | 인증번호 확인 후 `SELLER` 역할 승격 (auth-service) |
+| 상품 관리 | SELLER는 본인이 등록한 상품만 수정/삭제 가능 (상품에 `sellerId` 필드 추가) |
+| 정산 | 주문 완료 시 판매금액의 일정 비율을 SELLER 정산 계좌에 적립 (정산 서비스 별도) |
+
+**필요 작업**
+- [ ] `Role` 열거형에 `SELLER` 추가
+- [ ] `User` 엔티티에 `phone`, `sellerAppliedAt` 필드 추가
+- [ ] SMS 인증 서비스 연동 (Twilio 또는 NHN Cloud SMS)
+- [ ] `POST /api/v1/auth/seller/apply` — 판매자 신청 + SMS 발송
+- [ ] `POST /api/v1/auth/seller/verify` — 인증번호 확인 + 역할 승격
+- [ ] `Product` 엔티티에 `sellerId` 추가, SELLER는 본인 상품만 관리
+- [ ] JWT 클레임에 `role: SELLER` 반영
+- [ ] 정산 서비스 (settlement-service) 신규 생성
+- [ ] 프론트: 내 정보 화면에 "판매자 신청" UI 추가
+
+---
+
+### B-02. 마일리지
+
+**개요**: 주문 완료 시 결제금액의 일정 비율 마일리지 적립, 다음 주문 시 사용
+
+**구현 범위**
+- 적립: 주문 확정 시 결제금액의 1% 자동 적립
+- 사용: 주문 시 보유 마일리지 전액 또는 일부 차감
+- 내역: 적립/사용 이력 조회
+
+**필요 작업**
+- [ ] `mileage-service` 신규 생성 (또는 auth-service 확장)
+- [ ] `Mileage` 엔티티 — userId, amount, type(EARN/USE), createdAt
+- [ ] Kafka 이벤트 연동 — `OrderConfirmed` 이벤트 수신 후 마일리지 적립
+- [ ] `GET /api/v1/mileage/me` — 잔액 및 내역 조회
+- [ ] `POST /api/v1/mileage/use` — 사용 요청 (주문 서비스에서 호출)
+- [ ] 프론트: 주문 화면에 마일리지 사용 UI, 내 정보에 잔액 표시
+
+---
+
+### B-03. 쿠폰
+
+**개요**: ADMIN이 쿠폰 발행, USER가 다운로드 후 주문 시 적용
+
+**구현 범위**
+- 발행: ADMIN이 정률/정액 할인 쿠폰 생성 (유효기간, 최소 주문금액, 최대 할인금액)
+- 다운로드: USER가 쿠폰 목록에서 발급
+- 사용: 주문 시 보유 쿠폰 선택 → 할인 적용 (1회용, 사용 후 소멸)
+
+**필요 작업**
+- [ ] `coupon-service` 신규 생성
+- [ ] `Coupon` 엔티티 — 쿠폰 정의 (코드, 타입, 금액, 유효기간, 발급 수량)
+- [ ] `UserCoupon` 엔티티 — 유저별 보유/사용 현황
+- [ ] `POST /api/v1/coupons` (ADMIN) — 쿠폰 생성
+- [ ] `POST /api/v1/coupons/{id}/download` — 쿠폰 다운로드
+- [ ] `GET /api/v1/coupons/me` — 내 쿠폰 목록
+- [ ] 주문 생성 시 쿠폰 코드 전달 → order-service에서 coupon-service 검증 호출
+- [ ] 프론트: 쿠폰함 화면, 주문 시 쿠폰 선택 UI
+
+---
+
 ## 기술 스택 확정
 | 항목 | 선택 |
 |------|------|

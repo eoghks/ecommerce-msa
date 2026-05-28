@@ -17,7 +17,7 @@ spring:
   data:
     redis:
       host: ${REDIS_PRODUCT_HOST:localhost}
-      port: ${REDIS_PRODUCT_PORT:6380}
+      port: ${REDIS_PRODUCT_PORT:6379}
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
     consumer:
@@ -47,5 +47,11 @@ management:
         include: health, info
 
 logging:
+  file:
+    name: ${user.dir}/logs/product-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
   level:
     com.ecommerce: INFO
