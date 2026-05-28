@@ -1,7 +1,7 @@
 # 주간 개발 로드맵
 
 > 하루 2시간 / 주 5일 / 총 7주  
-> 스택: Java 21, Spring Boot 3.x, Gradle, PostgreSQL, Redis, React, Docker
+> 스택: Java 21, Spring Boot 3.5, Gradle, PostgreSQL, Redis, React 19, Docker
 
 ---
 
@@ -74,17 +74,10 @@
 | Day | 작업 |
 |-----|------|
 | 1 ✅ | React 프로젝트 생성, 라우터/Axios 기본 세팅, 로그인·회원가입·내 정보 화면, Navbar |
-| 2 | **[TODO] 비밀번호 찾기 화면** ("비밀번호를 잊으셨나요?" 링크 → 이메일 입력 → 임시 비밀번호 발급 or 재설정 링크 전송) + 상품 목록/상세 화면 |
+| 2 ✅ | 비밀번호 찾기 화면(PR #14), 상품 목록/상세 화면, Gateway 안정화(JWKS fastRecovery + Optional 인증), 로그인 UX 개선 |
 | 3 | 장바구니 (Redis 기반) + 주문하기 화면 |
 | 4 | 관리자 화면 — 상품 등록/수정/삭제 |
 | 5 | 관리자 화면 — 주문 목록 조회 + PR → develop 머지 |
-
-> **Day 2 비밀번호 찾기 구현 시 필요 작업**
-> - `LoginPage` — "비밀번호를 잊으셨나요?" 링크 추가
-> - `ForgotPasswordPage` — 이메일 입력 화면
-> - `auth-service` — `/api/v1/auth/forgot-password` 엔드포인트 (이메일 인증 or 임시 비밀번호)
-> - 이메일 발송: Spring Mail (SMTP) or 임시 비밀번호 직접 응답 (개발용)
-> - Gateway 화이트리스트에 `/api/v1/auth/forgot-password` 추가
 
 ---
 
@@ -226,9 +219,9 @@
 | 항목 | 선택 |
 |------|------|
 | Language | Java 21 |
-| Framework | Spring Boot 3.x |
+| Framework | Spring Boot 3.5 |
 | Build | Gradle |
-| DB | PostgreSQL |
+| DB | PostgreSQL 16 |
 | Cache | Redis 7.x |
-| Frontend | React 18 |
+| Frontend | React 19, Vite 8, Tailwind CSS |
 | Infra | Docker, Docker Compose |
