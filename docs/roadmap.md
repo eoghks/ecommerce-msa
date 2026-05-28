@@ -199,6 +199,29 @@
 
 ---
 
+### B-04. 프론트엔드 TypeScript 마이그레이션
+
+**개요**: 현재 JavaScript(JSX)로 작성된 프론트엔드를 TypeScript(TSX)로 전환
+
+**전환 범위**
+| 작업 | 대상 |
+|------|------|
+| 파일 리네임 | `.jsx` → `.tsx`, `.js` → `.ts` (약 25개) |
+| 타입 정의 | API 응답 타입 (`Product`, `Order`, `User`, `Category` 등) |
+| 스토어 타입 | Zustand `authStore`, `cartStore` 인터페이스 정의 |
+| 컴포넌트 props | 각 컴포넌트 props 타입 명시 |
+| `tsconfig.json` | Vite + React 기준 설정 |
+
+**사전 조건**
+- `@types/react`, `@types/react-dom` 이미 설치됨 (`devDependencies`)
+- `typescript` 패키지 설치 필요 (`npm i -D typescript`)
+
+**예상 소요**: 1일 (파일 변환 + 타입 에러 수정)
+
+**우선순위**: 낮음 — 7주 기능 완성 후 리팩토링 단계에서 진행
+
+---
+
 ## 기술 스택 확정
 | 항목 | 선택 |
 |------|------|
