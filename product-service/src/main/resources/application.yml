@@ -47,5 +47,11 @@ management:
         include: health, info
 
 logging:
+  file:
+    name: ${user.dir}/logs/product-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
   level:
     com.ecommerce: INFO
