@@ -32,7 +32,9 @@ const LoginPage = () => {
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
-  const [info, setInfo] = useState(location.state?.message || '');
+  const sessionMsg = sessionStorage.getItem('loginMessage') || '';
+  if (sessionMsg) sessionStorage.removeItem('loginMessage');
+  const [info, setInfo] = useState(location.state?.message || sessionMsg);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState('');
 

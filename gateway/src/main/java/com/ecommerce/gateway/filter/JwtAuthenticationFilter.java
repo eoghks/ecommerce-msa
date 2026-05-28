@@ -74,6 +74,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
         RSAPublicKey publicKey = jwksClient.getPublicKey();
         if (publicKey == null) {
+            // 선택적 인증 경로는 공개키 미로드 시에도 익명으로 통과
+            if (isOptional) {
+                log.warn("공개키 미로드 — 선택적 인증 경로 익명 통과: path={}", path);
+                return chain.filter(exchange);
+            }
             log.warn("공개키 미로드 — Auth Service 연결 확인 필요: path={}", path);
             return onUnauthorized(exchange);
         }
@@ -82,6 +87,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         try {
             SignedJWT jwt = SignedJWT.parse(token);
             if (!jwt.verify(new RSASSAVerifier(publicKey))) {
+                // 선택적 인증 경로는 서명 불일치 시에도 익명으로 통과 (키 교체 과도기 대응)
+                if (isOptional) {
+                    log.warn("JWT 서명 불일치 — 선택적 인증 경로 익명 통과 (키 교체 과도기?): path={}", path);
+                    return chain.filter(exchange);
+                }
                 log.warn("JWT 서명 검증 실패: path={}", path);
                 return onUnauthorized(exchange);
             }
@@ -91,6 +101,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             // HR-02: exp 클레임 null 방어
             Date expiry = claims.getExpirationTime();
             if (expiry == null || expiry.before(new Date())) {
+                // 선택적 인증 경로는 만료 토큰도 익명으로 통과
+                if (isOptional) {
+                    log.warn("JWT 만료 — 선택적 인증 경로 익명 통과: path={}", path);
+                    return chain.filter(exchange);
+                }
                 log.warn("JWT 만료 또는 exp 클레임 없음: path={}", path);
                 return onUnauthorized(exchange);
             }
@@ -120,6 +135,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
 
         } catch (Exception e) {
+            // 선택적 인증 경로는 파싱 실패 시에도 익명으로 통과
+            if (isOptional) {
+                log.warn("JWT 파싱/검증 오류 — 선택적 인증 경로 익명 통과: {}", e.getMessage());
+                return chain.filter(exchange);
+            }
             log.warn("JWT 검증 실패: {}", e.getMessage());
             return onUnauthorized(exchange);
         }

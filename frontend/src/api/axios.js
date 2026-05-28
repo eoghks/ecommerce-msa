@@ -27,6 +27,8 @@ instance.interceptors.response.use(
     const isPublic = PUBLIC_ENDPOINTS.some((p) => url.includes(p));
     if (error.response?.status === 401 && !isPublic) {
       localStorage.removeItem('accessToken');
+      // 로그인 페이지에서 안내 메시지를 표시할 수 있도록 sessionStorage에 저장
+      sessionStorage.setItem('loginMessage', '세션이 만료되었습니다. 다시 로그인해주세요.');
       window.location.href = '/login';
     }
     return Promise.reject(error);
