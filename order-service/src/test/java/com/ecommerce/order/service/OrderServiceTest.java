@@ -49,10 +49,11 @@ class OrderServiceTest {
     void createOrder_success() {
         Long userId = 1L;
         OrderCreateRequest request = new OrderCreateRequest(
-                List.of(new OrderItemRequest(10L, 2))
+                List.of(new OrderItemRequest(10L, 2)),
+                "홍길동", "010-1234-5678", "서울시 강남구 테헤란로 1"
         );
         ProductClient.ProductInfo productInfo =
-                new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10);
+                new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10, "https://example.com/img.jpg");
         Order savedOrder = buildOrder(userId, 10L, "갤럭시 S24", 1_200_000L, 2);
 
         given(productClient.getProduct(10L)).willReturn(productInfo);
