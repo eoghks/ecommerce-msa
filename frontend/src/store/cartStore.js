@@ -24,28 +24,35 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  /** 상품 추가 → 서버 반영 후 재조회 */
+  /** 상품 추가 → 서버 반영 후 재조회 (가격·상품명은 서버에서 Product Service 조회) */
   addItem: async (product, quantity = 1) => {
     await addCartItem({
       productId: product.id,
-      productName: product.name,
-      price: product.price,
       quantity,
-      imageUrl: product.imageUrl ?? null,
     });
     await get().fetchCart();
   },
 
-  /** 수량 변경 → 로컬 즉시 반영 + 서버 동기화 */
+  /** 수량 변경 → 로컬 즉시 반영 + 서버 동기화 (HR-02: 실패 시 원복) */
   updateQuantity: async (productId, quantity) => {
-    set({ items: get().items.map((i) => (i.productId === productId ? { ...i, quantity } : i)) });
-    await updateCartItem(productId, quantity);
+    const prev = get().items;
+    set({ items: prev.map((i) => (i.productId === productId ? { ...i, quantity } : i)) });
+    try {
+      await updateCartItem(productId, quantity);
+    } catch {
+      set({ items: prev }); // 서버 오류 시 변경 전 상태로 원복
+    }
   },
 
-  /** 개별 삭제 → 로컬 즉시 반영 + 서버 동기화 */
+  /** 개별 삭제 → 로컬 즉시 반영 + 서버 동기화 (HR-02: 실패 시 원복) */
   removeItem: async (productId) => {
-    set({ items: get().items.filter((i) => i.productId !== productId) });
-    await removeCartItem(productId);
+    const prev = get().items;
+    set({ items: prev.filter((i) => i.productId !== productId) });
+    try {
+      await removeCartItem(productId);
+    } catch {
+      set({ items: prev }); // 서버 오류 시 삭제 취소
+    }
   },
 
   /** 전체 비우기 */

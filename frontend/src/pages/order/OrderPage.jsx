@@ -42,7 +42,8 @@ const OrderPage = () => {
         price: i.price,
         quantity: i.quantity,
       }));
-      await createOrder(orderItems);
+      // HR-05: 배송 정보 함께 전송
+      await createOrder(orderItems, { receiver, phone, address });
       await clear();
       navigate('/orders', { state: { ordered: true } });
     } catch (err) {

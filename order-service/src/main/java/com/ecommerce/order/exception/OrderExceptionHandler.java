@@ -28,6 +28,14 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(CartItemNotFoundException.class)
+    public ProblemDetail handleCartItemNotFound(CartItemNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Cart Item Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/cart-item-not-found"));
+        return pd;
+    }
+
     /** 취소 불가 상태 주문 취소 시도 → 409 Conflict */
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException ex) {

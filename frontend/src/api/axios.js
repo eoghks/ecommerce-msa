@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken, clearToken } from '../store/tokenStore';
 
 // API Gateway 주소 — 환경별 .env로 관리
 const instance = axios.create({
@@ -7,9 +8,9 @@ const instance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// 요청 인터셉터 — JWT Access Token 자동 첨부
+// 요청 인터셉터 — JWT Access Token 자동 첨부 (CR-05: 메모리 전용 토큰 사용)
 instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = getToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -26,7 +27,8 @@ instance.interceptors.response.use(
     const url = error.config?.url || '';
     const isPublic = PUBLIC_ENDPOINTS.some((p) => url.includes(p));
     if (error.response?.status === 401 && !isPublic) {
-      localStorage.removeItem('accessToken');
+      // CR-05: localStorage 대신 메모리 토큰 초기화
+      clearToken();
       // 로그인 페이지에서 안내 메시지를 표시할 수 있도록 sessionStorage에 저장
       sessionStorage.setItem('loginMessage', '세션이 만료되었습니다. 다시 로그인해주세요.');
       window.location.href = '/login';

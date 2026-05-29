@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import PrivateRoute from './components/common/PrivateRoute';
 import AdminRoute from './components/common/AdminRoute';
-import { getOrCreateGuestId } from './utils/guestId';
+import api from './api/axios';
 import useCartStore from './store/cartStore';
 
 import LoginPage from './pages/auth/LoginPage';
@@ -27,8 +27,8 @@ const Layout = ({ children }) => {
   const fetchCart = useCartStore((s) => s.fetchCart);
 
   useEffect(() => {
-    // 게스트 식별 쿠키 초기화 (비로그인 장바구니용)
-    getOrCreateGuestId();
+    // CR-06: guestId HttpOnly 쿠키를 서버가 발급 — JS에서 직접 쿠키 생성 금지
+    api.post('/api/v1/cart/guest/init').catch(() => {/* 실패해도 비로그인 장바구니 미사용으로 처리 */});
     // 앱 진입 시 장바구니 서버 동기화
     fetchCart();
   }, []);

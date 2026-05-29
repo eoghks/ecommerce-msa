@@ -59,13 +59,23 @@ public class CartItem {
         updatedAt = LocalDateTime.now();
     }
 
+    // HR-04: 수량 하한 1 / 상한 999 검증
+    private static final int MAX_QUANTITY = 999;
+
     public void updateQuantity(int quantity) {
+        if (quantity < 1 || quantity > MAX_QUANTITY) {
+            throw new IllegalArgumentException("수량은 1 ~ " + MAX_QUANTITY + " 사이여야 합니다.");
+        }
         this.quantity = quantity;
         this.updatedAt = LocalDateTime.now();
     }
 
     public void addQuantity(int delta) {
-        this.quantity += delta;
+        int next = this.quantity + delta;
+        if (next < 1 || next > MAX_QUANTITY) {
+            throw new IllegalArgumentException("수량은 1 ~ " + MAX_QUANTITY + " 사이여야 합니다.");
+        }
+        this.quantity = next;
         this.updatedAt = LocalDateTime.now();
     }
 }
