@@ -20,7 +20,7 @@ spring:
   data:
     redis:
       host: ${REDIS_ORDER_HOST:localhost}
-      port: ${REDIS_ORDER_PORT:6381}
+      port: ${REDIS_ORDER_PORT:6379}
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
     consumer:
