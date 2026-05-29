@@ -47,7 +47,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     // 토큰 없이도 접근 허용 (있으면 검증 후 헤더 주입)
     private static final List<String> OPTIONAL_AUTH_LIST = List.of(
             "/api/v1/products",
-            "/api/v1/categories"
+            "/api/v1/categories",
+            "/api/v1/cart"      // 비로그인 장바구니 허용 (게스트: 쿠키 기반)
     );
 
     private final JwksClient jwksClient;
