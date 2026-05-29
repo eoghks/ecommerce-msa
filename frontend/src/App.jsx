@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import PrivateRoute from './components/common/PrivateRoute';
 import AdminRoute from './components/common/AdminRoute';
+import { getOrCreateGuestId } from './utils/guestId';
+import useCartStore from './store/cartStore';
 
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -21,6 +24,14 @@ const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
 const Layout = ({ children }) => {
   const { pathname } = useLocation();
   const isAuthPage = AUTH_PATHS.includes(pathname);
+  const fetchCart = useCartStore((s) => s.fetchCart);
+
+  useEffect(() => {
+    // 게스트 식별 쿠키 초기화 (비로그인 장바구니용)
+    getOrCreateGuestId();
+    // 앱 진입 시 장바구니 서버 동기화
+    fetchCart();
+  }, []);
 
   return (
     <>
@@ -47,8 +58,8 @@ const App = () => (
               <Route path="/products"     element={<ProductListPage />} />
               <Route path="/products/:id" element={<ProductDetailPage />} />
 
-              {/* 로그인 필요 */}
-              <Route path="/cart"         element={<PrivateRoute><CartPage /></PrivateRoute>} />
+              {/* 비로그인도 접근 가능 (게스트 장바구니) */}
+              <Route path="/cart"         element={<CartPage />} />
               <Route path="/order"        element={<PrivateRoute><OrderPage /></PrivateRoute>} />
               <Route path="/orders"       element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
               <Route path="/my/profile"   element={<PrivateRoute><MyProfilePage /></PrivateRoute>} />

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { login } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
+import useCartStore from '../../store/cartStore';
+import { mergeGuestCart } from '../../api/cart';
 
 const IconEmail = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,6 +31,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const loginStore = useAuthStore((s) => s.login);
+  const fetchCart = useCartStore((s) => s.fetchCart);
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -61,11 +64,18 @@ const LoginPage = () => {
       const { accessToken } = res.data;
       loginStore(accessToken);
 
+      // 게스트 장바구니 → 사용자 장바구니 병합 (실패해도 로그인 진행)
+      try {
+        await mergeGuestCart();
+      } catch (_) { /* 병합 실패 무시 */ }
+      await fetchCart();
+
       const claims = JSON.parse(atob(accessToken.split('.')[1]));
+      const from = location.state?.from;
       if (claims?.pwdChangeRequired) {
         navigate('/my/profile', { state: { forceChange: true } });
       } else {
-        navigate('/products');
+        navigate(from || '/products');
       }
     } catch (err) {
       const msg = err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.';

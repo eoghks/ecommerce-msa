@@ -57,21 +57,21 @@ const Navbar = () => {
 
         {/* 우측 영역 */}
         <div className="flex items-center gap-1.5 md:gap-2 ml-auto">
+          {/* 장바구니 — 비로그인도 표시 (게스트 장바구니) */}
+          <Link to="/cart" className="relative flex items-center justify-center w-[38px] h-[38px] rounded-lg no-underline hover:bg-gray-100 transition-colors">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+            {totalCount > 0 && (
+              <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-[3px] bg-brand-600 text-white text-[10px] font-bold rounded-lg flex items-center justify-center">
+                {totalCount}
+              </span>
+            )}
+          </Link>
+
           {isAuthenticated ? (
             <>
-              {/* 장바구니 */}
-              <Link to="/cart" className="relative flex items-center justify-center w-[38px] h-[38px] rounded-lg no-underline hover:bg-gray-100 transition-colors">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-                {totalCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-[3px] bg-brand-600 text-white text-[10px] font-bold rounded-lg flex items-center justify-center">
-                    {totalCount}
-                  </span>
-                )}
-              </Link>
-
               {/* MY 드롭다운 — md 이상 */}
               <div ref={myRef} className="relative hidden md:block">
                 <button
