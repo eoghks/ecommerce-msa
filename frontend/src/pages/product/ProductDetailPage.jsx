@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { getProduct } from '../../api/product';
 import useCartStore from '../../store/cartStore';
-import useAuthStore from '../../store/authStore';
-
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const ProductDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
   const addItem = useCartStore((s) => s.addItem);
 
   const [product, setProduct] = useState(null);
@@ -31,14 +27,14 @@ const ProductDetailPage = () => {
     setQuantity((q) => Math.max(1, Math.min(product?.stock ?? 1, q + delta)));
   };
 
-  const handleAddCart = () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/products/${id}` } });
-      return;
+  const handleAddCart = async () => {
+    try {
+      await addItem(product, quantity);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    } catch {
+      // 장바구니 추가 실패 — 무시 (네트워크 오류 등)
     }
-    addItem(product, quantity);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
   };
 
   /* 로딩 */
@@ -161,11 +157,6 @@ const ProductDetailPage = () => {
                 )}
               </button>
 
-              {!isAuthenticated && (
-                <p className="text-[12px] text-gray-400 m-0 text-center">
-                  장바구니는 로그인 후 이용 가능합니다.
-                </p>
-              )}
             </div>
           )}
 
