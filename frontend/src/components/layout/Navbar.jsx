@@ -109,12 +109,18 @@ const Navbar = () => {
                       </svg>
                       내 주문
                     </Link>
+                    <div className="h-px bg-gray-100 mx-3" />
+                    <button
+                      onClick={() => { setMyOpen(false); handleLogout(); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors bg-transparent border-none">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                      </svg>
+                      로그아웃
+                    </button>
                   </div>
                 )}
               </div>
-
-              {/* 로그아웃 — md 이상 */}
-              <button onClick={handleLogout} className="btn-outline hidden md:block">로그아웃</button>
 
               {/* 햄버거 — md 미만 */}
               <div ref={mobileRef} className="relative md:hidden">
