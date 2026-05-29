@@ -1,7 +1,7 @@
 import api from './axios';
 
-export const createOrder = (items) =>
-  api.post('/api/v1/orders', { items });
+export const createOrder = (items, { receiver, phone, address }) =>
+  api.post('/api/v1/orders', { items, receiver, phone, address });
 
 export const getMyOrders = (page = 0, size = 20) =>
   api.get('/api/v1/orders/me', { params: { page, size } });

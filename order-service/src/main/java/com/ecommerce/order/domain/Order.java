@@ -43,6 +43,16 @@ public class Order {
     @Column(nullable = false)
     private Long totalPrice;
 
+    // HR-05: 배송 정보 — 주문 시 수령인·연락처·주소 저장
+    @Column(length = 100)
+    private String receiver;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Column(length = 300)
+    private String address;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -55,9 +65,13 @@ public class Order {
     private LocalDateTime updatedAt;
 
     @Builder
-    private Order(Long userId, Long totalPrice, List<OrderItem> items) {
+    private Order(Long userId, Long totalPrice, String receiver, String phone,
+                  String address, List<OrderItem> items) {
         this.userId     = userId;
         this.totalPrice = totalPrice;
+        this.receiver   = receiver;
+        this.phone      = phone;
+        this.address    = address;
         this.status     = OrderStatus.PENDING;
         if (items != null) {
             items.forEach(this::addItem);

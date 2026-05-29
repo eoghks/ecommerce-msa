@@ -40,7 +40,7 @@ public class OrderService {
         List<OrderItem> items = fetchOrderItems(request);
         long totalPrice = items.stream().mapToLong(OrderItem::subtotal).sum();
 
-        return saveOrderAndPublishEvent(userId, totalPrice, items);
+        return saveOrderAndPublishEvent(userId, totalPrice, items, request);
     }
 
     /**
@@ -49,10 +49,15 @@ public class OrderService {
      */
     @Transactional
     protected OrderResponse saveOrderAndPublishEvent(Long userId, long totalPrice,
-                                                     List<OrderItem> items) {
+                                                     List<OrderItem> items,
+                                                     OrderCreateRequest request) {
         Order order = Order.builder()
                 .userId(userId)
                 .totalPrice(totalPrice)
+                // HR-05: 배송 정보 저장
+                .receiver(request.receiver())
+                .phone(request.phone())
+                .address(request.address())
                 .items(items)
                 .build();
         Order savedOrder = orderRepository.save(order);

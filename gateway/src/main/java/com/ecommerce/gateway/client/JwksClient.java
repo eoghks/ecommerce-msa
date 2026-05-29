@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
 
 /**
  * Auth Service JWKS 엔드포인트에서 RSA 공개키를 fetch·캐싱.
@@ -33,8 +34,10 @@ import java.security.interfaces.RSAPublicKey;
 @Component
 public class JwksClient {
 
-    private static final int  MAX_RETRY      = 3;
-    private static final long RETRY_DELAY_MS = 2000L;
+    private static final int      MAX_RETRY        = 3;
+    private static final long     RETRY_DELAY_MS   = 2000L;
+    // HR-06: block() 무한 대기 방지 — 5초 타임아웃
+    private static final Duration JWKS_TIMEOUT     = Duration.ofSeconds(5);
 
     @Value("${auth.jwks-url:http://localhost:8081/api/v1/auth/.well-known/jwks.json}")
     private String jwksUrl;
@@ -71,7 +74,7 @@ public class JwksClient {
                         .uri(jwksUrl)
                         .retrieve()
                         .bodyToMono(String.class)
-                        .block();
+                        .block(JWKS_TIMEOUT); // HR-06: 무한 대기 방지
 
                 this.publicKey = ((RSAKey) JWKSet.parse(json).getKeys().get(0)).toRSAPublicKey();
                 log.info("JWKS 공개키 로드 완료 (시도 {}회)", attempt);

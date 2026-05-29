@@ -12,6 +12,9 @@ public record OrderResponse(
         OrderStatus status,
         Long totalPrice,
         List<OrderItemResponse> items,
+        String receiver,
+        String phone,
+        String address,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -22,6 +25,9 @@ public record OrderResponse(
                 order.getStatus(),
                 order.getTotalPrice(),
                 order.getItems().stream().map(OrderItemResponse::from).toList(),
+                order.getReceiver(),
+                order.getPhone(),
+                order.getAddress(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );

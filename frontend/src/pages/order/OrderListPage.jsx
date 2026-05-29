@@ -6,11 +6,9 @@ const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const STATUS_LABEL = {
-  PENDING: { text: '결제 대기', color: '#f59e0b' },
-  PAID: { text: '결제 완료', color: '#3b82f6' },
-  SHIPPING: { text: '배송 중', color: '#8b5cf6' },
-  DELIVERED: { text: '배송 완료', color: '#22c55e' },
-  CANCELLED: { text: '취소됨', color: '#9ca3af' },
+  PENDING:   { text: '결제 대기', color: '#f59e0b' },
+  CONFIRMED: { text: '주문 확정', color: '#22c55e' },
+  CANCELLED: { text: '취소됨',   color: '#9ca3af' },
 };
 
 const OrderListPage = () => {

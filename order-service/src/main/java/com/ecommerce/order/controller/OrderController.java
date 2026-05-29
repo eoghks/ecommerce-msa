@@ -37,7 +37,7 @@ public class OrderController {
     }
 
     /** 내 주문 목록 조회 (페이징, 기본 20건) */
-    @GetMapping
+    @GetMapping("/me")
     public ResponseEntity<Page<OrderResponse>> getMyOrders(
             @RequestHeader("X-User-Id") Long userId,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable

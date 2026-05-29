@@ -16,6 +16,7 @@ public class OrderCreatedEvent extends BaseEvent {
         super("ORDER_CREATED");
         this.orderId = orderId;
         this.userId  = userId;
-        this.items   = items;
+        // L-03: 방어적 복사 — 외부 리스트 변경으로 이벤트 상태가 오염되는 것을 방지
+        this.items   = List.copyOf(items);
     }
 }

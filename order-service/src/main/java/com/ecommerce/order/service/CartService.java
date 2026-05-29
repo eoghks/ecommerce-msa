@@ -1,10 +1,12 @@
 package com.ecommerce.order.service;
 
+import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.domain.CartItem;
 import com.ecommerce.order.domain.CartItemRecord;
 import com.ecommerce.order.dto.request.CartAddRequest;
 import com.ecommerce.order.dto.response.CartItemResponse;
 import com.ecommerce.order.dto.response.CartResponse;
+import com.ecommerce.order.exception.CartItemNotFoundException;
 import com.ecommerce.order.repository.CartItemRepository;
 import com.ecommerce.order.support.CartPrincipal;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -30,6 +32,7 @@ public class CartService {
     private final CartItemRepository cartItemRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper redisObjectMapper;
+    private final ProductClient productClient;
 
     // ── 조회 ─────────────────────────────────────────────────────────────────
 
@@ -57,10 +60,14 @@ public class CartService {
     @Transactional
     public void updateItem(CartPrincipal principal, Long productId, int quantity) {
         if (principal.isLoggedIn()) {
-            cartItemRepository.findByUserIdAndProductId(principal.userId(), productId)
-                    .ifPresent(item -> item.updateQuantity(quantity));
+            // HR-03: 존재하지 않는 항목 수정 시 404 반환
+            CartItem item = cartItemRepository.findByUserIdAndProductId(principal.userId(), productId)
+                    .orElseThrow(() -> new CartItemNotFoundException(productId));
+            item.updateQuantity(quantity);
         } else {
             List<CartItemRecord> items = readGuestItems(principal.guestId());
+            boolean found = items.stream().anyMatch(i -> i.productId().equals(productId));
+            if (!found) throw new CartItemNotFoundException(productId);
             List<CartItemRecord> updated = items.stream()
                     .map(i -> i.productId().equals(productId) ? i.withQuantity(quantity) : i)
                     .toList();
@@ -129,16 +136,18 @@ public class CartService {
     }
 
     private void addDbItem(Long userId, CartAddRequest req) {
+        // CR-01: 가격·상품명을 클라이언트 입력 대신 Product Service에서 서버 측 조회
+        ProductClient.ProductInfo product = productClient.getProduct(req.productId());
         cartItemRepository.findByUserIdAndProductId(userId, req.productId())
                 .ifPresentOrElse(
                         existing -> existing.addQuantity(req.quantity()),
                         () -> cartItemRepository.save(CartItem.builder()
                                 .userId(userId)
-                                .productId(req.productId())
-                                .productName(req.productName())
-                                .price(req.price())
+                                .productId(product.id())
+                                .productName(product.name())
+                                .price(product.price())
                                 .quantity(req.quantity())
-                                .imageUrl(req.imageUrl())
+                                .imageUrl(product.imageUrl())
                                 .build())
                 );
     }
@@ -152,6 +161,8 @@ public class CartService {
     }
 
     private void addGuestItem(String guestId, CartAddRequest req) {
+        // CR-01: 가격·상품명을 클라이언트 입력 대신 Product Service에서 서버 측 조회
+        ProductClient.ProductInfo product = productClient.getProduct(req.productId());
         List<CartItemRecord> items = new ArrayList<>(readGuestItems(guestId));
         boolean exists = false;
         for (int i = 0; i < items.size(); i++) {
@@ -162,7 +173,7 @@ public class CartService {
             }
         }
         if (!exists) {
-            items.add(new CartItemRecord(req.productId(), req.productName(), req.price(), req.quantity(), req.imageUrl()));
+            items.add(new CartItemRecord(product.id(), product.name(), product.price(), req.quantity(), product.imageUrl()));
         }
         saveGuestItems(guestId, items);
     }
