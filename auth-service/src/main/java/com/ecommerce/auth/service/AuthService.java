@@ -6,7 +6,6 @@ import com.ecommerce.auth.dto.SellerApplyRequest;
 import com.ecommerce.auth.dto.SellerApplyResponse;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
-import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
 import com.ecommerce.auth.dto.ChangePasswordRequest;
 import com.ecommerce.auth.dto.ForgotPasswordRequest;
@@ -94,15 +93,15 @@ public class AuthService {
 
     // LW-01: Redis 쓰기 포함 — readOnly 제거
     @Transactional
-    public RefreshResponse refresh(RefreshRequest request) {
-        Long userId = refreshTokenRepository.findUserIdByToken(request.getRefreshToken())
+    public RefreshResponse refresh(String refreshToken) {
+        Long userId = refreshTokenRepository.findUserIdByToken(refreshToken)
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않거나 만료된 Refresh Token입니다."));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidTokenException("토큰에 해당하는 사용자를 찾을 수 없습니다."));
 
         // Refresh Token Rotation
-        refreshTokenRepository.delete(request.getRefreshToken());
+        refreshTokenRepository.delete(refreshToken);
         String newRefreshToken = jwtProvider.issueRefreshToken();
         refreshTokenRepository.save(newRefreshToken, userId, jwtProvider.getRefreshTokenTtl());
 

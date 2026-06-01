@@ -6,16 +6,18 @@ import com.ecommerce.auth.dto.ForgotPasswordResponse;
 import com.ecommerce.auth.dto.MeResponse;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
-import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
 import com.ecommerce.auth.dto.SellerApplyRequest;
 import com.ecommerce.auth.dto.SellerApplyResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.service.AuthService;
+import com.ecommerce.auth.support.RefreshTokenCookie;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,6 +35,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenCookie refreshTokenCookie;
 
     @PostMapping("/signup")
     public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
@@ -44,18 +47,33 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+        LoginResponse response = authService.login(request);
+        // Refresh Token은 HttpOnly 쿠키로 전달 (바디에는 @JsonIgnore로 제외됨)
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(response.getRefreshToken()))
+                .body(response);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(authService.refresh(request));
+    public ResponseEntity<RefreshResponse> refresh(
+            @CookieValue(value = RefreshTokenCookie.NAME, required = false) String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.status(401).build();
+        }
+        RefreshResponse response = authService.refresh(refreshToken);
+        // Rotation된 새 Refresh Token을 쿠키로 재발급
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(response.getRefreshToken()))
+                .body(response);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestHeader("X-User-Id") Long userId) {
         authService.logout(userId);
-        return ResponseEntity.noContent().build();
+        // 쿠키 만료 처리
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.expire())
+                .build();
     }
 
     // 내 정보 조회 — 게이트웨이가 설정한 X-User-Id 헤더 사용

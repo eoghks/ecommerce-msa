@@ -5,6 +5,7 @@ import PrivateRoute from './components/common/PrivateRoute';
 import AdminRoute from './components/common/AdminRoute';
 import api from './api/axios';
 import useCartStore from './store/cartStore';
+import useAuthStore from './store/authStore';
 
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -41,7 +42,26 @@ const Layout = ({ children }) => {
   );
 };
 
-const App = () => (
+// 초기 세션 복원 중 표시할 풀스크린 로더
+const BootLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <div className="w-8 h-8 rounded-full animate-spin border-[3px] border-gray-200 border-t-brand-600" />
+  </div>
+);
+
+const App = () => {
+  const tryRestoreAuth = useAuthStore((s) => s.tryRestoreAuth);
+  const authResolved = useAuthStore((s) => s.authResolved);
+
+  useEffect(() => {
+    // 앱 시작/새 탭 진입 시 refresh 쿠키로 세션 복원 시도 (1회)
+    tryRestoreAuth();
+  }, []);
+
+  // 복원 완료 전엔 로더 — PrivateRoute가 미인증으로 오판해 /login 튕기는 것 방지
+  if (!authResolved) return <BootLoader />;
+
+  return (
   <BrowserRouter>
     <Layout>
       <Routes>
@@ -73,6 +93,7 @@ const App = () => (
       </Routes>
     </Layout>
   </BrowserRouter>
-);
+  );
+};
 
 export default App;

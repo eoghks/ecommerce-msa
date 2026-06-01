@@ -15,8 +15,10 @@ const UNAUTHENTICATED = { isAuthenticated: false, userId: null, role: null, pwdC
 
 const useAuthStore = create((set) => ({
   // CR-05: 초기 상태는 항상 미인증 — localStorage 미사용
-  //        페이지 새로고침 시 tryRestoreAuth()가 refresh 토큰으로 복원
+  //        페이지 새로고침/새 탭 시 tryRestoreAuth()가 refresh 쿠키로 복원
   ...UNAUTHENTICATED,
+  // 초기 세션 복원 시도 완료 여부 — 완료 전엔 라우트 판단 보류 (깜빡임/오리다이렉트 방지)
+  authResolved: false,
 
   login: (token) => {
     setToken(token); // 메모리에만 저장
@@ -51,11 +53,14 @@ const useAuthStore = create((set) => ({
           userId: claims?.sub ?? null,
           role: claims?.role ?? null,
           pwdChangeRequired: claims?.pwdChangeRequired ?? false,
+          authResolved: true,
         });
+        return;
       }
+      set({ ...UNAUTHENTICATED, authResolved: true });
     } catch {
       // refresh 실패 → 미인증 유지 (로그인 필요)
-      set(UNAUTHENTICATED);
+      set({ ...UNAUTHENTICATED, authResolved: true });
     }
   },
 }));
