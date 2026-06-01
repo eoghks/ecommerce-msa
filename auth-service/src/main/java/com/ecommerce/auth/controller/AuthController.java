@@ -8,6 +8,8 @@ import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
 import com.ecommerce.auth.dto.RefreshRequest;
 import com.ecommerce.auth.dto.RefreshResponse;
+import com.ecommerce.auth.dto.SellerApplyRequest;
+import com.ecommerce.auth.dto.SellerApplyResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.service.AuthService;
@@ -73,6 +75,14 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<ForgotPasswordResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    // 판매자 신청 + mock 인증 — JWT 필요 (X-User-Id 헤더)
+    @PostMapping("/seller/apply")
+    public ResponseEntity<SellerApplyResponse> applyForSeller(
+            @RequestHeader("X-User-Id") Long userId,
+            @Valid @RequestBody SellerApplyRequest request) {
+        return ResponseEntity.ok(authService.applyForSeller(userId, request.phone()));
     }
 
     // 이메일 중복 체크 — 비인증 공개 엔드포인트

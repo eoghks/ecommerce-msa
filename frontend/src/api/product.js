@@ -17,3 +17,14 @@ export const updateProduct = (id, data) =>
 
 export const deleteProduct = (id) =>
   api.delete(`/api/v1/products/${id}`);
+
+export const getMyProducts = (params) =>
+  api.get('/api/v1/products/mine', { params });
+
+export const uploadProductImage = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return api.post('/api/v1/products/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};

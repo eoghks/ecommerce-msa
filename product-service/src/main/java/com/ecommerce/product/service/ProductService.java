@@ -8,6 +8,7 @@ import com.ecommerce.product.dto.request.UpdateProductRequest;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
 import com.ecommerce.product.exception.CategoryNotFoundException;
+import com.ecommerce.product.exception.NotProductOwnerException;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,44 +37,54 @@ public class ProductService {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper redisObjectMapper;
 
-    /** 상품 등록 (ADMIN) */
+    /** 상품 등록 (ADMIN/SELLER) */
     @Transactional
-    public ProductResponse createProduct(CreateProductRequest request) {
+    public ProductResponse createProduct(CreateProductRequest request, Long sellerId, String role) {
         Category category = loadCategory(request.categoryId());
+        // ADMIN은 sellerId null (플랫폼 상품), SELLER는 본인 ID
+        Long resolvedSellerId = "ADMIN".equals(role) ? null : sellerId;
         Product product = Product.builder()
                 .name(request.name())
                 .description(request.description())
                 .price(request.price())
                 .stock(request.stock())
                 .imageUrl(request.imageUrl())
+                .sellerId(resolvedSellerId)
                 .category(category)
                 .build();
         return ProductResponse.from(productRepository.save(product));
     }
 
-    /** 상품 수정 (ADMIN) */
+    /** 상품 수정 (ADMIN: 전체, SELLER: 본인 것만) */
     @Transactional
-    public ProductResponse updateProduct(Long id, UpdateProductRequest request) {
+    public ProductResponse updateProduct(Long id, UpdateProductRequest request, Long userId, String role) {
         Product product = loadProduct(id);
+        if ("SELLER".equals(role) && !product.isOwnedBy(userId)) {
+            throw new NotProductOwnerException(id);
+        }
         Category category = loadCategory(request.categoryId());
-        product.update(
-                request.name(),
-                request.description(),
-                request.price(),
-                request.stock(),
-                request.imageUrl(),
-                category
-        );
+        product.update(request.name(), request.description(), request.price(),
+                request.stock(), request.imageUrl(), category);
         evictDetailCache(id);
         return ProductResponse.from(product);
     }
 
-    /** 상품 삭제 (ADMIN) */
+    /** 상품 삭제 (ADMIN: 전체, SELLER: 본인 것만) */
     @Transactional
-    public void deleteProduct(Long id) {
+    public void deleteProduct(Long id, Long userId, String role) {
         Product product = loadProduct(id);
+        if ("SELLER".equals(role) && !product.isOwnedBy(userId)) {
+            throw new NotProductOwnerException(id);
+        }
         productRepository.delete(product);
         evictDetailCache(id);
+    }
+
+    /** 내 상품 목록 (SELLER 전용) */
+    @Transactional(readOnly = true)
+    public Page<ProductSummaryResponse> getMyProducts(Long sellerId, Pageable pageable) {
+        return productRepository.findBySellerId(sellerId, pageable)
+                .map(ProductSummaryResponse::from);
     }
 
     /** 상품 목록 조회 (카테고리 + 키워드 필터) */

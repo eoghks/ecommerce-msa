@@ -139,6 +139,31 @@ services:
       - ecommerce-net
 
   # ───────────────────────────────────────────────
+  # MinIO — S3 호환 로컬 오브젝트 스토리지 (상품 이미지)
+  # API: 9000, 콘솔: 9001 (http://localhost:9001)
+  # ───────────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: ecommerce-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ecommerce-net
+
+  # ───────────────────────────────────────────────
   # Kafka UI — 토픽/메시지 시각화 (개발용)
   # ───────────────────────────────────────────────
   kafka-ui:
@@ -165,6 +190,7 @@ volumes:
   zookeeper-data:
   zookeeper-log:
   kafka-data:
+  minio-data:
 
 networks:
   ecommerce-net:

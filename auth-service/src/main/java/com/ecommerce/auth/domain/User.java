@@ -55,12 +55,21 @@ public class User {
     @Column(nullable = false)
     private boolean passwordChangeRequired = false;
 
+    @Column(length = 20)
+    private String phone;
+
     @Builder
     private User(String email, String password, String name, Role role) {
         this.email    = email;
         this.password = password;
         this.name     = name;
         this.role     = role;
+    }
+
+    /** 판매자 승격 — 전화번호 저장 후 SELLER 역할 부여 */
+    public void promoteToSeller(String phone) {
+        this.phone = phone;
+        this.role  = Role.SELLER;
     }
 
     public void changePassword(String encodedPassword) {

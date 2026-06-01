@@ -2,6 +2,8 @@ package com.ecommerce.auth.service;
 
 import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
+import com.ecommerce.auth.dto.SellerApplyRequest;
+import com.ecommerce.auth.dto.SellerApplyResponse;
 import com.ecommerce.auth.dto.LoginRequest;
 import com.ecommerce.auth.dto.LoginResponse;
 import com.ecommerce.auth.dto.RefreshRequest;
@@ -150,6 +152,21 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidTokenException("사용자를 찾을 수 없습니다."));
         return new MeResponse(user);
+    }
+
+    /**
+     * 판매자 신청 + mock 인증.
+     * 테스트 서버이므로 전화번호 저장 후 즉시 SELLER 승격 + 새 JWT 발급.
+     */
+    @Transactional
+    public SellerApplyResponse applyForSeller(Long userId, String phone) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new InvalidTokenException("사용자를 찾을 수 없습니다."));
+        user.promoteToSeller(phone);
+        String accessToken = jwtProvider.issueAccessToken(
+                user.getId(), user.getRole().name(), user.isPasswordChangeRequired());
+        return new SellerApplyResponse("테스트 서버입니다. 인증되었습니다.", accessToken,
+                jwtProvider.getAccessTokenExpiryMs());
     }
 
     @Transactional(readOnly = true)

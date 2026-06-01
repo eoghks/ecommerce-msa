@@ -192,6 +192,17 @@
 
 ---
 
+### B-05. 카테고리 관리 (ADMIN 전용)
+
+**개요**: ADMIN 상품 관리 화면에 카테고리 탭 추가. 판매자는 기존 카테고리 선택만 가능.
+
+**구현 범위**
+- ADMIN 화면에 "카테고리" 탭 추가
+- 카테고리 추가/수정/삭제 API (`POST/PUT/DELETE /api/v1/categories`) — ADMIN 전용
+- SELLER는 드롭다운 선택만 허용 (현재 구조 유지)
+
+---
+
 ### B-04. 프론트엔드 TypeScript 마이그레이션
 
 **개요**: 현재 JavaScript(JSX)로 작성된 프론트엔드를 TypeScript(TSX)로 전환

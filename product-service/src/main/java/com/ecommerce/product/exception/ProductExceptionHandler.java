@@ -22,5 +22,10 @@ public class ProductExceptionHandler {
         return pd;
     }
 
-
+    @ExceptionHandler(NotProductOwnerException.class)
+    public ProblemDetail handleNotOwner(NotProductOwnerException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setTitle("Forbidden");
+        return pd;
+    }
 }

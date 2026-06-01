@@ -8,6 +8,7 @@ public record ProductSummaryResponse(
         Long price,
         int stock,
         String imageUrl,
+        Long sellerId,
         Long categoryId,
         String categoryName
 ) {
@@ -18,6 +19,7 @@ public record ProductSummaryResponse(
                 product.getPrice(),
                 product.getStock(),
                 product.getImageUrl(),
+                product.getSellerId(),
                 product.getCategory().getId(),
                 product.getCategory().getName()
         );
