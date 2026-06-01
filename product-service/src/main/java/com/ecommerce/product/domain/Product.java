@@ -50,6 +50,10 @@ public class Product {
     @Column(length = 500)
     private String imageUrl;
 
+    /** 판매자 ID — null이면 ADMIN이 등록한 상품 */
+    @Column(name = "seller_id")
+    private Long sellerId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -64,13 +68,24 @@ public class Product {
 
     @Builder
     private Product(String name, String description, Long price,
-                    int stock, String imageUrl, Category category) {
+                    int stock, String imageUrl, Long sellerId, Category category) {
         this.name        = name;
         this.description = description;
         this.price       = price;
         this.stock       = stock;
         this.imageUrl    = imageUrl;
+        this.sellerId    = sellerId;
         this.category    = category;
+    }
+
+    /** SELLER 본인 상품인지 확인 */
+    public boolean isOwnedBy(Long userId) {
+        return userId != null && userId.equals(this.sellerId);
+    }
+
+    /** 이미지 URL 교체 (마이그레이션용) */
+    public void updateImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     /** 상품 정보 수정 */

@@ -83,7 +83,7 @@ class ProductServiceTest {
         given(categoryRepository.findById(1L)).willReturn(Optional.of(category));
         given(productRepository.save(any(Product.class))).willReturn(product);
 
-        ProductResponse response = productService.createProduct(request);
+        ProductResponse response = productService.createProduct(request, 1L, "ADMIN");
 
         assertThat(response.name()).isEqualTo("테스트 상품");
         assertThat(response.price()).isEqualTo(10_000L);
@@ -99,7 +99,7 @@ class ProductServiceTest {
 
         given(categoryRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> productService.createProduct(request))
+        assertThatThrownBy(() -> productService.createProduct(request, 1L, "ADMIN"))
                 .isInstanceOf(CategoryNotFoundException.class);
     }
 
@@ -115,7 +115,7 @@ class ProductServiceTest {
         given(categoryRepository.findById(1L)).willReturn(Optional.of(category));
         given(redisTemplate.delete(anyString())).willReturn(true);
 
-        ProductResponse response = productService.updateProduct(1L, request);
+        ProductResponse response = productService.updateProduct(1L, request, 1L, "ADMIN");
 
         assertThat(response.name()).isEqualTo("수정 상품");
         assertThat(response.price()).isEqualTo(20_000L);
@@ -130,7 +130,7 @@ class ProductServiceTest {
 
         given(productRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> productService.updateProduct(99L, request))
+        assertThatThrownBy(() -> productService.updateProduct(99L, request, 1L, "ADMIN"))
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
@@ -142,7 +142,7 @@ class ProductServiceTest {
         given(productRepository.findById(1L)).willReturn(Optional.of(product));
         given(redisTemplate.delete(anyString())).willReturn(true);
 
-        productService.deleteProduct(1L);
+        productService.deleteProduct(1L, 1L, "ADMIN");
 
         verify(productRepository).delete(product);
         verify(redisTemplate).delete("product:detail:1");
@@ -153,7 +153,7 @@ class ProductServiceTest {
     void deleteProduct_productNotFound() {
         given(productRepository.findById(99L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> productService.deleteProduct(99L))
+        assertThatThrownBy(() -> productService.deleteProduct(99L, 1L, "ADMIN"))
                 .isInstanceOf(ProductNotFoundException.class);
         verify(productRepository, never()).delete(any());
     }

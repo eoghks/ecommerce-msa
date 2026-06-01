@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getMe, changePassword } from '../../api/auth';
+import { getMe, changePassword, applyForSeller } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
 
 const getPasswordStrength = (pw) => {
@@ -22,9 +22,17 @@ const MyProfilePage = () => {
 
   const forceChange = location.state?.forceChange ?? false;
 
+  const { login: setToken } = useAuthStore();
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pwOpen, setPwOpen] = useState(forceChange);
+
+  // 판매자 신청
+  const [sellerPhone, setSellerPhone] = useState('');
+  const [sellerLoading, setSellerLoading] = useState(false);
+  const [sellerMsg, setSellerMsg] = useState('');
+  const [sellerError, setSellerError] = useState('');
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
@@ -66,6 +74,23 @@ const MyProfilePage = () => {
     }
   };
 
+  const handleSellerApply = async () => {
+    setSellerError('');
+    if (!sellerPhone.trim()) { setSellerError('전화번호를 입력해주세요.'); return; }
+    setSellerLoading(true);
+    try {
+      const res = await applyForSeller(sellerPhone.trim());
+      const { accessToken, message } = res.data;
+      setToken(accessToken);           // 새 JWT(SELLER role)로 스토어 갱신
+      setProfile((p) => ({ ...p, role: 'SELLER', phone: sellerPhone.trim() }));
+      setSellerMsg(message);
+    } catch (err) {
+      setSellerError(err.response?.data?.detail || '판매자 신청에 실패했습니다.');
+    } finally {
+      setSellerLoading(false);
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -104,16 +129,70 @@ const MyProfilePage = () => {
             <span className="text-base sm:text-[18px] font-bold text-gray-900">{profile?.name || '-'}</span>
             <span className="px-2.5 py-[3px] rounded-full text-[11px] font-semibold"
               style={{
-                background: profile?.role === 'ADMIN' ? '#fef3c7' : '#eef2ff',
-                color: profile?.role === 'ADMIN' ? '#d97706' : '#4f46e5',
+                background: profile?.role === 'ADMIN' ? '#fef3c7' : profile?.role === 'SELLER' ? '#d1fae5' : '#eef2ff',
+                color:      profile?.role === 'ADMIN' ? '#d97706' : profile?.role === 'SELLER' ? '#059669' : '#4f46e5',
               }}>
-              {profile?.role}
+              {profile?.role === 'SELLER' ? '🏪 판매자' : profile?.role}
             </span>
           </div>
           <div className="text-[13px] text-gray-500 truncate">{profile?.email}</div>
           <div className="text-[12px] text-gray-400 mt-0.5">가입일 · {formatDate(profile?.createdAt)}</div>
         </div>
       </div>
+
+      {/* 판매자 신청 카드 — USER만 표시 */}
+      {profile?.role === 'USER' && (
+        <div className="card">
+          <div className="flex items-start justify-between gap-4 mb-1">
+            <div>
+              <div className="text-[15px] font-bold text-gray-900 mb-1">판매자 신청</div>
+              <div className="text-[13px] text-gray-500">판매자가 되면 직접 상품을 등록하고 판매할 수 있습니다.</div>
+            </div>
+          </div>
+          {sellerMsg ? (
+            <div className="mt-4 info-box flex items-center gap-2">
+              <span className="text-green-500 text-[6px]">●</span>{sellerMsg}
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="field-label">전화번호</label>
+                <input
+                  type="tel"
+                  value={sellerPhone}
+                  onChange={(e) => { setSellerPhone(e.target.value); setSellerError(''); }}
+                  placeholder="010-0000-0000"
+                  className="input-field pl-3"
+                />
+              </div>
+              {sellerError && <div className="error-box"><span className="text-[6px] text-red-400">●</span> {sellerError}</div>}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] text-gray-400">테스트 서버에서는 번호 입력 후 즉시 인증됩니다.</span>
+                <button
+                  onClick={handleSellerApply}
+                  disabled={sellerLoading}
+                  className="h-10 px-5 text-white text-sm font-semibold rounded-[10px] border-none disabled:opacity-70 shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)' }}>
+                  {sellerLoading ? '처리 중...' : '인증하기'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SELLER 배지 카드 */}
+      {profile?.role === 'SELLER' && (
+        <div className="card" style={{ border: '1.5px solid #d1fae5', background: '#f0fdf4' }}>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🏪</span>
+            <div>
+              <div className="text-[15px] font-bold text-emerald-700">판매자 계정입니다</div>
+              <div className="text-[13px] text-emerald-600">상단 메뉴의 <strong>상품관리</strong>에서 상품을 등록·수정·삭제할 수 있습니다.</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 보안 카드 */}
       <div className="card">

@@ -14,11 +14,14 @@ public class MeResponse {
     private final String role;
     private final LocalDateTime createdAt;
 
+    private final String phone;
+
     public MeResponse(User user) {
         this.id        = user.getId();
         this.email     = user.getEmail();
         this.name      = user.getName();
         this.role      = user.getRole().name();
+        this.phone     = user.getPhone();
         this.createdAt = user.getCreatedAt();
     }
 }

@@ -53,6 +53,11 @@ const Navbar = () => {
               관리자
             </Link>
           )}
+          {isAuthenticated && role === 'SELLER' && (
+            <Link to="/admin" className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 no-underline hover:bg-emerald-50 transition-colors">
+              상품관리
+            </Link>
+          )}
         </div>
 
         {/* 우측 영역 */}

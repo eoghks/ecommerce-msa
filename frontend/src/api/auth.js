@@ -20,3 +20,6 @@ export const getMe = () =>
 
 export const forgotPassword = (email) =>
   api.post('/api/v1/auth/forgot-password', { email });
+
+export const applyForSeller = (phone) =>
+  api.post('/api/v1/auth/seller/apply', { phone });
