@@ -55,14 +55,18 @@ JWT 필요: `/logout`, `/me`, `/change-password`
 ```json
 {
   "accessToken": "eyJhbGci...",
-  "refreshToken": "550e8400-e29b-41d4-a716-446655440000",
   "tokenType": "Bearer",
   "expiresIn": 3600000
 }
 ```
+```
+Set-Cookie: refreshToken=550e8400-...; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax
+```
 
 > `expiresIn` 단위: 밀리초 (3600000 = 1시간)  
-> Refresh Token은 Response Body로 반환 (쿠키 미사용)
+> **Refresh Token은 HttpOnly 쿠키로 전달** — 응답 바디에는 포함하지 않음 (XSS 방어)  
+> Access Token은 바디로 반환 → 클라이언트 메모리에만 보관 (localStorage 미사용)  
+> `Secure` 플래그는 운영(HTTPS)에서만 활성화 (`app.cookie.secure`)
 
 **Error**
 | 상태코드 | 사유 |
@@ -75,29 +79,32 @@ JWT 필요: `/logout`, `/me`, `/change-password`
 
 ### `POST /api/v1/auth/refresh`
 
+> **Request Body 없음** — Refresh Token은 HttpOnly 쿠키에서 자동 전송  
+> 새 탭/새로고침 시 클라이언트가 이 엔드포인트로 세션 복원
+
 **Request**
-```json
-{
-  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
-}
+```
+Cookie: refreshToken=550e8400-...   (브라우저 자동 전송)
 ```
 
 **Response** `200 OK`
 ```json
 {
   "accessToken": "eyJhbGci...",
-  "refreshToken": "새로운-uuid",
   "tokenType": "Bearer",
   "expiresIn": 3600000
 }
 ```
+```
+Set-Cookie: refreshToken=새로운-uuid; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax
+```
 
-> Refresh Token Rotation: 요청 시 기존 토큰 Redis에서 삭제 후 신규 토큰 발급
+> Refresh Token Rotation: 기존 토큰 Redis에서 삭제 후 신규 토큰 발급 + 쿠키 재설정
 
 **Error**
 | 상태코드 | 사유 |
 |---------|------|
-| 401 | Refresh Token 없음 / 만료 / Redis에 없음 |
+| 401 | Refresh 쿠키 없음 / 만료 / Redis에 없음 |
 
 ---
 
@@ -111,6 +118,11 @@ JWT 필요: `/logout`, `/me`, `/change-password`
 **Request Body** 없음
 
 **Response** `204 No Content`
+```
+Set-Cookie: refreshToken=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax
+```
+
+> Refresh Token 쿠키도 즉시 만료 처리
 
 **Error**
 | 상태코드 | 사유 |

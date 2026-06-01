@@ -5,6 +5,7 @@ import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.service.AuthService;
+import com.ecommerce.auth.support.RefreshTokenCookie;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtProvider jwtProvider;
+
+    @MockBean
+    private RefreshTokenCookie refreshTokenCookie;
 
     @Test
     @DisplayName("회원가입 성공 - 201 반환")

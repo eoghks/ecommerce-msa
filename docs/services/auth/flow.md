@@ -35,25 +35,31 @@ Client → POST /api/v1/auth/login
         4. Refresh Token 발급 (UUID, 7일)
         5. Redis 저장: refresh:{refreshToken} = userId (TTL 7일)
            ↓
-      응답: Access Token + Refresh Token (모두 Response Body)
+      응답: Access Token (Body) + Refresh Token (HttpOnly 쿠키)
 ```
+
+> **토큰 저장 전략**
+> - Access Token → 응답 Body → 클라이언트 **메모리**에만 보관 (localStorage 미사용)
+> - Refresh Token → **HttpOnly; SameSite=Lax 쿠키** → JS 접근 불가 (XSS 방어)
+> - 새 탭/새로고침 시 메모리의 Access Token은 사라지지만, 쿠키의 Refresh Token으로
+>   `/refresh` 호출해 자동 복원 (App 부팅 시 `tryRestoreAuth`)
 
 ---
 
 ## 토큰 갱신 흐름 (Rotation)
 
 ```
-Client → POST /api/v1/auth/refresh (Body: { "refreshToken": "..." })
+Client → POST /api/v1/auth/refresh  (Cookie: refreshToken=... 자동 전송, Body 없음)
            ↓
       AuthController
+        1. @CookieValue로 Refresh Token 추출 (없으면 401)
            ↓
       AuthService
-        1. Request Body에서 Refresh Token 추출
-        2. Redis 조회: refresh:{refreshToken} → userId 조회
+        2. Redis 조회: refresh:{refreshToken} → userId
         3. userId로 User 조회 후 신규 Access Token + 신규 Refresh Token 발급
         4. Redis 업데이트: 기존 토큰 삭제 + 신규 토큰 저장
            ↓
-      응답: 신규 Access Token + 신규 Refresh Token (모두 Response Body)
+      응답: 신규 Access Token (Body) + 신규 Refresh Token (HttpOnly 쿠키 재설정)
 ```
 
 ---
@@ -61,12 +67,12 @@ Client → POST /api/v1/auth/refresh (Body: { "refreshToken": "..." })
 ## 로그아웃 흐름
 
 ```
-Client → POST /api/v1/auth/logout (Body: { "refreshToken": "..." })
+Client → POST /api/v1/auth/logout  (Authorization: Bearer <accessToken>)
            ↓
       AuthService
-        1. Redis에서 refresh:{refreshToken} 삭제
+        1. Redis에서 해당 유저의 모든 refresh 토큰 삭제
            ↓
-      응답: 204 No Content
+      응답: 204 No Content + Set-Cookie: refreshToken=; Max-Age=0 (쿠키 만료)
 ```
 
 > Access Token은 블랙리스트 미사용 — 만료(1시간)까지 유효  
@@ -95,8 +101,9 @@ Client → GET /api/v1/products (Authorization: Bearer <accessToken>)
 
 | Role | 권한 |
 |------|------|
-| USER | 상품 조회, 주문 생성·조회 |
-| ADMIN | 상품 CRUD, 전체 주문 조회 |
+| USER | 상품 조회, 주문 생성·조회, 판매자 신청 |
+| SELLER | USER 권한 + 본인 상품 CRUD (`sellerId` 일치 항목만) |
+| ADMIN | 전체 상품 CRUD, 전체 주문 조회 |
 
 - Spring Security `@PreAuthorize("hasRole('ADMIN')")` 로 엔드포인트 보호
 - Gateway는 토큰 검증만, 세부 권한 확인은 각 서비스에서 처리

@@ -47,6 +47,8 @@ spring:
 app:
   mail:
     expose-temp-password: true   # prod profile에서 false로 override
+  cookie:
+    secure: false                # dev: HTTP 허용. prod profile에서 true (HTTPS 전용)
 
 server:
   port: 8081
@@ -86,3 +88,5 @@ spring:
 app:
   mail:
     expose-temp-password: false
+  cookie:
+    secure: true                 # 운영: HTTPS 전용 쿠키
