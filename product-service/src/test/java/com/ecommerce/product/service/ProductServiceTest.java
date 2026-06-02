@@ -50,6 +50,7 @@ class ProductServiceTest {
     @Mock private RedisTemplate<String, String> redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
     @Mock private ObjectMapper redisObjectMapper;
+    @Mock private com.ecommerce.product.client.UserClient userClient;
 
     @InjectMocks private ProductService productService;
 

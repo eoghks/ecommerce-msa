@@ -13,6 +13,7 @@ import com.ecommerce.auth.dto.ForgotPasswordResponse;
 import com.ecommerce.auth.dto.MeResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.dto.UserSummaryResponse;
 import com.ecommerce.auth.exception.DuplicateEmailException;
 import com.ecommerce.auth.exception.InvalidCredentialsException;
 import com.ecommerce.auth.exception.InvalidTokenException;
@@ -171,6 +172,15 @@ public class AuthService {
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    /** 서비스 간 사용자 요약 배치 조회 (product-service 판매자 정보 표시용) */
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> getUsersByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return userRepository.findByIdIn(ids).stream()
+                .map(UserSummaryResponse::from)
+                .toList();
     }
 
     // MD-01: Controller 대신 Service에서 JWK 조립
