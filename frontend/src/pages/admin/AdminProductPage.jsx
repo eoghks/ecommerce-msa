@@ -135,9 +135,21 @@ const AdminProductPage = () => {
       {/* 상품 등록/수정 폼 */}
       {formOpen && (
         <div className="bg-white border border-gray-100 rounded-2xl p-5 mb-6 shadow-sm">
-          <h2 className="text-[15px] font-bold text-gray-800 mb-4 m-0">
+          <h2 className="text-[15px] font-bold text-gray-800 mb-1 m-0">
             {editing ? '상품 수정' : '새 상품 등록'}
           </h2>
+          {/* 관리자: 수정 중인 상품의 판매자 정보 */}
+          {isAdmin && editing && (
+            <div className="text-[12px] text-gray-500 mb-4">
+              판매자:{' '}
+              {editing.sellerId
+                ? <span className="text-emerald-600 font-medium">
+                    {editing.sellerName || `#${editing.sellerId}`}
+                    {editing.sellerEmail ? ` (${editing.sellerEmail})` : ''}
+                  </span>
+                : <span className="text-amber-600 font-medium">플랫폼(관리자) 등록 상품</span>}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
@@ -251,10 +263,18 @@ const AdminProductPage = () => {
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-[13px] font-bold text-brand-600">{formatPrice(p.price)}</span>
                   <span className="text-[12px] text-gray-400">재고 {p.stock}개</span>
-                  {isAdmin && p.sellerId && (
-                    <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                      판매자 #{p.sellerId}
-                    </span>
+                  {isAdmin && (p.sellerId
+                    ? (
+                      <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        {p.sellerName ? `${p.sellerName}` : `판매자 #${p.sellerId}`}
+                        {p.sellerEmail ? ` · ${p.sellerEmail}` : ''}
+                      </span>
+                    )
+                    : (
+                      <span className="text-[11px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                        플랫폼(관리자)
+                      </span>
+                    )
                   )}
                 </div>
               </div>

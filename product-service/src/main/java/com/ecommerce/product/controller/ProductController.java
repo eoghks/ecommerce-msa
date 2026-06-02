@@ -92,15 +92,17 @@ public class ProductController {
         return ResponseEntity.ok(productService.getMyProducts(userId, pageable));
     }
 
-    /** 상품 목록 조회 */
+    /** 상품 목록 조회 — ADMIN 요청 시 판매자명/이메일 포함 */
     @GetMapping
     public ResponseEntity<Page<ProductSummaryResponse>> findProducts(
+            @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
+        boolean enrichSeller = "ADMIN".equals(role);
         return ResponseEntity.ok(productService.findProducts(
-                new ProductSearchRequest(categoryId, keyword, pageable)
+                new ProductSearchRequest(categoryId, keyword, pageable), enrichSeller
         ));
     }
 

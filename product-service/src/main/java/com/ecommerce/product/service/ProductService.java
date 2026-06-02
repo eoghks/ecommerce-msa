@@ -1,5 +1,6 @@
 package com.ecommerce.product.service;
 
+import com.ecommerce.product.client.UserClient;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.dto.request.CreateProductRequest;
@@ -23,6 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -36,6 +40,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper redisObjectMapper;
+    private final UserClient userClient;
 
     /** 상품 등록 (ADMIN/SELLER) */
     @Transactional
@@ -90,8 +95,31 @@ public class ProductService {
     /** 상품 목록 조회 (카테고리 + 키워드 필터) */
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponse> findProducts(ProductSearchRequest request) {
-        return productRepository.findAllWithFilter(request.categoryId(), request.keyword(), request.pageable())
-                .map(ProductSummaryResponse::from);
+        return findProducts(request, false);
+    }
+
+    /**
+     * 상품 목록 조회.
+     * enrichSeller=true (ADMIN) 이면 판매자명/이메일을 Auth Service에서 배치 조회해 포함.
+     */
+    @Transactional(readOnly = true)
+    public Page<ProductSummaryResponse> findProducts(ProductSearchRequest request, boolean enrichSeller) {
+        Page<Product> page = productRepository.findAllWithFilter(
+                request.categoryId(), request.keyword(), request.pageable());
+
+        if (!enrichSeller) {
+            return page.map(ProductSummaryResponse::from);
+        }
+
+        // 판매자 ID 모아 한 번에 조회 (N+1 방지) — sellerId가 null인 ADMIN 상품은 제외
+        List<Long> sellerIds = page.getContent().stream()
+                .map(Product::getSellerId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, UserClient.UserSummary> sellers = userClient.getUsersByIds(sellerIds);
+
+        return page.map(p -> ProductSummaryResponse.from(p, sellers.get(p.getSellerId())));
     }
 
     /** 상품 상세 조회 — Redis Cache-Aside */

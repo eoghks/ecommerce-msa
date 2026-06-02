@@ -11,6 +11,7 @@ import com.ecommerce.auth.dto.SellerApplyRequest;
 import com.ecommerce.auth.dto.SellerApplyResponse;
 import com.ecommerce.auth.dto.SignupRequest;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.dto.UserSummaryResponse;
 import com.ecommerce.auth.service.AuthService;
 import com.ecommerce.auth.support.RefreshTokenCookie;
 import jakarta.validation.Valid;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -101,6 +103,13 @@ public class AuthController {
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody SellerApplyRequest request) {
         return ResponseEntity.ok(authService.applyForSeller(userId, request.phone()));
+    }
+
+    // 서비스 간 사용자 요약 배치 조회 (product-service 판매자 정보 표시용)
+    // 게이트웨이 화이트리스트 제외 — 서비스 간 직접 호출 전용
+    @GetMapping("/users")
+    public ResponseEntity<List<UserSummaryResponse>> getUsers(@RequestParam List<Long> ids) {
+        return ResponseEntity.ok(authService.getUsersByIds(ids));
     }
 
     // 이메일 중복 체크 — 비인증 공개 엔드포인트
