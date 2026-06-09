@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getCategories, getProducts, getMyProducts, createProduct, updateProduct, deleteProduct, uploadProductImage } from '../../api/product';
+import { getCategories, getProducts, getMyProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, banProduct, unbanProduct } from '../../api/product';
 import useAuthStore from '../../store/authStore';
 
 const EMPTY_FORM = { name: '', description: '', price: '', stock: '', imageUrl: '', categoryId: '' };
@@ -26,7 +26,7 @@ const AdminProductPage = () => {
     try {
       const [catRes, prodRes] = await Promise.all([
         getCategories(),
-        isAdmin ? getProducts({ size: 100 }) : getMyProducts({ size: 100 }),
+        isAdmin ? getProducts({ size: 100, includeBanned: true }) : getMyProducts({ size: 100 }),
       ]);
       setCategories(catRes.data.content ?? catRes.data ?? []);
       setProducts(prodRes.data.content ?? []);
@@ -115,6 +115,19 @@ const AdminProductPage = () => {
     } catch (err) {
       setError(err.response?.data?.detail || '삭제에 실패했습니다.');
       setDeleteId(null);
+    }
+  };
+
+  const handleBanToggle = async (product) => {
+    try {
+      if (product.status === 'BANNED') {
+        await unbanProduct(product.id);
+      } else {
+        await banProduct(product.id);
+      }
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.detail || '판매 상태 변경에 실패했습니다.');
     }
   };
 
@@ -259,6 +272,11 @@ const AdminProductPage = () => {
                   <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0">
                     {p.categoryName}
                   </span>
+                  {p.status === 'BANNED' && (
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold shrink-0">
+                      판매 금지됨
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-[13px] font-bold text-brand-600">{formatPrice(p.price)}</span>
@@ -278,25 +296,41 @@ const AdminProductPage = () => {
                   )}
                 </div>
               </div>
-              {/* 버튼 */}
+              {/* 버튼 — ADMIN: 판매 금지/해제 (운영 검열) / SELLER: 수정·삭제 (본인 상품) */}
               <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => openEdit(p)}
-                  className="h-8 px-3 text-[12px] font-medium text-brand-600 border border-brand-200 rounded-lg hover:bg-brand-50 bg-white transition-colors">
-                  수정
-                </button>
-                {deleteId === p.id ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[12px] text-red-500 font-medium">삭제?</span>
-                    <button onClick={() => handleDelete(p.id)}
-                      className="h-8 px-2 text-[12px] text-white bg-red-500 rounded-lg border-none">확인</button>
-                    <button onClick={() => setDeleteId(null)}
-                      className="h-8 px-2 text-[12px] text-gray-500 bg-gray-100 rounded-lg border-none">취소</button>
-                  </div>
+                {isAdmin ? (
+                  p.status === 'BANNED' ? (
+                    <button onClick={() => handleBanToggle(p)}
+                      className="h-8 px-3 text-[12px] font-medium text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 bg-white transition-colors">
+                      판매 재개
+                    </button>
+                  ) : (
+                    <button onClick={() => handleBanToggle(p)}
+                      className="h-8 px-3 text-[12px] font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 bg-white transition-colors">
+                      판매 금지
+                    </button>
+                  )
                 ) : (
-                  <button onClick={() => setDeleteId(p.id)}
-                    className="h-8 px-3 text-[12px] font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 bg-white transition-colors">
-                    삭제
-                  </button>
+                  <>
+                    <button onClick={() => openEdit(p)}
+                      className="h-8 px-3 text-[12px] font-medium text-brand-600 border border-brand-200 rounded-lg hover:bg-brand-50 bg-white transition-colors">
+                      수정
+                    </button>
+                    {deleteId === p.id ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[12px] text-red-500 font-medium">삭제?</span>
+                        <button onClick={() => handleDelete(p.id)}
+                          className="h-8 px-2 text-[12px] text-white bg-red-500 rounded-lg border-none">확인</button>
+                        <button onClick={() => setDeleteId(null)}
+                          className="h-8 px-2 text-[12px] text-gray-500 bg-gray-100 rounded-lg border-none">취소</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setDeleteId(p.id)}
+                        className="h-8 px-3 text-[12px] font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 bg-white transition-colors">
+                        삭제
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

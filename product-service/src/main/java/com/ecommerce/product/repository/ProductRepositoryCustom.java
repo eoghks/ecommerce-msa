@@ -6,5 +6,5 @@ import org.springframework.data.domain.Pageable;
 
 public interface ProductRepositoryCustom {
 
-    Page<Product> findAllWithFilter(Long categoryId, String keyword, Pageable pageable);
+    Page<Product> findAllWithFilter(Long categoryId, String keyword, boolean includeBanned, Pageable pageable);
 }

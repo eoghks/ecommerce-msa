@@ -1,6 +1,7 @@
 package com.ecommerce.product.repository;
 
 import com.ecommerce.product.domain.Product;
+import com.ecommerce.product.domain.ProductStatus;
 import com.ecommerce.product.domain.QCategory;
 import com.ecommerce.product.domain.QProduct;
 import com.querydsl.core.BooleanBuilder;
@@ -23,8 +24,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     private static final QCategory category = QCategory.category;
 
     @Override
-    public Page<Product> findAllWithFilter(Long categoryId, String keyword, Pageable pageable) {
-        BooleanBuilder condition = buildCondition(categoryId, keyword);
+    public Page<Product> findAllWithFilter(Long categoryId, String keyword, boolean includeBanned, Pageable pageable) {
+        BooleanBuilder condition = buildCondition(categoryId, keyword, includeBanned);
 
         // 목록 조회 (N+1 방지 — category fetch join)
         List<Product> content = queryFactory
@@ -48,13 +49,17 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     }
 
     /** 동적 조건 조립 — null이면 해당 조건 제외 */
-    private BooleanBuilder buildCondition(Long categoryId, String keyword) {
+    private BooleanBuilder buildCondition(Long categoryId, String keyword, boolean includeBanned) {
         BooleanBuilder builder = new BooleanBuilder();
         if (categoryId != null) {
             builder.and(category.id.eq(categoryId));
         }
         if (keyword != null && !keyword.isBlank()) {
             builder.and(product.name.contains(keyword));
+        }
+        // 공개 목록(includeBanned=false)은 판매 금지 상품 제외
+        if (!includeBanned) {
+            builder.and(product.status.eq(ProductStatus.ACTIVE));
         }
         return builder;
     }

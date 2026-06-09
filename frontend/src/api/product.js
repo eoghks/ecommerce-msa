@@ -21,6 +21,12 @@ export const deleteProduct = (id) =>
 export const getMyProducts = (params) =>
   api.get('/api/v1/products/mine', { params });
 
+export const banProduct = (id) =>
+  api.patch(`/api/v1/products/${id}/ban`);
+
+export const unbanProduct = (id) =>
+  api.patch(`/api/v1/products/${id}/unban`);
+
 export const uploadProductImage = (file) => {
   const formData = new FormData();
   formData.append('file', file);

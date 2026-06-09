@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -72,6 +73,22 @@ public class ProductController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 판매 금지 (ADMIN 전용) */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/ban")
+    public ResponseEntity<Void> banProduct(@PathVariable Long id) {
+        productService.banProduct(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 판매 금지 해제 (ADMIN 전용) */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/unban")
+    public ResponseEntity<Void> unbanProduct(@PathVariable Long id) {
+        productService.unbanProduct(id);
+        return ResponseEntity.noContent().build();
+    }
+
     /** 상품 이미지 업로드 → MinIO 저장 후 URL 반환 (ADMIN/SELLER) */
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
     @PostMapping("/upload-image")
@@ -92,17 +109,23 @@ public class ProductController {
         return ResponseEntity.ok(productService.getMyProducts(userId, pageable));
     }
 
-    /** 상품 목록 조회 — ADMIN 요청 시 판매자명/이메일 포함 */
+    /**
+     * 상품 목록 조회.
+     * 공개 목록은 항상 판매 금지 상품 제외 (보는 사람이 ADMIN이어도).
+     * 관리자 화면은 includeBanned=true를 명시해야 금지 상품 포함 + 판매자 정보 노출 (ADMIN 한정).
+     */
     @GetMapping
     public ResponseEntity<Page<ProductSummaryResponse>> findProducts(
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false, defaultValue = "false") boolean includeBanned,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        boolean enrichSeller = "ADMIN".equals(role);
+        // 관리자 화면 전용 뷰: ADMIN이 명시적으로 요청할 때만 (금지 상품 포함 + 판매자 정보)
+        boolean adminView = "ADMIN".equals(role) && includeBanned;
         return ResponseEntity.ok(productService.findProducts(
-                new ProductSearchRequest(categoryId, keyword, pageable), enrichSeller
+                new ProductSearchRequest(categoryId, keyword, pageable), adminView
         ));
     }
 
