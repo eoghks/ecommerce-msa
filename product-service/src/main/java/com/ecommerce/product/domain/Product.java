@@ -3,6 +3,8 @@ package com.ecommerce.product.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -54,6 +56,11 @@ public class Product {
     @Column(name = "seller_id")
     private Long sellerId;
 
+    /** 판매 상태 — 기본 ACTIVE, ADMIN이 BANNED로 전환 */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ProductStatus status;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -76,11 +83,26 @@ public class Product {
         this.imageUrl    = imageUrl;
         this.sellerId    = sellerId;
         this.category    = category;
+        this.status      = ProductStatus.ACTIVE;
     }
 
     /** SELLER 본인 상품인지 확인 */
     public boolean isOwnedBy(Long userId) {
         return userId != null && userId.equals(this.sellerId);
+    }
+
+    /** 판매 금지 (ADMIN) */
+    public void ban() {
+        this.status = ProductStatus.BANNED;
+    }
+
+    /** 판매 금지 해제 (ADMIN) */
+    public void unban() {
+        this.status = ProductStatus.ACTIVE;
+    }
+
+    public boolean isBanned() {
+        return this.status == ProductStatus.BANNED;
     }
 
     /** 이미지 URL 교체 (마이그레이션용) */

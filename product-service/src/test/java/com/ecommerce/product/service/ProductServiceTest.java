@@ -212,7 +212,7 @@ class ProductServiceTest {
         PageRequest pageable = PageRequest.of(0, 20);
         Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
 
-        given(productRepository.findAllWithFilter(null, null, pageable))
+        given(productRepository.findAllWithFilter(null, null, false, pageable))
                 .willReturn(productPage);
 
         Page<ProductSummaryResponse> result = productService.findProducts(
@@ -228,7 +228,7 @@ class ProductServiceTest {
         PageRequest pageable = PageRequest.of(0, 20);
         Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
 
-        given(productRepository.findAllWithFilter(1L, "테스트", pageable))
+        given(productRepository.findAllWithFilter(1L, "테스트", false, pageable))
                 .willReturn(productPage);
 
         Page<ProductSummaryResponse> result = productService.findProducts(

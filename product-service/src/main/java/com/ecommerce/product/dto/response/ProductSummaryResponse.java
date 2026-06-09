@@ -12,6 +12,7 @@ public record ProductSummaryResponse(
         Long sellerId,
         String sellerName,   // ADMIN 조회 시에만 채워짐 (그 외 null)
         String sellerEmail,  // ADMIN 조회 시에만 채워짐 (그 외 null)
+        String status,
         Long categoryId,
         String categoryName
 ) {
@@ -30,6 +31,7 @@ public record ProductSummaryResponse(
                 product.getSellerId(),
                 seller != null ? seller.name()  : null,
                 seller != null ? seller.email() : null,
+                product.getStatus().name(),
                 product.getCategory().getId(),
                 product.getCategory().getName()
         );

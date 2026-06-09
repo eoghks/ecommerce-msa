@@ -78,7 +78,7 @@ class ProductRepositoryTest {
     @DisplayName("필터 없음 — 전체 상품 조회")
     void findAllWithFilter_noFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, null, PageRequest.of(0, 20));
+                null, null, false, PageRequest.of(0, 20));
 
         assertThat(result.getTotalElements()).isEqualTo(3);
     }
@@ -87,7 +87,7 @@ class ProductRepositoryTest {
     @DisplayName("카테고리 필터 — 전자기기만 조회")
     void findAllWithFilter_categoryFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                electronics.getId(), null, PageRequest.of(0, 20));
+                electronics.getId(), null, false, PageRequest.of(0, 20));
 
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent())
@@ -98,7 +98,7 @@ class ProductRepositoryTest {
     @DisplayName("키워드 필터 — '갤럭시' 포함 조회")
     void findAllWithFilter_keywordFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, "갤럭시", PageRequest.of(0, 20));
+                null, "갤럭시", false, PageRequest.of(0, 20));
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("갤럭시 S24");
@@ -108,7 +108,7 @@ class ProductRepositoryTest {
     @DisplayName("카테고리 + 키워드 복합 필터")
     void findAllWithFilter_combinedFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                electronics.getId(), "아이폰", PageRequest.of(0, 20));
+                electronics.getId(), "아이폰", false, PageRequest.of(0, 20));
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("아이폰 15");
@@ -118,7 +118,7 @@ class ProductRepositoryTest {
     @DisplayName("일치하는 상품 없음 — 빈 페이지 반환")
     void findAllWithFilter_noResult() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, "존재하지않는키워드xyz", PageRequest.of(0, 20));
+                null, "존재하지않는키워드xyz", false, PageRequest.of(0, 20));
 
         assertThat(result.getTotalElements()).isEqualTo(0);
         assertThat(result.getContent()).isEmpty();
@@ -128,7 +128,7 @@ class ProductRepositoryTest {
     @DisplayName("페이징 — size=2, page=0")
     void findAllWithFilter_paging() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, null, PageRequest.of(0, 2));
+                null, null, false, PageRequest.of(0, 2));
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(3);

@@ -85,6 +85,20 @@ public class ProductService {
         evictDetailCache(id);
     }
 
+    /** 판매 금지 (ADMIN) */
+    @Transactional
+    public void banProduct(Long id) {
+        loadProduct(id).ban();
+        evictDetailCache(id);  // 캐시 제거 → 공개 조회 즉시 차단
+    }
+
+    /** 판매 금지 해제 (ADMIN) */
+    @Transactional
+    public void unbanProduct(Long id) {
+        loadProduct(id).unban();
+        evictDetailCache(id);
+    }
+
     /** 내 상품 목록 (SELLER 전용) */
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponse> getMyProducts(Long sellerId, Pageable pageable) {
@@ -104,8 +118,9 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponse> findProducts(ProductSearchRequest request, boolean enrichSeller) {
+        // ADMIN(enrichSeller=true)만 판매 금지 상품 포함, 공개 목록은 제외
         Page<Product> page = productRepository.findAllWithFilter(
-                request.categoryId(), request.keyword(), request.pageable());
+                request.categoryId(), request.keyword(), enrichSeller, request.pageable());
 
         if (!enrichSeller) {
             return page.map(ProductSummaryResponse::from);
@@ -135,8 +150,12 @@ public class ProductService {
             return deserialize(cachedJson);
         }
 
-        // DB 조회 후 캐시 저장
-        ProductResponse response = ProductResponse.from(loadProduct(id));
+        // DB 조회 — 판매 금지 상품은 공개 조회에서 404 (캐시에 담지 않음)
+        Product product = loadProduct(id);
+        if (product.isBanned()) {
+            throw new ProductNotFoundException(id);
+        }
+        ProductResponse response = ProductResponse.from(product);
         redisTemplate.opsForValue().set(cacheKey, serialize(response), CACHE_TTL);
         log.debug("상품 상세 캐시 저장. id={}", id);
         return response;
