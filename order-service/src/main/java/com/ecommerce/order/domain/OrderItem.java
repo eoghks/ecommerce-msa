@@ -16,6 +16,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "order_item")
 @Getter
@@ -53,6 +55,12 @@ public class OrderItem {
     @Column(nullable = false, length = 20)
     private OrderItemStatus status;
 
+    @Column(name = "cancel_reason", length = 300)
+    private String cancelReason;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
     @Builder
     private OrderItem(Long productId, String productName, Long price, Integer quantity, Long sellerId) {
         this.productId   = productId;
@@ -61,6 +69,16 @@ public class OrderItem {
         this.quantity    = quantity;
         this.sellerId    = sellerId;
         this.status      = OrderItemStatus.ACTIVE;
+    }
+
+    /** 항목 취소 — 사유 필수. 이미 취소된 항목은 멱등 처리 */
+    public void cancel(String reason, LocalDateTime when) {
+        if (this.status == OrderItemStatus.CANCELLED) {
+            return;
+        }
+        this.status       = OrderItemStatus.CANCELLED;
+        this.cancelReason = reason;
+        this.cancelledAt  = when;
     }
 
     // Order 엔티티에서만 호출 — 양방향 연관관계 설정

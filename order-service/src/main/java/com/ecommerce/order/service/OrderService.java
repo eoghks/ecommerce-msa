@@ -8,6 +8,8 @@ import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.event.OrderCreatedEvent;
 import com.ecommerce.order.event.OrderItemPayload;
+import com.ecommerce.order.exception.OrderItemAccessDeniedException;
+import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -135,6 +137,32 @@ public class OrderService {
     public Page<OrderResponse> getSellerOrders(Long sellerId, Pageable pageable) {
         return orderRepository.findBySellerId(sellerId, pageable)
                 .map(order -> OrderResponse.forSeller(order, sellerId));
+    }
+
+    /**
+     * 주문 항목 취소 (사유 필수).
+     * ADMIN: 전체 항목 / SELLER: 본인 상품 항목만.
+     * 취소 후 주문 상태(전체→CANCELLED, 일부→PARTIALLY_CANCELLED)·합계 재계산.
+     */
+    @Transactional
+    public void cancelOrderItem(Long orderId, Long itemId, String reason, Long userId, String role) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        OrderItem item = order.getItems().stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new OrderItemNotFoundException(itemId));
+
+        // SELLER는 본인 상품 항목만 취소 가능
+        if ("SELLER".equals(role) && !item.isOwnedBy(userId)) {
+            throw new OrderItemAccessDeniedException(itemId);
+        }
+
+        order.cancelItem(itemId, reason);
+        log.info("주문 항목 취소. orderId={}, itemId={}, by={}({}), reason={}",
+                orderId, itemId, userId, role, reason);
+        // PR-C: 재고 복구 이벤트(order.item.cancelled) 발행 예정
     }
 
     /** 주문 상세 조회 — 본인 주문만 허용 */

@@ -19,3 +19,7 @@ export const getAllOrders = (page = 0, size = 20) =>
 // 판매자 주문 조회 (SELLER) — 본인 상품 항목만
 export const getSellerOrders = (page = 0, size = 20) =>
   api.get('/api/v1/orders/seller', { params: { page, size } });
+
+// 주문 항목 취소 (ADMIN 전체 / SELLER 본인 항목) — 사유 필수
+export const cancelOrderItem = (orderId, itemId, reason) =>
+  api.patch(`/api/v1/orders/${orderId}/items/${itemId}/cancel`, { reason });
