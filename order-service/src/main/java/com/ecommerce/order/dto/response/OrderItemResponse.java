@@ -10,7 +10,8 @@ public record OrderItemResponse(
         Integer quantity,
         Long subtotal,
         Long sellerId,
-        String status
+        String status,
+        String cancelReason
 ) {
     public static OrderItemResponse from(OrderItem item) {
         return new OrderItemResponse(
@@ -21,7 +22,8 @@ public record OrderItemResponse(
                 item.getQuantity(),
                 item.subtotal(),
                 item.getSellerId(),
-                item.getStatus().name()
+                item.getStatus().name(),
+                item.getCancelReason()
         );
     }
 }

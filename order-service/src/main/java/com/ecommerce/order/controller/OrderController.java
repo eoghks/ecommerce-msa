@@ -1,6 +1,7 @@
 package com.ecommerce.order.controller;
 
 import com.ecommerce.order.dto.request.OrderCreateRequest;
+import com.ecommerce.order.dto.request.OrderItemCancelRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -81,6 +83,22 @@ public class OrderController {
             @PathVariable Long orderId
     ) {
         orderService.cancelByUser(orderId, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 주문 항목 취소 (ADMIN: 전체 / SELLER: 본인 상품 항목). 사유 필수.
+     */
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PatchMapping("/{orderId}/items/{itemId}/cancel")
+    public ResponseEntity<Void> cancelOrderItem(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Role") String role,
+            @PathVariable Long orderId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody OrderItemCancelRequest request
+    ) {
+        orderService.cancelOrderItem(orderId, itemId, request.reason(), userId, role);
         return ResponseEntity.noContent().build();
     }
 }

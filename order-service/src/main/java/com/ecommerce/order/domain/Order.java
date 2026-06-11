@@ -112,6 +112,42 @@ public class Order {
         return this.status == OrderStatus.PENDING;
     }
 
+    /**
+     * 항목 단위 취소 (판매자/관리자). 사유 필수.
+     * 취소 후 주문 상태·합계를 재계산한다:
+     *   - 전 항목 취소 → CANCELLED
+     *   - 일부만 취소 → PARTIALLY_CANCELLED
+     *   - totalPrice → 살아있는(ACTIVE) 항목 합계로 갱신
+     * @return 취소된 항목 (재고 복구 이벤트 발행용)
+     */
+    public OrderItem cancelItem(Long itemId, String reason) {
+        OrderItem target = items.stream()
+                .filter(i -> i.getId().equals(itemId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "주문에 해당 항목이 없습니다. itemId=" + itemId));
+
+        target.cancel(reason, LocalDateTime.now());
+        recalculateAfterCancel();
+        return target;
+    }
+
+    private void recalculateAfterCancel() {
+        boolean allCancelled = items.stream().noneMatch(OrderItem::isActive);
+        boolean anyCancelled = items.stream().anyMatch(i -> !i.isActive());
+
+        if (allCancelled) {
+            this.status = OrderStatus.CANCELLED;
+        } else if (anyCancelled) {
+            this.status = OrderStatus.PARTIALLY_CANCELLED;
+        }
+        // 합계는 살아있는 항목만 반영
+        this.totalPrice = items.stream()
+                .filter(OrderItem::isActive)
+                .mapToLong(OrderItem::subtotal)
+                .sum();
+    }
+
     private void addItem(OrderItem item) {
         items.add(item);
         item.assignOrder(this);

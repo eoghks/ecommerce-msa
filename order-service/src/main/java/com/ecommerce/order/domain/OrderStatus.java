@@ -9,6 +9,7 @@ public enum OrderStatus {
 
     PENDING("PENDING"),
     CONFIRMED("CONFIRMED"),
+    PARTIALLY_CANCELLED("PARTIALLY_CANCELLED"),  // 일부 항목만 취소됨
     CANCELLED("CANCELLED");
 
     private final String code;

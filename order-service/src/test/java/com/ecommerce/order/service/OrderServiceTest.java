@@ -8,6 +8,8 @@ import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderCreatedApplicationEvent;
+import com.ecommerce.order.exception.OrderItemAccessDeniedException;
+import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.repository.OrderRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +22,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -241,6 +244,68 @@ class OrderServiceTest {
                 .isInstanceOf(OrderNotFoundException.class);
     }
 
+    // ── 주문 항목 취소 (부분 취소) ──────────────────────────────────
+
+    @Test
+    @DisplayName("cancelOrderItem — 일부 항목 취소 시 PARTIALLY_CANCELLED + 합계 재계산")
+    void cancelOrderItem_partial() {
+        // 판매자 7(2만), 판매자 8(5만) 섞인 주문. itemId=1이 판매자 7
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "재고 소진", 7L, "SELLER");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_CANCELLED);
+        // 살아있는 항목(판매자 8, 5만)만 합계
+        assertThat(order.getTotalPrice()).isEqualTo(50_000L);
+    }
+
+    @Test
+    @DisplayName("cancelOrderItem — 전 항목 취소 시 CANCELLED")
+    void cancelOrderItem_all() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 7L}, new long[]{20_000L, 30_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "사유1", 7L, "SELLER");
+        orderService.cancelOrderItem(1L, 2L, "사유2", 7L, "SELLER");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getTotalPrice()).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("cancelOrderItem — SELLER가 타 판매자 항목 취소 시 403")
+    void cancelOrderItem_seller_otherItem() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        // 판매자 7이 itemId=2(판매자 8 항목) 취소 시도
+        assertThatThrownBy(() -> orderService.cancelOrderItem(1L, 2L, "사유", 7L, "SELLER"))
+                .isInstanceOf(OrderItemAccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("cancelOrderItem — ADMIN은 어떤 항목이든 취소 가능")
+    void cancelOrderItem_admin_anyItem() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 2L, "관리자 조치", 999L, "ADMIN");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_CANCELLED);
+        assertThat(order.getTotalPrice()).isEqualTo(20_000L);
+    }
+
+    @Test
+    @DisplayName("cancelOrderItem — 존재하지 않는 항목 취소 시 404")
+    void cancelOrderItem_itemNotFound() {
+        Order order = buildMultiSellerOrder(new long[]{7L}, new long[]{20_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrderItem(1L, 999L, "사유", 7L, "SELLER"))
+                .isInstanceOf(OrderItemNotFoundException.class);
+    }
+
     // ── helper ──────────────────────────────────────────────────────
 
     private Order buildOrder(Long userId, Long productId, String productName,
@@ -258,24 +323,31 @@ class OrderServiceTest {
                 .build();
     }
 
-    /** 여러 판매자 상품이 섞인 주문 생성 (sellerIds[i] 판매자, prices[i] 단가, 수량 1) */
+    /**
+     * 여러 판매자 상품이 섞인 주문 생성 (sellerIds[i] 판매자, prices[i] 단가, 수량 1).
+     * OrderItem id는 1부터 순번으로 부여 (취소 테스트에서 itemId로 사용).
+     */
     private Order buildMultiSellerOrder(long[] sellerIds, long[] prices) {
         List<OrderItem> items = new java.util.ArrayList<>();
         long total = 0;
         for (int i = 0; i < sellerIds.length; i++) {
-            items.add(OrderItem.builder()
+            OrderItem item = OrderItem.builder()
                     .productId(100L + i)
                     .productName("상품" + i)
                     .price(prices[i])
                     .quantity(1)
                     .sellerId(sellerIds[i])
-                    .build());
+                    .build();
+            ReflectionTestUtils.setField(item, "id", (long) (i + 1));
+            items.add(item);
             total += prices[i];
         }
-        return Order.builder()
+        Order order = Order.builder()
                 .userId(1L)
                 .totalPrice(total)
                 .items(items)
                 .build();
+        ReflectionTestUtils.setField(order, "id", 1L);
+        return order;
     }
 }
