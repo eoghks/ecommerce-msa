@@ -11,3 +11,11 @@ export const getOrder = (id) =>
 
 export const cancelOrder = (id) =>
   api.delete(`/api/v1/orders/${id}`);
+
+// 전체 주문 조회 (ADMIN)
+export const getAllOrders = (page = 0, size = 20) =>
+  api.get('/api/v1/orders/admin', { params: { page, size } });
+
+// 판매자 주문 조회 (SELLER) — 본인 상품 항목만
+export const getSellerOrders = (page = 0, size = 20) =>
+  api.get('/api/v1/orders/seller', { params: { page, size } });

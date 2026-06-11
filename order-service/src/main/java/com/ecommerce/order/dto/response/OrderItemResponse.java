@@ -8,7 +8,9 @@ public record OrderItemResponse(
         String productName,
         Long price,
         Integer quantity,
-        Long subtotal
+        Long subtotal,
+        Long sellerId,
+        String status
 ) {
     public static OrderItemResponse from(OrderItem item) {
         return new OrderItemResponse(
@@ -17,7 +19,9 @@ public record OrderItemResponse(
                 item.getProductName(),
                 item.getPrice(),
                 item.getQuantity(),
-                item.subtotal()
+                item.subtotal(),
+                item.getSellerId(),
+                item.getStatus().name()
         );
     }
 }

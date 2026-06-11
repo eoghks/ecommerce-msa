@@ -53,7 +53,7 @@ class OrderServiceTest {
                 "홍길동", "010-1234-5678", "서울시 강남구 테헤란로 1"
         );
         ProductClient.ProductInfo productInfo =
-                new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10, "https://example.com/img.jpg");
+                new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10, "https://example.com/img.jpg", 7L);
         Order savedOrder = buildOrder(userId, 10L, "갤럭시 S24", 1_200_000L, 2);
 
         given(productClient.getProduct(10L)).willReturn(productInfo);
@@ -143,6 +143,43 @@ class OrderServiceTest {
         assertThat(result.getContent().get(0).userId()).isEqualTo(userId);
     }
 
+    @Test
+    @DisplayName("getAllOrders — 전체 주문 페이징 조회 (ADMIN)")
+    void getAllOrders_success() {
+        PageRequest pageable = PageRequest.of(0, 20);
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        Page<Order> page = new PageImpl<>(List.of(order), pageable, 1);
+
+        given(orderRepository.findAll(pageable)).willReturn(page);
+
+        Page<OrderResponse> result = orderService.getAllOrders(pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("getSellerOrders — 본인 상품 항목만 노출, 합계도 본인 항목 기준")
+    void getSellerOrders_onlyOwnItems() {
+        Long sellerId = 7L;
+        PageRequest pageable = PageRequest.of(0, 20);
+        // 한 주문에 판매자 7(2만원×1)과 판매자 8(5만원×1) 상품이 섞임
+        Order order = buildMultiSellerOrder(
+                new long[]{7L, 8L},
+                new long[]{20_000L, 50_000L});
+        Page<Order> page = new PageImpl<>(List.of(order), pageable, 1);
+
+        given(orderRepository.findBySellerId(sellerId, pageable)).willReturn(page);
+
+        Page<OrderResponse> result = orderService.getSellerOrders(sellerId, pageable);
+
+        OrderResponse res = result.getContent().get(0);
+        // 판매자 7 항목만 보여야 함
+        assertThat(res.items()).hasSize(1);
+        assertThat(res.items().get(0).sellerId()).isEqualTo(7L);
+        // 합계도 판매자 7 항목(2만원)만
+        assertThat(res.totalPrice()).isEqualTo(20_000L);
+    }
+
     // ── 주문 상세 조회 ──────────────────────────────────────────────
 
     @Test
@@ -218,6 +255,27 @@ class OrderServiceTest {
                 .userId(userId)
                 .totalPrice(price * quantity)
                 .items(List.of(item))
+                .build();
+    }
+
+    /** 여러 판매자 상품이 섞인 주문 생성 (sellerIds[i] 판매자, prices[i] 단가, 수량 1) */
+    private Order buildMultiSellerOrder(long[] sellerIds, long[] prices) {
+        List<OrderItem> items = new java.util.ArrayList<>();
+        long total = 0;
+        for (int i = 0; i < sellerIds.length; i++) {
+            items.add(OrderItem.builder()
+                    .productId(100L + i)
+                    .productName("상품" + i)
+                    .price(prices[i])
+                    .quantity(1)
+                    .sellerId(sellerIds[i])
+                    .build());
+            total += prices[i];
+        }
+        return Order.builder()
+                .userId(1L)
+                .totalPrice(total)
+                .items(items)
                 .build();
     }
 }
