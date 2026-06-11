@@ -43,6 +43,7 @@ public class ProductClient {
             String name,
             Long price,
             int stock,
-            String imageUrl
+            String imageUrl,
+            Long sellerId
     ) {}
 }

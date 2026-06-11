@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,6 +44,25 @@ public class OrderController {
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
     ) {
         return ResponseEntity.ok(orderService.getMyOrders(userId, pageable));
+    }
+
+    /** 전체 주문 목록 조회 (ADMIN) */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin")
+    public ResponseEntity<Page<OrderResponse>> getAllOrders(
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
+    ) {
+        return ResponseEntity.ok(orderService.getAllOrders(pageable));
+    }
+
+    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목만 노출 */
+    @PreAuthorize("hasRole('SELLER')")
+    @GetMapping("/seller")
+    public ResponseEntity<Page<OrderResponse>> getSellerOrders(
+            @RequestHeader("X-User-Id") Long sellerId,
+            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
+    ) {
+        return ResponseEntity.ok(orderService.getSellerOrders(sellerId, pageable));
     }
 
     /** 주문 상세 조회 */

@@ -86,6 +86,7 @@ public class OrderService {
                             .productName(product.name())
                             .price(product.price())
                             .quantity(itemRequest.quantity())
+                            .sellerId(product.sellerId())
                             .build();
                 })
                 .toList();
@@ -120,6 +121,20 @@ public class OrderService {
     public Page<OrderResponse> getMyOrders(Long userId, Pageable pageable) {
         return orderRepository.findByUserId(userId, pageable)
                 .map(OrderResponse::from);
+    }
+
+    /** 전체 주문 목록 조회 (ADMIN) */
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(pageable)
+                .map(OrderResponse::from);
+    }
+
+    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목만 노출 */
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getSellerOrders(Long sellerId, Pageable pageable) {
+        return orderRepository.findBySellerId(sellerId, pageable)
+                .map(order -> OrderResponse.forSeller(order, sellerId));
     }
 
     /** 주문 상세 조회 — 본인 주문만 허용 */

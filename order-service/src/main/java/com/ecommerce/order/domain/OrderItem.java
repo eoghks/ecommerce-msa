@@ -2,6 +2,8 @@ package com.ecommerce.order.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -43,12 +45,22 @@ public class OrderItem {
     @Column(nullable = false)
     private Integer quantity;
 
+    // 판매자 ID — null이면 ADMIN(플랫폼) 등록 상품. 주문 시점 스냅샷
+    @Column(name = "seller_id")
+    private Long sellerId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrderItemStatus status;
+
     @Builder
-    private OrderItem(Long productId, String productName, Long price, Integer quantity) {
+    private OrderItem(Long productId, String productName, Long price, Integer quantity, Long sellerId) {
         this.productId   = productId;
         this.productName = productName;
         this.price       = price;
         this.quantity    = quantity;
+        this.sellerId    = sellerId;
+        this.status      = OrderItemStatus.ACTIVE;
     }
 
     // Order 엔티티에서만 호출 — 양방향 연관관계 설정
@@ -58,5 +70,14 @@ public class OrderItem {
 
     public long subtotal() {
         return price * quantity;
+    }
+
+    /** 해당 판매자의 항목인지 */
+    public boolean isOwnedBy(Long sellerId) {
+        return sellerId != null && sellerId.equals(this.sellerId);
+    }
+
+    public boolean isActive() {
+        return this.status == OrderItemStatus.ACTIVE;
     }
 }
