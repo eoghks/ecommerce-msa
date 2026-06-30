@@ -1,6 +1,5 @@
 package com.ecommerce.product.service;
 
-import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +20,11 @@ public class RestockTransactionService {
 
     @Transactional
     public void increaseStock(Long productId, int quantity) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException(productId));
-        product.increaseStock(quantity);  // dirty check 자동 flush
+        // 원자적 복구 (취소 보상)
+        int updated = productRepository.increaseStockAtomic(productId, quantity);
+        if (updated == 0) {
+            throw new ProductNotFoundException(productId);
+        }
         log.info("재고 복구 완료. productId={}, +{}", productId, quantity);
     }
 }

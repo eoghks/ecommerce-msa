@@ -30,11 +30,15 @@ public class StockDecreaseTransactionService {
     @Transactional
     public void decreaseStock(OrderCreatedPayload payload) {
         for (OrderCreatedPayload.Item item : payload.items()) {
-            com.ecommerce.product.domain.Product product = productRepository
-                    .findById(item.productId())
-                    .orElseThrow(() -> new ProductNotFoundException(item.productId()));
-            product.decreaseStock(item.quantity());  // 재고 부족 시 IllegalStateException
-            // dirty check 으로 자동 flush — 별도 save() 불필요
+            // H-4: 원자적 조건부 차감 — 동시 주문 oversell 방지
+            int updated = productRepository.decreaseStockIfEnough(item.productId(), item.quantity());
+            if (updated == 0) {
+                if (!productRepository.existsById(item.productId())) {
+                    throw new ProductNotFoundException(item.productId());
+                }
+                // 상품은 있으나 재고 부족 → 보상 트랜잭션 트리거
+                throw new IllegalStateException("재고가 부족합니다. productId=" + item.productId());
+            }
         }
         log.info("재고 차감 완료. orderId={}", payload.orderId());
     }
