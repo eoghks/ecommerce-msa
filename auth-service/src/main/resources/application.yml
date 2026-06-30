@@ -96,3 +96,5 @@ app:
     expose-temp-password: false
   cookie:
     secure: true                 # 운영: HTTPS 전용 쿠키
+  seller:
+    auto-approve: false          # 운영: 판매자 자동 승인 차단 (심사 절차 필요)

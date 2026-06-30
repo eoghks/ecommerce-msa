@@ -143,11 +143,18 @@ public class ProductService {
         String cacheKey = CACHE_DETAIL_PREFIX + id;
 
         // 캐시 조회 — 히트 시 TTL 연장 (자주 조회되는 상품 캐시 유지)
+        // M-5: 캐시 손상 시 500 대신 캐시 미스로 폴백 (손상 키 삭제 후 DB 재조회)
         String cachedJson = redisTemplate.opsForValue().get(cacheKey);
         if (cachedJson != null) {
-            redisTemplate.expire(cacheKey, CACHE_TTL);
-            log.debug("상품 상세 캐시 히트. id={}", id);
-            return deserialize(cachedJson);
+            ProductResponse cached = tryDeserialize(cachedJson);
+            if (cached != null) {
+                redisTemplate.expire(cacheKey, CACHE_TTL);
+                log.debug("상품 상세 캐시 히트. id={}", id);
+                return cached;
+            }
+            // 역직렬화 실패 — 손상 캐시 제거하고 DB 재조회로 진행
+            log.warn("상품 캐시 손상 — 삭제 후 DB 재조회. id={}", id);
+            redisTemplate.delete(cacheKey);
         }
 
         // DB 조회 — 판매 금지 상품은 공개 조회에서 404 (캐시에 담지 않음)
@@ -170,12 +177,13 @@ public class ProductService {
         }
     }
 
-    private ProductResponse deserialize(String json) {
+    /** 캐시 역직렬화 — 실패 시 null 반환(캐시 미스 폴백). */
+    private ProductResponse tryDeserialize(String json) {
         try {
             return redisObjectMapper.readValue(json, ProductResponse.class);
         } catch (JsonProcessingException e) {
-            // 캐시 데이터 손상 — 로그 후 캐시 미스로 처리하려면 null 반환도 가능
-            throw new IllegalStateException("상품 캐시 역직렬화 실패.", e);
+            log.warn("상품 캐시 역직렬화 실패: {}", e.getMessage());
+            return null;
         }
     }
 
