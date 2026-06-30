@@ -20,6 +20,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Entity
 @Table(name = "orders")   // order는 SQL 예약어
@@ -113,23 +114,39 @@ public class Order {
     }
 
     /**
+     * C-2: 항목 단위 취소 가능 상태인지.
+     * 재고가 실제로 차감된 주문(CONFIRMED) 또는 일부만 취소된 주문(PARTIALLY_CANCELLED)만 허용.
+     * PENDING(아직 차감 전)·CANCELLED(차감된 적 없거나 이미 전체 취소)는 불가 →
+     * 차감되지 않은 수량이 재고에 복구되는 과복구(over-restock)를 막는다.
+     */
+    public boolean isItemCancellable() {
+        return this.status == OrderStatus.CONFIRMED
+                || this.status == OrderStatus.PARTIALLY_CANCELLED;
+    }
+
+    /**
      * 항목 단위 취소 (판매자/관리자). 사유 필수.
      * 취소 후 주문 상태·합계를 재계산한다:
      *   - 전 항목 취소 → CANCELLED
      *   - 일부만 취소 → PARTIALLY_CANCELLED
      *   - totalPrice → 살아있는(ACTIVE) 항목 합계로 갱신
-     * @return 취소된 항목 (재고 복구 이벤트 발행용)
+     * C-3: 실제로 ACTIVE→CANCELLED 전이가 일어난 경우에만 항목을 반환한다.
+     *      이미 취소된 항목이면 Optional.empty() → 호출부가 재고 복구 이벤트를 중복 발행하지 않음.
+     * @return 새로 취소된 항목 (없으면 empty)
      */
-    public OrderItem cancelItem(Long itemId, String reason) {
+    public Optional<OrderItem> cancelItem(Long itemId, String reason) {
         OrderItem target = items.stream()
                 .filter(i -> i.getId().equals(itemId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
                         "주문에 해당 항목이 없습니다. itemId=" + itemId));
 
-        target.cancel(reason, LocalDateTime.now());
+        boolean transitioned = target.cancel(reason, LocalDateTime.now());
+        if (!transitioned) {
+            return Optional.empty();   // 이미 취소된 항목 — 멱등, 이벤트 미발행
+        }
         recalculateAfterCancel();
-        return target;
+        return Optional.of(target);
     }
 
     private void recalculateAfterCancel() {
