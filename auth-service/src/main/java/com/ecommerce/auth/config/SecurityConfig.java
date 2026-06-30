@@ -21,6 +21,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/actuator/**").permitAll()  // 헬스체크/모니터링 — 인증 없이 허용
                 .anyRequest().authenticated()
             );
         return http.build();
