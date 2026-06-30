@@ -30,4 +30,12 @@ public class OrderKafkaEventRelay {
                 applicationEvent.kafkaEvent().getOrderId());
         orderEventPublisher.publishOrderCreated(applicationEvent.kafkaEvent());
     }
+
+    /** 항목 취소 커밋 후 재고 복구 이벤트 발행 */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onOrderItemCancelled(OrderItemCancelledApplicationEvent applicationEvent) {
+        log.info("트랜잭션 커밋 후 항목 취소 이벤트 발행. orderId={}, itemId={}",
+                applicationEvent.kafkaEvent().getOrderId(), applicationEvent.kafkaEvent().getItemId());
+        orderEventPublisher.publishOrderItemCancelled(applicationEvent.kafkaEvent());
+    }
 }

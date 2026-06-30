@@ -7,7 +7,6 @@ import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
-import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.exception.OrderItemAccessDeniedException;
 import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
@@ -30,6 +29,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.times;
@@ -41,14 +42,15 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    @Mock private OrderRepository          orderRepository;
-    @Mock private ProductClient            productClient;
+    @Mock private OrderRepository           orderRepository;
+    @Mock private ProductClient             productClient;
+    @Mock private OrderPersistenceService   orderPersistenceService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
 
     // ── 주문 생성 ──────────────────────────────────────────────────
 
     @Test
-    @DisplayName("주문 생성 — 상품 정보 조회 후 저장 및 ApplicationEvent 발행")
+    @DisplayName("주문 생성 — 상품 조회 후 영속 빈(saveAndPublish)에 위임 (프록시 경유 트랜잭션 보장)")
     void createOrder_success() {
         Long userId = 1L;
         OrderCreateRequest request = new OrderCreateRequest(
@@ -58,16 +60,20 @@ class OrderServiceTest {
         ProductClient.ProductInfo productInfo =
                 new ProductClient.ProductInfo(10L, "갤럭시 S24", 1_200_000L, 10, "https://example.com/img.jpg", 7L);
         Order savedOrder = buildOrder(userId, 10L, "갤럭시 S24", 1_200_000L, 2);
+        OrderResponse expected = OrderResponse.from(savedOrder);
 
         given(productClient.getProduct(10L)).willReturn(productInfo);
-        given(orderRepository.save(any(Order.class))).willReturn(savedOrder);
+        // 가격은 서버(ProductClient)에서 조회한 값으로 계산: 1,200,000 × 2
+        given(orderPersistenceService.saveAndPublish(eq(userId), eq(2_400_000L), anyList(), eq(request)))
+                .willReturn(expected);
 
         OrderResponse response = orderService.createOrder(userId, request);
 
         assertThat(response).isNotNull();
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING);
-        then(applicationEventPublisher).should(times(1))
-                .publishEvent(any(OrderCreatedApplicationEvent.class));
+        // 자기호출 제거 검증: 별도 빈에 위임됐는지
+        then(orderPersistenceService).should(times(1))
+                .saveAndPublish(eq(userId), eq(2_400_000L), anyList(), eq(request));
     }
 
     // ── 주문 확정 ──────────────────────────────────────────────────
@@ -258,6 +264,9 @@ class OrderServiceTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_CANCELLED);
         // 살아있는 항목(판매자 8, 5만)만 합계
         assertThat(order.getTotalPrice()).isEqualTo(50_000L);
+        // 재고 복구 이벤트(AFTER_COMMIT 발행용) 등록 확인
+        then(applicationEventPublisher).should(times(1))
+                .publishEvent(any(com.ecommerce.order.event.OrderItemCancelledApplicationEvent.class));
     }
 
     @Test
