@@ -62,6 +62,9 @@ management:
     web:
       exposure:
         include: health, info
+  endpoint:
+    health:
+      show-details: always   # dev: 모니터링 서비스가 컴포넌트 상태를 읽을 수 있도록
 
 logging:
   file:
