@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
@@ -315,6 +316,40 @@ class OrderServiceTest {
                 .isInstanceOf(OrderItemNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("C-2: PENDING(미차감) 주문 항목 취소 시 409 — 과복구 방지")
+    void cancelOrderItem_pending_rejected() {
+        // confirm 안 한 PENDING 주문 (재고 차감 전)
+        Order order = Order.builder().userId(1L).totalPrice(20_000L)
+                .items(List.of(OrderItem.builder()
+                        .productId(100L).productName("상품").price(20_000L).quantity(1).sellerId(7L).build()))
+                .build();
+        ReflectionTestUtils.setField(order, "id", 1L);
+        ReflectionTestUtils.setField(order.getItems().get(0), "id", 1L);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrderItem(1L, 1L, "사유", 7L, "SELLER"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("취소할 수 없는 주문 상태");
+        // 재고 복구 이벤트 미발행 (차감된 적 없으므로)
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(com.ecommerce.order.event.OrderItemCancelledApplicationEvent.class));
+    }
+
+    @Test
+    @DisplayName("C-3: 이미 취소된 항목 재취소 시 복구 이벤트 1회만 발행")
+    void cancelOrderItem_idempotentEvent() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "사유", 7L, "SELLER");
+        orderService.cancelOrderItem(1L, 1L, "사유 재시도", 7L, "SELLER"); // 같은 항목 재취소
+
+        // 전이는 1회뿐 → 이벤트도 1회만
+        then(applicationEventPublisher).should(times(1))
+                .publishEvent(any(com.ecommerce.order.event.OrderItemCancelledApplicationEvent.class));
+    }
+
     // ── helper ──────────────────────────────────────────────────────
 
     private Order buildOrder(Long userId, Long productId, String productName,
@@ -357,6 +392,7 @@ class OrderServiceTest {
                 .items(items)
                 .build();
         ReflectionTestUtils.setField(order, "id", 1L);
+        order.confirm();   // 항목 취소 가능 상태(CONFIRMED) — 재고 차감 완료 가정 (C-2)
         return order;
     }
 }

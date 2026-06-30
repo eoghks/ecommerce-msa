@@ -112,6 +112,8 @@ public class OrderService {
      * 주문 항목 취소 (사유 필수).
      * ADMIN: 전체 항목 / SELLER: 본인 상품 항목만.
      * 취소 후 주문 상태(전체→CANCELLED, 일부→PARTIALLY_CANCELLED)·합계 재계산.
+     * C-2: 재고가 실제 차감된 주문(CONFIRMED/부분취소)만 허용 — 과복구 방지.
+     * C-3: 실제 취소 전이가 일어난 경우에만 재고 복구 이벤트 발행 — 중복 발행 방지.
      */
     @Transactional
     public void cancelOrderItem(Long orderId, Long itemId, String reason, Long userId, String role) {
@@ -128,14 +130,20 @@ public class OrderService {
             throw new OrderItemAccessDeniedException(itemId);
         }
 
-        OrderItem cancelled = order.cancelItem(itemId, reason);
-        log.info("주문 항목 취소. orderId={}, itemId={}, by={}({}), reason={}",
-                orderId, itemId, userId, role, reason);
+        // C-2: 차감이 완료된 주문만 항목 취소 허용 (과복구 방지)
+        if (!order.isItemCancellable()) {
+            throw new IllegalStateException(
+                    "항목을 취소할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
+        }
 
-        // 트랜잭션 커밋 후 재고 복구 이벤트 발행 (AFTER_COMMIT)
-        applicationEventPublisher.publishEvent(new OrderItemCancelledApplicationEvent(
-                new OrderItemCancelledEvent(
-                        orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
+        // C-3: 실제 ACTIVE→CANCELLED 전이가 일어난 경우에만 복구 이벤트 발행
+        order.cancelItem(itemId, reason).ifPresent(cancelled -> {
+            log.info("주문 항목 취소. orderId={}, itemId={}, by={}({}), reason={}",
+                    orderId, itemId, userId, role, reason);
+            applicationEventPublisher.publishEvent(new OrderItemCancelledApplicationEvent(
+                    new OrderItemCancelledEvent(
+                            orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
+        });
     }
 
     /** 주문 상세 조회 — 본인 주문만 허용 */
