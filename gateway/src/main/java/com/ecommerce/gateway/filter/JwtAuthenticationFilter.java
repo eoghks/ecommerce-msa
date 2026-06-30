@@ -51,42 +51,62 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/cart"      // 비로그인 장바구니 허용 (게스트: 쿠키 기반)
     );
 
+    // 서비스 간 직접 호출(내부망) 전용 — 게이트웨이(외부)로는 접근 차단
+    private static final List<String> INTERNAL_ONLY_LIST = List.of(
+            "/api/v1/auth/users"   // H-1: 판매자 PII 배치 조회 (product→auth 내부 전용)
+    );
+
     private final JwksClient jwksClient;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
 
-        if (isWhitelisted(path)) {
-            return chain.filter(exchange);
+        // C-1: 진입 즉시 클라이언트가 위조했을 수 있는 신뢰 헤더(X-User-*)를 무조건 제거.
+        //      이후 모든 통과 분기는 sanitize된 요청을 사용하고, JWT 검증 성공 시에만 재주입한다.
+        ServerHttpRequest sanitizedRequest = exchange.getRequest().mutate()
+                .headers(h -> {
+                    h.remove(HEADER_USER_ID);
+                    h.remove(HEADER_USER_ROLE);
+                })
+                .build();
+        ServerWebExchange sanitized = exchange.mutate().request(sanitizedRequest).build();
+
+        // H-1: 내부 전용 엔드포인트는 외부(게이트웨이) 접근 차단
+        if (isInternalOnly(path)) {
+            log.warn("내부 전용 엔드포인트 외부 접근 차단: path={}", path);
+            return onForbidden(sanitized);
         }
 
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (isWhitelisted(path)) {
+            return chain.filter(sanitized);
+        }
+
+        String authHeader = sanitized.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         boolean isOptional = isOptionalAuth(path);
 
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             if (isOptional) {
-                // 토큰 없어도 통과 (비로그인 상품 조회 허용)
-                return chain.filter(exchange);
+                // 토큰 없어도 통과 (비로그인 상품 조회 허용) — 단 헤더는 이미 제거됨
+                return chain.filter(sanitized);
             }
             log.warn("인증 헤더 없음: path={}", path);
-            return onUnauthorized(exchange);
+            return onUnauthorized(sanitized);
         }
 
         RSAPublicKey publicKey = jwksClient.getPublicKey();
         if (publicKey == null) {
             // 토큰을 제공했는데 공개키 미로드 — optional 경로여도 검증 불가이므로 401
             log.warn("공개키 미로드 — Auth Service 연결 확인 필요: path={}", path);
-            return onUnauthorized(exchange);
+            return onUnauthorized(sanitized);
         }
 
         String token = authHeader.substring(BEARER_PREFIX.length());
         try {
             SignedJWT jwt = SignedJWT.parse(token);
             if (!jwt.verify(new RSASSAVerifier(publicKey))) {
-                // 토큰을 제공했는데 서명 불일치 — optional 경로여도 401
                 log.warn("JWT 서명 검증 실패: path={}", path);
-                return onUnauthorized(exchange);
+                return onUnauthorized(sanitized);
             }
 
             JWTClaimsSet claims = jwt.getJWTClaimsSet();
@@ -94,20 +114,15 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             // HR-02: exp 클레임 null 방어
             Date expiry = claims.getExpirationTime();
             if (expiry == null || expiry.before(new Date())) {
-                // 토큰을 제공했는데 만료 — optional 경로여도 401
                 log.warn("JWT 만료 또는 exp 클레임 없음: path={}", path);
-                return onUnauthorized(exchange);
+                return onUnauthorized(sanitized);
             }
 
             String userId = claims.getSubject();
             String role   = claims.getStringClaim("role");
 
-            // HR-04: 클라이언트 위조 헤더 제거 후 재설정
-            ServerHttpRequest mutated = exchange.getRequest().mutate()
-                    .headers(h -> {
-                        h.remove(HEADER_USER_ID);
-                        h.remove(HEADER_USER_ROLE);
-                    })
+            // 검증 성공 시에만 신뢰 헤더 주입 (sanitize된 요청 기준)
+            ServerHttpRequest mutated = sanitizedRequest.mutate()
                     .header(HEADER_USER_ID,   userId)
                     .header(HEADER_USER_ROLE, role)
                     .build();
@@ -124,9 +139,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
 
         } catch (Exception e) {
-            // 토큰을 제공했는데 파싱 실패 — optional 경로여도 401
             log.warn("JWT 검증 실패: {}", e.getMessage());
-            return onUnauthorized(exchange);
+            return onUnauthorized(sanitized);
         }
     }
 
@@ -138,8 +152,17 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         return OPTIONAL_AUTH_LIST.stream().anyMatch(path::startsWith);
     }
 
+    private boolean isInternalOnly(String path) {
+        return INTERNAL_ONLY_LIST.stream().anyMatch(path::startsWith);
+    }
+
     private Mono<Void> onUnauthorized(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        return exchange.getResponse().setComplete();
+    }
+
+    private Mono<Void> onForbidden(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         return exchange.getResponse().setComplete();
     }
 
