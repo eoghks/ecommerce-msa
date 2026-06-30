@@ -37,6 +37,7 @@ spring:
 kafka:
   topic:
     order-created: order.created
+    order-item-cancelled: order.item.cancelled
     stock-decreased: stock.decreased
     stock-decrease-failed: stock.decrease.failed
 

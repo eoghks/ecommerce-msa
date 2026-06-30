@@ -24,9 +24,9 @@ spring:
       group-id: product-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+      # 타입 헤더(__TypeId__) 무시 — 리스너 메서드 파라미터 타입으로 역직렬화 (JsonMessageConverter)
+      # order-service 전용 클래스를 product-service 클래스패스에서 로드하려다 실패하던 문제 해결
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -38,6 +38,7 @@ spring:
 kafka:
   topic:
     order-created: order.created
+    order-item-cancelled: order.item.cancelled
     stock-decreased: stock.decreased
     stock-decrease-failed: stock.decrease.failed
 

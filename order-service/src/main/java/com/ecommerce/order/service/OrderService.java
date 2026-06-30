@@ -5,9 +5,8 @@ import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
-import com.ecommerce.order.event.OrderCreatedApplicationEvent;
-import com.ecommerce.order.event.OrderCreatedEvent;
-import com.ecommerce.order.event.OrderItemPayload;
+import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
+import com.ecommerce.order.event.OrderItemCancelledEvent;
 import com.ecommerce.order.exception.OrderItemAccessDeniedException;
 import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
@@ -29,6 +28,7 @@ public class OrderService {
 
     private final OrderRepository        orderRepository;
     private final ProductClient          productClient;
+    private final OrderPersistenceService orderPersistenceService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     /**
@@ -42,39 +42,8 @@ public class OrderService {
         List<OrderItem> items = fetchOrderItems(request);
         long totalPrice = items.stream().mapToLong(OrderItem::subtotal).sum();
 
-        return saveOrderAndPublishEvent(userId, totalPrice, items, request);
-    }
-
-    /**
-     * 주문 저장 + ApplicationEvent 등록.
-     * @Transactional 범위를 DB 작업으로만 한정.
-     */
-    @Transactional
-    protected OrderResponse saveOrderAndPublishEvent(Long userId, long totalPrice,
-                                                     List<OrderItem> items,
-                                                     OrderCreateRequest request) {
-        Order order = Order.builder()
-                .userId(userId)
-                .totalPrice(totalPrice)
-                // HR-05: 배송 정보 저장
-                .receiver(request.receiver())
-                .phone(request.phone())
-                .address(request.address())
-                .items(items)
-                .build();
-        Order savedOrder = orderRepository.save(order);
-
-        // ApplicationEvent 등록 — AFTER_COMMIT 시 OrderKafkaEventRelay가 Kafka 발행
-        List<OrderItemPayload> payloads = savedOrder.getItems().stream()
-                .map(item -> new OrderItemPayload(item.getProductId(), item.getQuantity()))
-                .toList();
-        applicationEventPublisher.publishEvent(
-                new OrderCreatedApplicationEvent(
-                        new OrderCreatedEvent(savedOrder.getId(), userId, payloads)));
-
-        log.info("주문 생성 완료. orderId={}, userId={}, totalPrice={}",
-                savedOrder.getId(), userId, totalPrice);
-        return OrderResponse.from(savedOrder);
+        // 별도 빈 호출 → 프록시 경유로 @Transactional 정상 적용 → AFTER_COMMIT 이벤트 발행 보장
+        return orderPersistenceService.saveAndPublish(userId, totalPrice, items, request);
     }
 
     /** 상품 정보 조회 및 OrderItem 생성 — 트랜잭션 외부 실행 */
@@ -159,10 +128,14 @@ public class OrderService {
             throw new OrderItemAccessDeniedException(itemId);
         }
 
-        order.cancelItem(itemId, reason);
+        OrderItem cancelled = order.cancelItem(itemId, reason);
         log.info("주문 항목 취소. orderId={}, itemId={}, by={}({}), reason={}",
                 orderId, itemId, userId, role, reason);
-        // PR-C: 재고 복구 이벤트(order.item.cancelled) 발행 예정
+
+        // 트랜잭션 커밋 후 재고 복구 이벤트 발행 (AFTER_COMMIT)
+        applicationEventPublisher.publishEvent(new OrderItemCancelledApplicationEvent(
+                new OrderItemCancelledEvent(
+                        orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
     }
 
     /** 주문 상세 조회 — 본인 주문만 허용 */
