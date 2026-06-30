@@ -59,6 +59,10 @@ public class AuthService {
     @Value("${app.mail.expose-temp-password:true}")
     private boolean exposeTempPassword;
 
+    // H-2: 판매자 mock 자동 승인 — dev만 true. prod 프로파일에서 false로 막아 누구나 SELLER 되는 것 방지
+    @Value("${app.seller.auto-approve:true}")
+    private boolean sellerAutoApprove;
+
     @Transactional
     public SignupResponse signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -160,6 +164,10 @@ public class AuthService {
      */
     @Transactional
     public SellerApplyResponse applyForSeller(Long userId, String phone) {
+        // H-2: prod 등에서 자동 승인이 꺼져 있으면 차단 (실제 심사 절차 필요)
+        if (!sellerAutoApprove) {
+            throw new IllegalStateException("판매자 자동 승인이 비활성화되어 있습니다. 관리자 심사가 필요합니다.");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidTokenException("사용자를 찾을 수 없습니다."));
         user.promoteToSeller(phone);
