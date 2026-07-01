@@ -41,7 +41,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics
+        include: health, info
   endpoint:
     health:
       show-details: when-authorized  # LW-04: 운영 내부 정보 노출 방지
