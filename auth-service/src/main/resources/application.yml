@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/auth_db}
+    username: ${DB_USERNAME:eoghks}
+    password: ${DB_PASSWORD:eoghks_local}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+  data:
+    redis:
+      host: ${REDIS_AUTH_HOST:localhost}
+      port: ${REDIS_AUTH_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: auth-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  # 이메일 설정 — 기본값은 빈 문자열 (dev 환경에서는 실제 발송 안 함)
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# 개발 환경: 임시 비밀번호를 응답으로 반환 (이메일 미발송)
+# 운영 환경(prod profile): 이메일 발송 후 응답에서 임시 비밀번호 제거
+app:
+  mail:
+    expose-temp-password: true   # prod profile에서 false로 override
+  cookie:
+    secure: false                # dev: HTTP 허용. prod profile에서 true (HTTPS 전용)
+
+server:
+  port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: never    # 보안(H-A): 헬스 상세(DB/Redis/Kafka 등) 비노출. status(UP/DOWN)만 공개 — 모니터링은 status만 사용
+  health:
+    mail:
+      enabled: false         # dev: SMTP 자격증명 없음 — 메일 헬스로 인해 전체 DOWN 되는 것 방지
+
+logging:
+  file:
+    name: ${user.dir}/logs/auth-service.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+  charset:
+    console: UTF-8
+  level:
+    com.ecommerce: INFO
+
+---
+# profile이 prod인 경우 아래로 변경
+spring:
+  config:
+    activate:
+      on-profile: prod
+  mail:
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+
+app:
+  mail:
+    expose-temp-password: false
+  cookie:
+    secure: true                 # 운영: HTTPS 전용 쿠키
+  seller:
+    auto-approve: false          # 운영: 판매자 자동 승인 차단 (심사 절차 필요)

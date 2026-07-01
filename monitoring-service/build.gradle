@@ -1,0 +1,13 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation project(':common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // common의 GlobalExceptionHandler가 AuthorizationDeniedException(security-core)를 참조.
+    // 클래스 해소용으로만 추가 — 웹 시큐리티 필터체인은 켜지지 않음(인가는 X-User-Role 헤더로 처리).
+    implementation 'org.springframework.security:spring-security-core'
+}

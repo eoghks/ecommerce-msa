@@ -1,11 +1,13 @@
 # Java / Spring Boot
 *.class
-*.jar
 *.war
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
 target/
 build/
 .gradle/
 *.log
+logs/
 
 # IDE
 .idea/
@@ -31,3 +33,6 @@ docker/volumes/
 # Secrets
 application-secret.yml
 application-prod.yml
+
+# Claude Code IDE 설정
+.claude/

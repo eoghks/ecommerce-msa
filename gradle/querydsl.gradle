@@ -1,0 +1,24 @@
+// QueryDSL 5.1.0 (Jakarta) 공통 설정 — JPA 엔티티 Q타입 자동 생성
+// 적용: apply from: rootProject.file('gradle/querydsl.gradle')
+
+def querydslVersion = '5.1.0'
+def querydslDir = layout.buildDirectory.dir('generated/querydsl').get().asFile
+
+dependencies {
+    implementation "com.querydsl:querydsl-jpa:${querydslVersion}:jakarta"
+    annotationProcessor "com.querydsl:querydsl-apt:${querydslVersion}:jakarta"
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir querydslDir
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.annotationProcessorGeneratedSourcesDirectory = querydslDir
+}
