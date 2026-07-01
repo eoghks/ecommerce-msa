@@ -6,6 +6,8 @@ const instance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
+  // HttpOnly refresh 쿠키 송수신 (로그인/리프레시 시 쿠키 기반 인증)
+  withCredentials: true,
 });
 
 // 요청 인터셉터 — JWT Access Token 자동 첨부 (CR-05: 메모리 전용 토큰 사용)
