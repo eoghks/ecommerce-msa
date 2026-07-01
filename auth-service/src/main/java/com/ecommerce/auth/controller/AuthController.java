@@ -84,10 +84,12 @@ public class AuthController {
         return ResponseEntity.ok(authService.getMe(userId));
     }
 
-    // 비밀번호 변경 — 인증 필요 (JWT)
+    // 비밀번호 변경 — 인증 필요 (게이트웨이가 주입한 X-User-Id 기준)
     @PostMapping("/change-password")
-    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
-        authService.changePassword(request);
+    public ResponseEntity<Void> changePassword(
+            @RequestHeader("X-User-Id") Long userId,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(userId, request);
         return ResponseEntity.noContent().build();
     }
 
@@ -106,9 +108,12 @@ public class AuthController {
     }
 
     // 서비스 간 사용자 요약 배치 조회 (product-service 판매자 정보 표시용)
-    // 게이트웨이 화이트리스트 제외 — 서비스 간 직접 호출 전용
+    // 게이트웨이 화이트리스트 제외 — 서비스 간 직접 호출 전용 (X-Internal-Token 필수)
     @GetMapping("/users")
-    public ResponseEntity<List<UserSummaryResponse>> getUsers(@RequestParam List<Long> ids) {
+    public ResponseEntity<List<UserSummaryResponse>> getUsers(
+            @RequestHeader(value = "X-Internal-Token", required = false) String internalToken,
+            @RequestParam List<Long> ids) {
+        authService.verifyInternalToken(internalToken);
         return ResponseEntity.ok(authService.getUsersByIds(ids));
     }
 
