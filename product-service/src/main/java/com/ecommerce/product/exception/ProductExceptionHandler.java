@@ -28,4 +28,11 @@ public class ProductExceptionHandler {
         pd.setTitle("Forbidden");
         return pd;
     }
+
+    @ExceptionHandler(MissingSellerIdException.class)
+    public ProblemDetail handleMissingSellerId(MissingSellerIdException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        pd.setTitle("Unauthorized");
+        return pd;
+    }
 }

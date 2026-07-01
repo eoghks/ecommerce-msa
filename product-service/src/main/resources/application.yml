@@ -46,6 +46,11 @@ service:
   auth:
     url: ${AUTH_SERVICE_URL:http://localhost:8081}
 
+app:
+  internal:
+    # M-N1: auth-service 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
+    token: ${INTERNAL_TOKEN:dev-internal-secret}
+
 minio:
   endpoint:   ${MINIO_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
