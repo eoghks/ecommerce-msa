@@ -1,15 +1,18 @@
 package com.ecommerce.order.service;
 
 import com.ecommerce.order.client.ProductClient;
+import com.ecommerce.order.domain.FailedOrderLog;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
+import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
 import com.ecommerce.order.event.OrderItemCancelledEvent;
 import com.ecommerce.order.exception.OrderItemAccessDeniedException;
 import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
+import com.ecommerce.order.repository.FailedOrderLogRepository;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +29,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final OrderRepository        orderRepository;
-    private final ProductClient          productClient;
-    private final OrderPersistenceService orderPersistenceService;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    /** 재고 확보 실패 자동취소 시 남기는 일반화된 사유 (민감정보 노출 방지) */
+    private static final String AUTO_CANCEL_REASON = "재고 확보 실패(자동취소)";
+
+    private final OrderRepository            orderRepository;
+    private final ProductClient              productClient;
+    private final OrderPersistenceService    orderPersistenceService;
+    private final ApplicationEventPublisher  applicationEventPublisher;
+    private final FailedOrderLogRepository   failedOrderLogRepository;
 
     /**
      * 주문 생성.
@@ -83,8 +90,24 @@ public class OrderService {
     public void cancelOrder(Long orderId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
+        boolean alreadyCancelled = order.getStatus() == com.ecommerce.order.domain.OrderStatus.CANCELLED;
         order.cancel();
-        log.warn("주문 취소 처리. orderId={}, reason={}", orderId, reason);
+        // M-3: 실제로 취소 전이가 일어난 경우에만 실패 로그 기록 (멱등 — 중복 재전달 시 중복 기록 방지)
+        if (!alreadyCancelled) {
+            failedOrderLogRepository.save(FailedOrderLog.builder()
+                    .orderId(orderId)
+                    .userId(order.getUserId())
+                    .reason(AUTO_CANCEL_REASON)   // 일반화된 사유만 기록 (원본 reason 미노출)
+                    .build());
+        }
+        log.warn("주문 자동 취소 처리. orderId={}, reason={}", orderId, reason);
+    }
+
+    /** 실패(자동취소) 주문 목록 조회 (ADMIN) — M-3 */
+    @Transactional(readOnly = true)
+    public Page<FailedOrderResponse> getFailedOrders(Pageable pageable) {
+        return failedOrderLogRepository.findAllByOrderByOccurredAtDesc(pageable)
+                .map(FailedOrderResponse::from);
     }
 
     /** 내 주문 목록 조회 (페이징) */
@@ -157,22 +180,37 @@ public class OrderService {
         return OrderResponse.from(order);
     }
 
+    /** 사용자 주문 취소 기본 사유 */
+    private static final String USER_CANCEL_REASON = "고객 주문 취소";
+
     /**
-     * 사용자 주문 취소 요청 — PENDING 상태만 취소 가능.
-     * CONFIRMED / CANCELLED 상태에서 시도 시 409 Conflict.
+     * 사용자 주문 취소 요청 — PENDING/CONFIRMED/PARTIALLY_CANCELLED 상태 취소 가능 (M-N3).
+     * CANCELLED(이미 전체취소) 상태에서 시도 시 409 Conflict.
+     * 설계: 차감된 주문은 활성 항목 전체를 항목취소 처리하여 기존 재고복구 Saga(항목취소 이벤트)를 재사용.
+     *   - 실제 전이가 일어난 항목만 복구 이벤트 발행 → 중복/과복구 방지
+     *   - PENDING(미차감)은 항목취소 없이 단순 취소 → 복구 이벤트 없음
+     * @param reason 취소 사유 (없으면 기본 "고객 주문 취소")
      */
     @Transactional
-    public void cancelByUser(Long orderId, Long userId) {
+    public void cancelByUser(Long orderId, Long userId, String reason) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         if (!order.getUserId().equals(userId)) {
             throw new OrderNotFoundException(orderId);
         }
-        if (!order.isCancellable()) {
+        if (!order.isUserCancellable()) {
             throw new IllegalStateException(
                     "취소할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
         }
-        order.cancel();
-        log.info("사용자 주문 취소. orderId={}, userId={}", orderId, userId);
+
+        String cancelReason = (reason == null || reason.isBlank()) ? USER_CANCEL_REASON : reason;
+        List<OrderItem> restockTargets = order.cancelByUser(cancelReason);
+        restockTargets.forEach(item -> applicationEventPublisher.publishEvent(
+                new OrderItemCancelledApplicationEvent(
+                        new OrderItemCancelledEvent(
+                                orderId, item.getId(), item.getProductId(), item.getQuantity()))));
+
+        log.info("사용자 주문 취소. orderId={}, userId={}, 복구항목수={}",
+                orderId, userId, restockTargets.size());
     }
 }

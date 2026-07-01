@@ -114,6 +114,39 @@ public class Order {
     }
 
     /**
+     * M-N3: 사용자가 취소 가능한 주문인지.
+     * PENDING(차감 전) + CONFIRMED/PARTIALLY_CANCELLED(차감 후) 모두 사용자 취소 허용.
+     * 이미 전체 취소된(CANCELLED) 주문만 불가.
+     */
+    public boolean isUserCancellable() {
+        return this.status == OrderStatus.PENDING
+                || this.status == OrderStatus.CONFIRMED
+                || this.status == OrderStatus.PARTIALLY_CANCELLED;
+    }
+
+    /**
+     * M-N3: 사용자 주문 취소 — 활성(ACTIVE) 항목 전체를 사유와 함께 항목취소한다.
+     * 차감된 항목만 재고 복구 이벤트가 나가도록, 실제 ACTIVE→CANCELLED 전이가 일어난 항목만 반환.
+     *   - PENDING(미차감): isItemCancellable=false 이므로 항목취소 없이 단순 CANCELLED 전이 → 복구 이벤트 없음
+     *   - CONFIRMED/부분취소(차감 후): 활성 항목만 전이 → 각 항목 복구 이벤트 발행 대상
+     * @return 새로 취소된 항목 목록 (복구 이벤트 발행 대상)
+     */
+    public List<OrderItem> cancelByUser(String reason) {
+        if (!isItemCancellable()) {
+            // PENDING 등 미차감 주문은 재고 복구 없이 단순 취소
+            cancel();
+            return List.of();
+        }
+        LocalDateTime now = LocalDateTime.now();
+        List<OrderItem> newlyCancelled = items.stream()
+                .filter(OrderItem::isActive)
+                .filter(item -> item.cancel(reason, now))
+                .toList();
+        recalculateAfterCancel();
+        return newlyCancelled;
+    }
+
+    /**
      * C-2: 항목 단위 취소 가능 상태인지.
      * 재고가 실제로 차감된 주문(CONFIRMED) 또는 일부만 취소된 주문(PARTIALLY_CANCELLED)만 허용.
      * PENDING(아직 차감 전)·CANCELLED(차감된 적 없거나 이미 전체 취소)는 불가 →

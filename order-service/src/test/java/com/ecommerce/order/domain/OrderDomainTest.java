@@ -74,6 +74,45 @@ class OrderDomainTest {
     }
 
     @Test
+    @DisplayName("M-N3: isUserCancellable — PENDING/CONFIRMED/PARTIALLY_CANCELLED 가능, CANCELLED 불가")
+    void isUserCancellable_states() {
+        Order pending = buildOrder();
+        assertThat(pending.isUserCancellable()).isTrue();   // PENDING
+
+        Order confirmed = buildOrder();
+        confirmed.confirm();
+        assertThat(confirmed.isUserCancellable()).isTrue();  // CONFIRMED
+
+        Order cancelled = buildOrder();
+        cancelled.cancel();
+        assertThat(cancelled.isUserCancellable()).isFalse(); // CANCELLED
+    }
+
+    @Test
+    @DisplayName("M-N3: cancelByUser — PENDING(미차감)은 복구 대상 없이 CANCELLED")
+    void cancelByUser_pending_noRestockTargets() {
+        Order order = buildOrder();
+
+        List<OrderItem> targets = order.cancelByUser("고객 주문 취소");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(targets).isEmpty();
+    }
+
+    @Test
+    @DisplayName("M-N3: cancelByUser — CONFIRMED(차감)은 활성 항목 전체를 복구 대상으로 반환하고 CANCELLED")
+    void cancelByUser_confirmed_returnsActiveItems() {
+        Order order = buildOrder();
+        order.confirm();
+
+        List<OrderItem> targets = order.cancelByUser("고객 주문 취소");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(targets).hasSize(2);   // 활성 항목 2개 모두 복구 대상
+        assertThat(order.getTotalPrice()).isEqualTo(0L);
+    }
+
+    @Test
     @DisplayName("OrderItem subtotal() — 단가 × 수량 계산")
     void orderItem_subtotal() {
         OrderItem item = OrderItem.builder()
