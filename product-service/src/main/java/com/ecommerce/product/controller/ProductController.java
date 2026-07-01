@@ -3,6 +3,7 @@ package com.ecommerce.product.controller;
 import com.ecommerce.product.dto.request.CreateProductRequest;
 import com.ecommerce.product.dto.request.ProductSearchRequest;
 import com.ecommerce.product.dto.request.UpdateProductRequest;
+import com.ecommerce.product.dto.response.ImageUploadResponse;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
 import com.ecommerce.product.service.FileStorageService;
@@ -92,11 +93,11 @@ public class ProductController {
     /** 상품 이미지 업로드 → MinIO 저장 후 URL 반환 (ADMIN/SELLER) */
     @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
     @PostMapping("/upload-image")
-    public ResponseEntity<java.util.Map<String, String>> uploadImage(
+    public ResponseEntity<ImageUploadResponse> uploadImage(
             @RequestParam("file") MultipartFile file
     ) {
         String url = fileStorageService.uploadImage(file);
-        return ResponseEntity.ok(java.util.Map.of("url", url));
+        return ResponseEntity.ok(new ImageUploadResponse(url));
     }
 
     /** 내 상품 목록 (SELLER 전용) */

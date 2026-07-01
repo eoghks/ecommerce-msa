@@ -16,11 +16,24 @@ public record ProductSummaryResponse(
         Long categoryId,
         String categoryName
 ) {
+    /** 공개/일반 목록 — M-4: 판매자 식별자(sellerId)·정보 노출 안 함 */
     public static ProductSummaryResponse from(Product product) {
-        return from(product, null);
+        return new ProductSummaryResponse(
+                product.getId(),
+                product.getName(),
+                product.getPrice(),
+                product.getStock(),
+                product.getImageUrl(),
+                null,   // sellerId 비노출
+                null,
+                null,
+                product.getStatus().name(),
+                product.getCategory().getId(),
+                product.getCategory().getName()
+        );
     }
 
-    /** seller 정보를 함께 매핑 (ADMIN 화면). seller가 null이면 판매자명/이메일은 비움 */
+    /** ADMIN 화면 — 판매자 식별자·이름·이메일 포함. seller가 null이면 이름/이메일은 비움 */
     public static ProductSummaryResponse from(Product product, UserClient.UserSummary seller) {
         return new ProductSummaryResponse(
                 product.getId(),
