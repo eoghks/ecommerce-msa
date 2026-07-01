@@ -25,6 +25,17 @@ public class RefreshTokenRepository {
         return Optional.ofNullable(value).map(Long::parseLong);
     }
 
+    /**
+     * H-B: 토큰 회전용 원자적 조회+삭제(Redis GETDEL).
+     * 동시 요청이 같은 refresh 토큰으로 들어와도 값을 얻는 요청은 단 하나뿐 →
+     * 나머지는 empty를 받아 거부된다(TOCTOU 방지, 재사용 탐지).
+     * @return 토큰에 매핑된 userId (없거나 이미 소비됐으면 empty)
+     */
+    public Optional<Long> findAndDeleteUserId(String refreshToken) {
+        String value = redisTemplate.opsForValue().getAndDelete(PREFIX + refreshToken);
+        return Optional.ofNullable(value).map(Long::parseLong);
+    }
+
     public void delete(String refreshToken) {
         redisTemplate.delete(PREFIX + refreshToken);
     }

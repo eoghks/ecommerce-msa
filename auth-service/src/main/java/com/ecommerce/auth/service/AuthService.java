@@ -99,14 +99,14 @@ public class AuthService {
     // LW-01: Redis 쓰기 포함 — readOnly 제거
     @Transactional
     public RefreshResponse refresh(String refreshToken) {
-        Long userId = refreshTokenRepository.findUserIdByToken(refreshToken)
+        // H-B: 조회+삭제를 원자적으로(GETDEL) — 동시 요청 TOCTOU 방지, 이미 소비된 토큰은 거부
+        Long userId = refreshTokenRepository.findAndDeleteUserId(refreshToken)
                 .orElseThrow(() -> new InvalidTokenException("유효하지 않거나 만료된 Refresh Token입니다."));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidTokenException("토큰에 해당하는 사용자를 찾을 수 없습니다."));
 
-        // Refresh Token Rotation
-        refreshTokenRepository.delete(refreshToken);
+        // Refresh Token Rotation — 기존 토큰은 이미 위에서 원자적으로 삭제됨. 새 토큰 발급.
         String newRefreshToken = jwtProvider.issueRefreshToken();
         refreshTokenRepository.save(newRefreshToken, userId, jwtProvider.getRefreshTokenTtl());
 
