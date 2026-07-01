@@ -5,6 +5,18 @@ spring:
 server:
   port: 8084
 
+# 모니터링 대상 서비스 (게이트웨이 우회 직접 호출, 각 url + /actuator/health)
+monitoring:
+  targets:
+    - name: auth
+      url: http://localhost:8081
+    - name: product
+      url: http://localhost:8082
+    - name: order
+      url: http://localhost:8083
+    - name: gateway
+      url: http://localhost:8080
+
 management:
   endpoints:
     web:
