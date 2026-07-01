@@ -78,6 +78,21 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("401 응답은 JSON 바디(error/message)를 포함한다 (M-1)")
+    void unauthorized_returns_json_body() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/orders").build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(exchange.getResponse().getHeaders().getContentType())
+                .isEqualTo(org.springframework.http.MediaType.APPLICATION_JSON);
+        String body = exchange.getResponse().getBodyAsString().block();
+        assertThat(body).contains("\"error\":\"unauthorized\"").contains("\"message\"");
+    }
+
+    @Test
     @DisplayName("인증 필수 경로에서 Bearer 접두사 없으면 401 반환")
     void invalid_token_format_returns_401() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
