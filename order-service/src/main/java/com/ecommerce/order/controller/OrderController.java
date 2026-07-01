@@ -1,7 +1,9 @@
 package com.ecommerce.order.controller;
 
+import com.ecommerce.order.dto.request.OrderCancelRequest;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemCancelRequest;
+import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -57,6 +59,15 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getAllOrders(pageable));
     }
 
+    /** 실패(자동취소) 주문 목록 조회 (ADMIN) — M-3 */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/admin/failed")
+    public ResponseEntity<Page<FailedOrderResponse>> getFailedOrders(
+            @PageableDefault(size = 20) Pageable pageable
+    ) {
+        return ResponseEntity.ok(orderService.getFailedOrders(pageable));
+    }
+
     /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목만 노출 */
     @PreAuthorize("hasRole('SELLER')")
     @GetMapping("/seller")
@@ -76,13 +87,18 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrder(orderId, userId));
     }
 
-    /** 주문 취소 (PENDING 상태만 가능) */
+    /**
+     * 주문 취소 (PENDING/CONFIRMED/부분취소 가능 — M-N3).
+     * 사유는 선택 — 미입력 시 기본 "고객 주문 취소". 차감된 주문은 재고 복구 Saga 재사용.
+     */
     @DeleteMapping("/{orderId}")
     public ResponseEntity<Void> cancelOrder(
             @RequestHeader("X-User-Id") Long userId,
-            @PathVariable Long orderId
+            @PathVariable Long orderId,
+            @Valid @RequestBody(required = false) OrderCancelRequest request
     ) {
-        orderService.cancelByUser(orderId, userId);
+        String reason = (request == null) ? null : request.reason();
+        orderService.cancelByUser(orderId, userId, reason);
         return ResponseEntity.noContent().build();
     }
 

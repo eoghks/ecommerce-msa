@@ -9,12 +9,17 @@ export const getMyOrders = (page = 0, size = 20) =>
 export const getOrder = (id) =>
   api.get(`/api/v1/orders/${id}`);
 
-export const cancelOrder = (id) =>
-  api.delete(`/api/v1/orders/${id}`);
+// 주문 취소 — 사유 선택(미입력 시 서버 기본 "고객 주문 취소"). 차감된 주문은 재고 복구 (M-N3)
+export const cancelOrder = (id, reason) =>
+  api.delete(`/api/v1/orders/${id}`, { data: reason ? { reason } : {} });
 
 // 전체 주문 조회 (ADMIN)
 export const getAllOrders = (page = 0, size = 20) =>
   api.get('/api/v1/orders/admin', { params: { page, size } });
+
+// 실패(자동취소) 주문 조회 (ADMIN) — M-3
+export const getFailedOrders = (page = 0, size = 20) =>
+  api.get('/api/v1/orders/admin/failed', { params: { page, size } });
 
 // 판매자 주문 조회 (SELLER) — 본인 상품 항목만
 export const getSellerOrders = (page = 0, size = 20) =>

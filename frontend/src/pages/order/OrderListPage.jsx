@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { getMyOrders } from '../../api/order';
+import { getMyOrders, cancelOrder } from '../../api/order';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const STATUS_LABEL = {
-  PENDING:   { text: '결제 대기', color: '#f59e0b' },
-  CONFIRMED: { text: '주문 확정', color: '#22c55e' },
-  CANCELLED: { text: '취소됨',   color: '#9ca3af' },
+  PENDING:             { text: '결제 대기',   color: '#f59e0b' },
+  CONFIRMED:           { text: '주문 확정',   color: '#22c55e' },
+  PARTIALLY_CANCELLED: { text: '일부 취소',   color: '#f97316' },
+  CANCELLED:           { text: '취소됨',     color: '#9ca3af' },
 };
+
+// M-N3: 사용자가 취소 가능한 상태 (이미 전체취소된 CANCELLED 제외)
+const CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 const OrderListPage = () => {
   const location = useLocation();
@@ -18,12 +22,16 @@ const OrderListPage = () => {
   const [error, setError] = useState('');
   const justOrdered = location.state?.ordered;
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    getMyOrders(0, 20)
+    return getMyOrders(0, 20)
       .then((res) => setOrders(res.data.content ?? res.data ?? []))
       .catch(() => setError('주문 내역을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
   if (loading) {
@@ -62,7 +70,7 @@ const OrderListPage = () => {
       ) : (
         <div className="flex flex-col gap-4">
           {orders.map((order) => (
-            <OrderCard key={order.id} order={order} />
+            <OrderCard key={order.id} order={order} onCancelled={load} />
           ))}
         </div>
       )}
@@ -70,11 +78,27 @@ const OrderListPage = () => {
   );
 };
 
-const OrderCard = ({ order }) => {
+const OrderCard = ({ order, onCancelled }) => {
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState('');
   const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
   const date = order.createdAt
     ? new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
+  const cancellable = CANCELLABLE_STATUSES.includes(order.status);
+
+  // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)
+  const handleCancel = () => {
+    if (!window.confirm('이 주문을 취소하시겠습니까?')) return;
+    const reason = window.prompt('취소 사유 (선택 — 비워두면 "고객 주문 취소")', '');
+    if (reason === null) return; // 프롬프트 취소
+    setCancelling(true);
+    setCancelError('');
+    cancelOrder(order.id, reason.trim() || undefined)
+      .then(() => onCancelled?.())
+      .catch(() => setCancelError('주문 취소에 실패했습니다.'))
+      .finally(() => setCancelling(false));
+  };
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5">
@@ -111,6 +135,17 @@ const OrderCard = ({ order }) => {
           {formatPrice(order.totalPrice ?? (order.items ?? []).reduce((s, i) => s + i.price * i.quantity, 0))}
         </span>
       </div>
+
+      {/* M-N3: 주문 취소 버튼 — 취소 가능 상태에서만 노출 */}
+      {cancellable && (
+        <div className="mt-4 flex flex-col items-end gap-1">
+          {cancelError && <span className="text-[12px] text-red-500">{cancelError}</span>}
+          <button onClick={handleCancel} disabled={cancelling}
+            className="h-9 px-4 text-[13px] font-medium text-red-600 border border-red-200 rounded-[10px] hover:bg-red-50 bg-white transition-colors disabled:opacity-60">
+            {cancelling ? '취소 중...' : '주문 취소'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };
