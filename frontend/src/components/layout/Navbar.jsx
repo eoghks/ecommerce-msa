@@ -56,6 +56,9 @@ const Navbar = () => {
               <Link to="/admin/orders" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 주문관리
               </Link>
+              <Link to="/admin/monitoring" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
+                모니터링
+              </Link>
             </>
           )}
           {isAuthenticated && role === 'SELLER' && (
@@ -163,9 +166,14 @@ const Navbar = () => {
                       상품
                     </Link>
                     {role === 'ADMIN' && (
-                      <Link to="/admin" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
-                        관리자
-                      </Link>
+                      <>
+                        <Link to="/admin" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
+                          관리자
+                        </Link>
+                        <Link to="/admin/monitoring" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
+                          모니터링
+                        </Link>
+                      </>
                     )}
                     <div className="h-px bg-gray-100 mx-3" />
                     <Link to="/my/profile" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>

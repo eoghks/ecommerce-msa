@@ -17,6 +17,7 @@ import OrderPage from './pages/order/OrderPage';
 import OrderListPage from './pages/order/OrderListPage';
 import AdminProductPage from './pages/admin/AdminProductPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
+import AdminMonitoringPage from './pages/admin/AdminMonitoringPage';
 import MyProfilePage from './pages/my/MyProfilePage';
 
 // 인증 페이지에서는 Navbar 숨김
@@ -87,6 +88,7 @@ const App = () => {
               {/* ADMIN 전용 */}
               <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
               <Route path="/admin/orders" element={<AdminRoute><AdminOrderPage /></AdminRoute>} />
+              <Route path="/admin/monitoring" element={<AdminRoute><AdminMonitoringPage /></AdminRoute>} />
             </Routes>
           </main>
         } />
