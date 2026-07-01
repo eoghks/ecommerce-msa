@@ -31,7 +31,8 @@ import java.util.concurrent.TimeUnit;
 public class StockDecreaseService {
 
     private static final String LOCK_KEY_PREFIX      = "stock:lock:order:";
-    private static final String PROCESSED_KEY_PREFIX = "stock:processed:";
+    // 재고 차감 완료 멱등키 — DLT 보상 시 실제 차감 여부 판별에도 사용 (OrderCreatedDltConsumer)
+    public static final String PROCESSED_KEY_PREFIX  = "stock:processed:";
     private static final long   LOCK_WAIT_SECONDS    = 3L;
     private static final long   LOCK_LEASE_SECONDS   = 10L;
     private static final Duration PROCESSED_TTL      = Duration.ofDays(1);

@@ -1,19 +1,21 @@
 package com.ecommerce.product.event;
 
+import com.ecommerce.product.service.StockDecreaseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
  * order.created.DLT 컨슈머 (H-3).
  *
- * 재고 차감(order.created)이 인프라 예외 등으로 재시도까지 모두 실패해 DLT로 이동한 경우,
- * 주문이 영원히 PENDING 으로 잠기는 것을 막기 위해 보상 이벤트(stock.decrease.failed)를 발행한다.
- * → Order Service 가 해당 주문을 CANCELLED 처리.
- *
- * 비즈니스 실패(재고 부족)는 StockDecreaseService 에서 직접 보상 이벤트를 발행하므로
- * 이 DLT 경로에는 인프라성 영구 실패만 도달한다.
+ * 재고 차감(order.created)이 재시도까지 실패해 DLT로 이동한 경우, 주문이 영원히 PENDING으로
+ * 잠기지 않도록 보상한다. 단, 이때 <b>실제 재고 차감이 완료됐는지</b>를 멱등키로 확인해
+ * over-cancel(재고는 차감됐는데 주문만 취소되는 불일치)을 방지한다:
+ *   - 차감 완료됨(멱등키 존재) → stock.decreased 재발행 (성공 복구) → 주문 CONFIRMED
+ *     (차감 성공 후 성공 이벤트 발행만 실패해 DLT로 온 케이스)
+ *   - 차감 안 됨 → stock.decrease.failed 발행 → 주문 CANCELLED
  */
 @Slf4j
 @Component
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class OrderCreatedDltConsumer {
 
     private final StockEventPublisher stockEventPublisher;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @KafkaListener(
             topics = "${kafka.topic.order-created:order.created}.DLT",
@@ -28,9 +31,19 @@ public class OrderCreatedDltConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(OrderCreatedPayload payload) {
-        log.error("order.created 처리 영구 실패(DLT) — 주문 취소 보상 발행. orderId={}, itemCount={}",
-                payload.orderId(), payload.items() == null ? 0 : payload.items().size());
-        stockEventPublisher.publishStockDecreaseFailed(
-                payload.orderId(), "재고 차감 처리 영구 실패 (DLT) — 자동 취소");
+        Long orderId = payload.orderId();
+        boolean alreadyDecreased = Boolean.TRUE.equals(
+                redisTemplate.hasKey(StockDecreaseService.PROCESSED_KEY_PREFIX + orderId));
+
+        if (alreadyDecreased) {
+            // 재고 차감은 완료 — 성공 이벤트만 유실됐던 케이스 → 성공 재발행 (over-cancel 방지)
+            log.warn("order.created DLT지만 재고 차감은 완료됨 → 성공 이벤트 재발행. orderId={}", orderId);
+            stockEventPublisher.publishStockDecreased(orderId);
+        } else {
+            // 차감된 적 없음 → 취소 보상
+            log.error("order.created 처리 영구 실패(DLT) — 주문 취소 보상 발행. orderId={}", orderId);
+            stockEventPublisher.publishStockDecreaseFailed(
+                    orderId, "재고 차감 처리 영구 실패 (DLT) — 자동 취소");
+        }
     }
 }
