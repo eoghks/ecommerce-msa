@@ -16,6 +16,7 @@ import com.ecommerce.auth.dto.SignupResponse;
 import com.ecommerce.auth.dto.UserSummaryResponse;
 import com.ecommerce.auth.exception.DuplicateEmailException;
 import com.ecommerce.auth.exception.InvalidCredentialsException;
+import com.ecommerce.auth.exception.InvalidInternalTokenException;
 import com.ecommerce.auth.exception.InvalidTokenException;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.repository.RefreshTokenRepository;
@@ -62,6 +63,10 @@ public class AuthService {
     // H-2: 판매자 mock 자동 승인 — dev만 true. prod 프로파일에서 false로 막아 누구나 SELLER 되는 것 방지
     @Value("${app.seller.auto-approve:true}")
     private boolean sellerAutoApprove;
+
+    // M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값 제공, prod는 env로 필수 주입.
+    @Value("${app.internal.token:dev-internal-secret}")
+    private String internalToken;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -120,8 +125,9 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(ChangePasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        // 인증 주체(X-User-Id) 기준으로 사용자 로드 — 임의 이메일 대상 변경 차단
+        User user = userRepository.findById(userId)
                 .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
@@ -180,6 +186,13 @@ public class AuthService {
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
         return userRepository.existsByEmail(email);
+    }
+
+    /** M-N1: 내부 호출 공유 시크릿 검증 — 불일치 시 403 */
+    public void verifyInternalToken(String token) {
+        if (token == null || !internalToken.equals(token)) {
+            throw new InvalidInternalTokenException();
+        }
     }
 
     /** 서비스 간 사용자 요약 배치 조회 (product-service 판매자 정보 표시용) */

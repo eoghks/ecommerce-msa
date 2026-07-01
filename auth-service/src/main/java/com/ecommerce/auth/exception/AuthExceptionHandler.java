@@ -42,4 +42,13 @@ public class AuthExceptionHandler {
         pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-token"));
         return pd;
     }
+
+    /** 내부 서비스 인증 실패 → 403 Forbidden */
+    @ExceptionHandler(InvalidInternalTokenException.class)
+    public ProblemDetail handleInvalidInternalToken(InvalidInternalTokenException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Invalid Internal Token");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-internal-token"));
+        return pd;
+    }
 }
