@@ -51,7 +51,7 @@ management:
         include: health, info
   endpoint:
     health:
-      show-details: always   # dev: 모니터링 서비스가 컴포넌트 상태를 읽을 수 있도록
+      show-details: never    # 보안(H-A): 헬스 상세 비노출. status(UP/DOWN)만 공개 — 모니터링은 status만 사용
 
 logging:
   file:

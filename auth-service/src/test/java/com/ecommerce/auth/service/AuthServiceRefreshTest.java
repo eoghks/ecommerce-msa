@@ -42,7 +42,8 @@ class AuthServiceRefreshTest {
         User user = User.builder().email("test@example.com").password("pw").name("테스터").role(Role.USER).build();
         ReflectionTestUtils.setField(user, "id", 1L);
 
-        given(refreshTokenRepository.findUserIdByToken(oldRefresh)).willReturn(Optional.of(1L));
+        // H-B: 원자적 조회+삭제(GETDEL)로 전환
+        given(refreshTokenRepository.findAndDeleteUserId(oldRefresh)).willReturn(Optional.of(1L));
         given(userRepository.findById(1L)).willReturn(Optional.of(user));
         given(jwtProvider.issueRefreshToken()).willReturn("new-refresh-token");
         given(jwtProvider.getRefreshTokenTtl()).willReturn(Duration.ofDays(7));
@@ -52,13 +53,14 @@ class AuthServiceRefreshTest {
         RefreshResponse response = authService.refresh(oldRefresh);
 
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
-        then(refreshTokenRepository).should().delete(oldRefresh);
+        // 조회 시점에 이미 원자적으로 삭제됨 — 별도 delete 호출 없음
+        then(refreshTokenRepository).should().findAndDeleteUserId(oldRefresh);
     }
 
     @Test
     @DisplayName("유효하지 않은 Refresh Token - 예외 발생")
     void refresh_invalidToken_throwsException() {
-        given(refreshTokenRepository.findUserIdByToken("invalid-token")).willReturn(Optional.empty());
+        given(refreshTokenRepository.findAndDeleteUserId("invalid-token")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh("invalid-token"))
                 .isInstanceOf(InvalidTokenException.class)

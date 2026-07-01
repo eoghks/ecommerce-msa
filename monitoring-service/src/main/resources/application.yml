@@ -21,10 +21,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics
+        include: health, info   # M-A: metrics 무보호 노출 제거
   endpoint:
     health:
-      show-details: always
+      show-details: never       # 보안(H-A): 헬스 상세 비노출
 
 logging:
   level:
