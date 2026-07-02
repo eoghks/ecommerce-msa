@@ -6,7 +6,9 @@ import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
+import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
+import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
 import com.ecommerce.order.exception.OrderItemAccessDeniedException;
 import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
@@ -47,6 +49,7 @@ class OrderServiceTest {
     @Mock private ProductClient             productClient;
     @Mock private OrderPersistenceService   orderPersistenceService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
+    @Mock private com.ecommerce.order.repository.FailedOrderLogRepository failedOrderLogRepository;
 
     // ── 주문 생성 ──────────────────────────────────────────────────
 
@@ -217,26 +220,60 @@ class OrderServiceTest {
     // ── 사용자 주문 취소 ────────────────────────────────────────────
 
     @Test
-    @DisplayName("cancelByUser — PENDING 주문 취소 성공")
-    void cancelByUser_success() {
+    @DisplayName("cancelByUser — PENDING(미차감) 주문 취소 성공, 재고 복구 이벤트 없음")
+    void cancelByUser_pending_success() {
         Long userId = 1L;
         Order order = buildOrder(userId, 10L, "상품", 10_000L, 1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
-        orderService.cancelByUser(1L, userId);
+        orderService.cancelByUser(1L, userId, null);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // PENDING은 미차감 → 복구 이벤트 미발행
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
     }
 
     @Test
-    @DisplayName("cancelByUser — CONFIRMED 주문 취소 시도 → 409")
-    void cancelByUser_alreadyConfirmed() {
-        Long userId = 1L;
-        Order order = buildOrder(userId, 10L, "상품", 10_000L, 1);
-        order.confirm();
+    @DisplayName("M-N3: cancelByUser — CONFIRMED 주문 취소 시 CANCELLED + 활성 항목마다 복구 이벤트 발행")
+    void cancelByUser_confirmed_restockEvents() {
+        // 판매자 7·8 항목 2개, confirm 완료(차감) 상태
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelByUser(1L, userId))
+        orderService.cancelByUser(1L, 1L, "단순 변심");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // 활성 항목 2개 → 복구 이벤트 2회
+        then(applicationEventPublisher).should(times(2))
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+    }
+
+    @Test
+    @DisplayName("M-N3: cancelByUser — 부분취소 주문 취소 시 남은 활성 항목만 복구 이벤트 (중복 방지)")
+    void cancelByUser_partiallyCancelled_onlyActiveRestock() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+        // 이미 item1 취소됨(PARTIALLY_CANCELLED) — item1은 복구 대상 아님
+        orderService.cancelOrderItem(1L, 1L, "사전 취소", 7L, "SELLER");
+
+        orderService.cancelByUser(1L, 1L, null);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // item1(항목취소 1회) + item2(사용자취소 1회) = 총 2회 — item1 재발행 없음
+        then(applicationEventPublisher).should(times(2))
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+    }
+
+    @Test
+    @DisplayName("cancelByUser — 이미 CANCELLED 주문 취소 시도 → 409")
+    void cancelByUser_alreadyCancelled() {
+        Long userId = 1L;
+        Order order = buildOrder(userId, 10L, "상품", 10_000L, 1);
+        order.cancel();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelByUser(1L, userId, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("취소할 수 없는 주문 상태");
     }
@@ -247,7 +284,7 @@ class OrderServiceTest {
         Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelByUser(1L, 999L))
+        assertThatThrownBy(() -> orderService.cancelByUser(1L, 999L, null))
                 .isInstanceOf(OrderNotFoundException.class);
     }
 
@@ -348,6 +385,52 @@ class OrderServiceTest {
         // 전이는 1회뿐 → 이벤트도 1회만
         then(applicationEventPublisher).should(times(1))
                 .publishEvent(any(com.ecommerce.order.event.OrderItemCancelledApplicationEvent.class));
+    }
+
+    // ── M-3: 실패(자동취소) 주문 ────────────────────────────────────
+
+    @Test
+    @DisplayName("M-3: cancelOrder(Saga) — 자동취소 시 실패 로그 1건 기록")
+    void cancelOrder_recordsFailedLog() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrder(1L, "재고 부족: internal-detail");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        then(failedOrderLogRepository).should(times(1))
+                .save(any(com.ecommerce.order.domain.FailedOrderLog.class));
+    }
+
+    @Test
+    @DisplayName("M-3: cancelOrder — 이미 CANCELLED면 실패 로그 중복 기록 안 함")
+    void cancelOrder_idempotent_noDuplicateLog() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        order.cancel();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrder(1L, "재고 부족");
+
+        then(failedOrderLogRepository).should(never())
+                .save(any(com.ecommerce.order.domain.FailedOrderLog.class));
+    }
+
+    @Test
+    @DisplayName("M-3: getFailedOrders — 최근 발생 순 페이징 조회 (ADMIN)")
+    void getFailedOrders_success() {
+        PageRequest pageable = PageRequest.of(0, 20);
+        com.ecommerce.order.domain.FailedOrderLog logEntry =
+                com.ecommerce.order.domain.FailedOrderLog.builder()
+                        .orderId(1L).userId(5L).reason("재고 확보 실패(자동취소)").build();
+        Page<com.ecommerce.order.domain.FailedOrderLog> page =
+                new PageImpl<>(List.of(logEntry), pageable, 1);
+        given(failedOrderLogRepository.findAllByOrderByOccurredAtDesc(pageable)).willReturn(page);
+
+        Page<FailedOrderResponse> result = orderService.getFailedOrders(pageable);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent().get(0).orderId()).isEqualTo(1L);
+        assertThat(result.getContent().get(0).reason()).isEqualTo("재고 확보 실패(자동취소)");
     }
 
     // ── helper ──────────────────────────────────────────────────────

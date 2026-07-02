@@ -8,6 +8,7 @@ import com.ecommerce.product.dto.request.UpdateProductRequest;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
 import com.ecommerce.product.exception.CategoryNotFoundException;
+import com.ecommerce.product.exception.MissingSellerIdException;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
@@ -104,6 +105,16 @@ class ProductServiceTest {
                 .isInstanceOf(CategoryNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("상품 등록 — SELLER인데 userId(null) 없으면 예외 (M-N2)")
+    void createProduct_sellerMissingUserId() {
+        CreateProductRequest request = new CreateProductRequest(
+                "테스트 상품", "설명", 10_000L, 10, null, 1L);
+
+        assertThatThrownBy(() -> productService.createProduct(request, null, "SELLER"))
+                .isInstanceOf(MissingSellerIdException.class);
+    }
+
     // ── updateProduct ─────────────────────────────────────────────
 
     @Test
@@ -135,6 +146,16 @@ class ProductServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("상품 수정 — SELLER인데 userId(null) 없으면 예외 (M-N2)")
+    void updateProduct_sellerMissingUserId() {
+        UpdateProductRequest request = new UpdateProductRequest(
+                "수정 상품", "설명", 20_000L, 5, null, 1L);
+
+        assertThatThrownBy(() -> productService.updateProduct(1L, request, null, "SELLER"))
+                .isInstanceOf(MissingSellerIdException.class);
+    }
+
     // ── deleteProduct ─────────────────────────────────────────────
 
     @Test
@@ -157,6 +178,13 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.deleteProduct(99L, 1L, "ADMIN"))
                 .isInstanceOf(ProductNotFoundException.class);
         verify(productRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("상품 삭제 — SELLER인데 userId(null) 없으면 예외 (M-N2)")
+    void deleteProduct_sellerMissingUserId() {
+        assertThatThrownBy(() -> productService.deleteProduct(1L, null, "SELLER"))
+                .isInstanceOf(MissingSellerIdException.class);
     }
 
     // ── getProduct ────────────────────────────────────────────────

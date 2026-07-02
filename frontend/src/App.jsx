@@ -17,6 +17,7 @@ import OrderPage from './pages/order/OrderPage';
 import OrderListPage from './pages/order/OrderListPage';
 import AdminProductPage from './pages/admin/AdminProductPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
+import AdminFailedOrderPage from './pages/admin/AdminFailedOrderPage';
 import AdminMonitoringPage from './pages/admin/AdminMonitoringPage';
 import MyProfilePage from './pages/my/MyProfilePage';
 
@@ -88,6 +89,7 @@ const App = () => {
               {/* ADMIN 전용 */}
               <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
               <Route path="/admin/orders" element={<AdminRoute><AdminOrderPage /></AdminRoute>} />
+              <Route path="/admin/failed" element={<AdminRoute><AdminFailedOrderPage /></AdminRoute>} />
               <Route path="/admin/monitoring" element={<AdminRoute><AdminMonitoringPage /></AdminRoute>} />
             </Routes>
           </main>

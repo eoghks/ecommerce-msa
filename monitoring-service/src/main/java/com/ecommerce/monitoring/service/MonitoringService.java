@@ -20,6 +20,9 @@ public class MonitoringService {
 
     private static final String HEALTH_PATH = "/actuator/health";
     private static final String STATUS_UP = "UP";
+    // 응답 DTO 노출용 일반화 사유 (예외 상세는 서버 로그로만 남김)
+    private static final String REASON_ABNORMAL = "상태 비정상";
+    private static final String REASON_UNREACHABLE = "연결 실패";
 
     private final RestClient monitoringRestClient;
     private final MonitoringProperties properties;
@@ -46,11 +49,14 @@ public class MonitoringService {
             if (STATUS_UP.equals(status)) {
                 return ServiceHealthResponse.up(target.getName(), elapsed);
             }
-            return ServiceHealthResponse.down(target.getName(), elapsed, "상태 비정상: " + status);
+            // 상세 상태값은 서버 로그로만, 응답에는 일반화 사유만 노출
+            log.warn("헬스 상태 비정상 - service={}, status={}", target.getName(), status);
+            return ServiceHealthResponse.down(target.getName(), elapsed, REASON_ABNORMAL);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - start;
+            // 예외 원문은 서버 로그로만, 응답에는 일반화 사유만 노출
             log.warn("헬스 체크 실패 - service={}, error={}", target.getName(), e.getMessage());
-            return ServiceHealthResponse.down(target.getName(), elapsed, e.getMessage());
+            return ServiceHealthResponse.down(target.getName(), elapsed, REASON_UNREACHABLE);
         }
     }
 }

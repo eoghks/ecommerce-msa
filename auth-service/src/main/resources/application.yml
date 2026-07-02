@@ -49,6 +49,9 @@ app:
     expose-temp-password: true   # prod profile에서 false로 override
   cookie:
     secure: false                # dev: HTTP 허용. prod profile에서 true (HTTPS 전용)
+  internal:
+    # M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
+    token: ${INTERNAL_TOKEN:dev-internal-secret}
 
 server:
   port: 8081
@@ -98,3 +101,5 @@ app:
     secure: true                 # 운영: HTTPS 전용 쿠키
   seller:
     auto-approve: false          # 운영: 판매자 자동 승인 차단 (심사 절차 필요)
+  internal:
+    token: ${INTERNAL_TOKEN}     # 운영: env 필수 (기본값 없음)

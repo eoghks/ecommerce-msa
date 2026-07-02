@@ -9,6 +9,7 @@ import com.ecommerce.product.dto.request.UpdateProductRequest;
 import com.ecommerce.product.dto.response.ProductResponse;
 import com.ecommerce.product.dto.response.ProductSummaryResponse;
 import com.ecommerce.product.exception.CategoryNotFoundException;
+import com.ecommerce.product.exception.MissingSellerIdException;
 import com.ecommerce.product.exception.NotProductOwnerException;
 import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
@@ -45,6 +46,7 @@ public class ProductService {
     /** 상품 등록 (ADMIN/SELLER) */
     @Transactional
     public ProductResponse createProduct(CreateProductRequest request, Long sellerId, String role) {
+        requireSellerId(sellerId, role);
         Category category = loadCategory(request.categoryId());
         // ADMIN은 sellerId null (플랫폼 상품), SELLER는 본인 ID
         Long resolvedSellerId = "ADMIN".equals(role) ? null : sellerId;
@@ -63,6 +65,7 @@ public class ProductService {
     /** 상품 수정 (ADMIN: 전체, SELLER: 본인 것만) */
     @Transactional
     public ProductResponse updateProduct(Long id, UpdateProductRequest request, Long userId, String role) {
+        requireSellerId(userId, role);
         Product product = loadProduct(id);
         if ("SELLER".equals(role) && !product.isOwnedBy(userId)) {
             throw new NotProductOwnerException(id);
@@ -77,6 +80,7 @@ public class ProductService {
     /** 상품 삭제 (ADMIN: 전체, SELLER: 본인 것만) */
     @Transactional
     public void deleteProduct(Long id, Long userId, String role) {
+        requireSellerId(userId, role);
         Product product = loadProduct(id);
         if ("SELLER".equals(role) && !product.isOwnedBy(userId)) {
             throw new NotProductOwnerException(id);
@@ -188,6 +192,13 @@ public class ProductService {
     }
 
     // ── private helpers ──────────────────────────────────────────
+
+    /** M-N2: SELLER 경로는 userId(X-User-Id) 필수. ADMIN은 null 허용(플랫폼 상품). */
+    private void requireSellerId(Long userId, String role) {
+        if (!"ADMIN".equals(role) && userId == null) {
+            throw new MissingSellerIdException();
+        }
+    }
 
     private Product loadProduct(Long id) {
         return productRepository.findById(id)
