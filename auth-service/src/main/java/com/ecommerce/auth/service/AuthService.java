@@ -43,6 +43,9 @@ public class AuthService {
 
     private static final String JWT_KEY_ID = "auth-key";
 
+    // L-N1: 내부 배치 조회 ids 개수 상한 — 무제한 조회 방지
+    private static final int MAX_USER_IDS = 100;
+
     // 임시 비밀번호 생성용 문자셋
     private static final String PW_UPPER  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String PW_LOWER  = "abcdefghijklmnopqrstuvwxyz";
@@ -199,6 +202,10 @@ public class AuthService {
     @Transactional(readOnly = true)
     public List<UserSummaryResponse> getUsersByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
+        // L-N1: 배치 조회 개수 상한 초과 시 400 거부
+        if (ids.size() > MAX_USER_IDS) {
+            throw new IllegalArgumentException("한 번에 조회 가능한 사용자는 최대 " + MAX_USER_IDS + "명입니다.");
+        }
         return userRepository.findByIdIn(ids).stream()
                 .map(UserSummaryResponse::from)
                 .toList();
