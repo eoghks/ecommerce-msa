@@ -19,13 +19,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.LongStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -146,5 +149,24 @@ class AuthServiceTest {
                 .isInstanceOf(InvalidInternalTokenException.class);
         assertThatThrownBy(() -> authService.verifyInternalToken(null))
                 .isInstanceOf(InvalidInternalTokenException.class);
+    }
+
+    @Test
+    @DisplayName("배치 조회 — null/빈 리스트는 빈 결과 반환")
+    void getUsersByIds_emptyReturnsEmpty() {
+        assertThat(authService.getUsersByIds(null)).isEmpty();
+        assertThat(authService.getUsersByIds(List.of())).isEmpty();
+        verify(userRepository, never()).findByIdIn(any());
+    }
+
+    @Test
+    @DisplayName("배치 조회 — ids 개수 상한(100) 초과 시 IllegalArgumentException")
+    void getUsersByIds_exceedsMax_throwsException() {
+        List<Long> ids = LongStream.rangeClosed(1, 101).boxed().toList();
+
+        assertThatThrownBy(() -> authService.getUsersByIds(ids))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("최대 100");
+        verify(userRepository, never()).findByIdIn(any());
     }
 }
