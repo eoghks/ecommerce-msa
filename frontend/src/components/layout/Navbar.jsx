@@ -53,6 +53,9 @@ const Navbar = () => {
               <Link to="/admin" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 관리자
               </Link>
+              <Link to="/admin/categories" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
+                카테고리
+              </Link>
               <Link to="/admin/orders" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 주문관리
               </Link>
@@ -172,6 +175,9 @@ const Navbar = () => {
                       <>
                         <Link to="/admin" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           관리자
+                        </Link>
+                        <Link to="/admin/categories" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
+                          카테고리
                         </Link>
                         <Link to="/admin/failed" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           실패주문
