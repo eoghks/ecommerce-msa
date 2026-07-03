@@ -24,4 +24,7 @@ public interface ProductRepository extends JpaRepository<Product, Long>, Product
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Product p SET p.stock = p.stock + :qty WHERE p.id = :id")
     int increaseStockAtomic(@Param("id") Long id, @Param("qty") int qty);
+
+    /** 카테고리 참조 상품 수 — 카테고리 삭제 정합성 검사용 */
+    long countByCategoryId(Long categoryId);
 }

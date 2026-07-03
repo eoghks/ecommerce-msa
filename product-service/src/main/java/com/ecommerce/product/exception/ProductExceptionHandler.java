@@ -22,6 +22,20 @@ public class ProductExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(DuplicateCategoryNameException.class)
+    public ProblemDetail handleDuplicateCategoryName(DuplicateCategoryNameException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        pd.setTitle("Duplicate Category Name");
+        return pd;
+    }
+
+    @ExceptionHandler(CategoryInUseException.class)
+    public ProblemDetail handleCategoryInUse(CategoryInUseException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        pd.setTitle("Category In Use");
+        return pd;
+    }
+
     @ExceptionHandler(NotProductOwnerException.class)
     public ProblemDetail handleNotOwner(NotProductOwnerException e) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
