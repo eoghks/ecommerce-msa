@@ -3,6 +3,8 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { getProducts, getCategories } from '../../api/product';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
+import useWishlistStore from '../../store/wishlistStore';
+import WishlistButton from '../../components/common/WishlistButton';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
@@ -58,6 +60,9 @@ const ProductCard = ({ product }) => {
               </svg>
             </div>
           )}
+
+          {/* 찜 하트 — 항상 표시 */}
+          <WishlistButton productId={product.id} variant="card" />
 
           {/* 품절 배지 */}
           {product.stock === 0 && (
@@ -174,6 +179,8 @@ const Pagination = ({ page, totalPages, onChange }) => {
 /* 메인 페이지 */
 const ProductListPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated } = useAuthStore();
+  const fetchWishlistIds = useWishlistStore((s) => s.fetchIds);
 
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
@@ -194,6 +201,11 @@ const ProductListPage = () => {
       .then((res) => setCategories(res.data))
       .catch(() => {});
   }, []);
+
+  /* 로그인 상태면 찜 ID 집합 로드 (하트 표시용) */
+  useEffect(() => {
+    if (isAuthenticated) fetchWishlistIds();
+  }, [isAuthenticated, fetchWishlistIds]);
 
   /* 상품 목록 로드 */
   const fetchProducts = useCallback(() => {

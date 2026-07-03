@@ -21,6 +21,7 @@ import AdminOrderPage from './pages/admin/AdminOrderPage';
 import AdminFailedOrderPage from './pages/admin/AdminFailedOrderPage';
 import AdminMonitoringPage from './pages/admin/AdminMonitoringPage';
 import MyProfilePage from './pages/my/MyProfilePage';
+import WishlistPage from './pages/my/WishlistPage';
 
 // 인증 페이지에서는 Navbar 숨김
 const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
@@ -86,6 +87,7 @@ const App = () => {
               <Route path="/order"        element={<PrivateRoute><OrderPage /></PrivateRoute>} />
               <Route path="/orders"       element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
               <Route path="/my/profile"   element={<PrivateRoute><MyProfilePage /></PrivateRoute>} />
+              <Route path="/my/wishlist"  element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
 
               {/* ADMIN 전용 */}
               <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
