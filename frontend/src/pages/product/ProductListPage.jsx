@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { getProducts, getCategories } from '../../api/product';
+import { getProducts, getCategories, getProductSuggestions } from '../../api/product';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
 import useWishlistStore from '../../store/wishlistStore';
@@ -8,6 +8,16 @@ import WishlistButton from '../../components/common/WishlistButton';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
+
+/* 정렬 옵션 — 서버 화이트리스트 키와 일치 */
+const SORT_OPTIONS = [
+  { value: 'latest', label: '최신순' },
+  { value: 'price_asc', label: '가격 낮은순' },
+  { value: 'price_desc', label: '가격 높은순' },
+  { value: 'name', label: '이름순' },
+];
+
+const SUGGEST_DEBOUNCE_MS = 250;
 
 /* 상품 카드 */
 const ProductCard = ({ product }) => {
@@ -194,6 +204,19 @@ const ProductListPage = () => {
   const categoryId = searchParams.get('categoryId') || '';
   const page = Number(searchParams.get('page') || 0);
   const size = Number(searchParams.get('size') || 10);
+  const sort = searchParams.get('sort') || 'latest';
+  const minPrice = searchParams.get('minPrice') || '';
+  const maxPrice = searchParams.get('maxPrice') || '';
+
+  // 가격대 입력 (로컬 상태 — 적용 버튼으로 URL 반영)
+  const [minPriceInput, setMinPriceInput] = useState(minPrice);
+  const [maxPriceInput, setMaxPriceInput] = useState(maxPrice);
+  const [priceError, setPriceError] = useState('');
+
+  // 자동완성 상태
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestTimer = useRef(null);
 
   /* 카테고리 목록 로드 */
   useEffect(() => {
@@ -211,9 +234,11 @@ const ProductListPage = () => {
   const fetchProducts = useCallback(() => {
     setLoading(true);
     setError('');
-    const params = { page, size, sort: 'createdAt,desc' };
+    const params = { page, size, sort };
     if (keyword) params.keyword = keyword;
     if (categoryId) params.categoryId = categoryId;
+    if (minPrice) params.minPrice = minPrice;
+    if (maxPrice) params.maxPrice = maxPrice;
 
     getProducts(params)
       .then((res) => {
@@ -223,17 +248,77 @@ const ProductListPage = () => {
       })
       .catch(() => setError('상품을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
-  }, [page, size, keyword, categoryId]);
+  }, [page, size, keyword, categoryId, sort, minPrice, maxPrice]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setKeyword(inputKeyword);
+  /* 자동완성 — 입력 debounce 후 후보 조회 */
+  useEffect(() => {
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    const trimmed = inputKeyword.trim();
+    if (!trimmed) {
+      setSuggestions([]);
+      return;
+    }
+    suggestTimer.current = setTimeout(() => {
+      getProductSuggestions(trimmed)
+        .then((res) => setSuggestions(res.data ?? []))
+        .catch(() => setSuggestions([]));
+    }, SUGGEST_DEBOUNCE_MS);
+    return () => clearTimeout(suggestTimer.current);
+  }, [inputKeyword]);
+
+  /* 키워드로 검색 실행 (검색바·자동완성 공통) */
+  const runSearch = (value) => {
+    setKeyword(value);
+    setShowSuggestions(false);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (inputKeyword) next.set('keyword', inputKeyword);
+      if (value) next.set('keyword', value);
       else next.delete('keyword');
+      next.delete('page');
+      return next;
+    });
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    runSearch(inputKeyword);
+  };
+
+  /* 자동완성 후보 선택 → 즉시 검색 */
+  const handleSelectSuggestion = (name) => {
+    setInputKeyword(name);
+    runSearch(name);
+  };
+
+  /* 정렬 변경 */
+  const handleSort = (value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('sort', value);
+      next.delete('page');
+      return next;
+    });
+  };
+
+  /* 가격대 적용 — min ≤ max, 음수 불가 검증 */
+  const handleApplyPrice = () => {
+    const min = minPriceInput.trim();
+    const max = maxPriceInput.trim();
+    if ((min && Number(min) < 0) || (max && Number(max) < 0)) {
+      setPriceError('가격은 0 이상이어야 합니다.');
+      return;
+    }
+    if (min && max && Number(min) > Number(max)) {
+      setPriceError('최소 가격이 최대 가격보다 클 수 없습니다.');
+      return;
+    }
+    setPriceError('');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (min) next.set('minPrice', min); else next.delete('minPrice');
+      if (max) next.set('maxPrice', max); else next.delete('maxPrice');
       next.delete('page');
       return next;
     });
@@ -271,7 +356,7 @@ const ProductListPage = () => {
     <div className="flex flex-col gap-5">
       {/* 검색창 */}
       <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="input-wrapper flex-1">
+        <div className="input-wrapper flex-1 relative">
           <span className="input-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -280,10 +365,32 @@ const ProductListPage = () => {
           <input
             type="text"
             value={inputKeyword}
-            onChange={(e) => setInputKeyword(e.target.value)}
+            onChange={(e) => { setInputKeyword(e.target.value); setShowSuggestions(true); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="상품명으로 검색"
             className="input-field"
+            autoComplete="off"
           />
+
+          {/* 자동완성 후보 드롭다운 */}
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute left-0 right-0 top-full mt-1 z-20 bg-white rounded-xl overflow-hidden list-none m-0 p-0"
+              style={{ border: '1px solid #e5e7eb', boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}>
+              {suggestions.map((name) => (
+                <li key={name}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelectSuggestion(name)}
+                    className="w-full text-left px-4 py-2.5 text-[13px] text-gray-700 bg-transparent border-none hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    {name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <button type="submit"
           className="h-11 px-5 text-white text-sm font-semibold rounded-[10px] border-none shrink-0 transition-opacity hover:opacity-90"
@@ -291,6 +398,54 @@ const ProductListPage = () => {
           검색
         </button>
       </form>
+
+      {/* 정렬 + 가격대 필터 */}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-[12px] text-gray-400">정렬</span>
+          <select
+            value={sort}
+            onChange={(e) => handleSort(e.target.value)}
+            className="h-9 px-3 text-[13px] text-gray-700 rounded-lg bg-white border border-gray-200 focus:border-brand-600 outline-none"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-[12px] text-gray-400">가격대 (원)</span>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min="0"
+              value={minPriceInput}
+              onChange={(e) => setMinPriceInput(e.target.value)}
+              placeholder="최소"
+              className="h-9 w-24 px-2.5 text-[13px] rounded-lg bg-white border border-gray-200 focus:border-brand-600 outline-none"
+            />
+            <span className="text-gray-400 text-sm">~</span>
+            <input
+              type="number"
+              min="0"
+              value={maxPriceInput}
+              onChange={(e) => setMaxPriceInput(e.target.value)}
+              placeholder="최대"
+              className="h-9 w-24 px-2.5 text-[13px] rounded-lg bg-white border border-gray-200 focus:border-brand-600 outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleApplyPrice}
+              className="h-9 px-4 text-[13px] font-medium text-gray-700 rounded-lg bg-white border border-gray-200 hover:border-brand-600 hover:text-brand-600 transition-colors"
+            >
+              적용
+            </button>
+          </div>
+        </div>
+
+        {priceError && <span className="text-[12px] text-red-500 pb-2">{priceError}</span>}
+      </div>
 
       {/* 카테고리 탭 */}
       {categories.length > 0 && (
@@ -358,7 +513,11 @@ const ProductListPage = () => {
               <p className="text-[15px] m-0 font-medium">검색 결과가 없습니다.</p>
               {(keyword || categoryId) && (
                 <button
-                  onClick={() => { setInputKeyword(''); setKeyword(''); setSearchParams({}); }}
+                  onClick={() => {
+                    setInputKeyword(''); setKeyword('');
+                    setMinPriceInput(''); setMaxPriceInput(''); setPriceError('');
+                    setSearchParams({});
+                  }}
                   className="text-[13px] text-brand-600 underline bg-transparent border-none"
                 >
                   전체 상품 보기
