@@ -123,8 +123,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public Page<ProductSummaryResponse> findProducts(ProductSearchRequest request, boolean enrichSeller) {
         // ADMIN(enrichSeller=true)만 판매 금지 상품 포함, 공개 목록은 제외
-        Page<Product> page = productRepository.findAllWithFilter(
-                request.categoryId(), request.keyword(), enrichSeller, request.pageable());
+        Page<Product> page = productRepository.findAllWithFilter(request, enrichSeller);
 
         if (!enrichSeller) {
             return page.map(ProductSummaryResponse::from);
@@ -139,6 +138,18 @@ public class ProductService {
         Map<Long, UserClient.UserSummary> sellers = userClient.getUsersByIds(sellerIds);
 
         return page.map(p -> ProductSummaryResponse.from(p, sellers.get(p.getSellerId())));
+    }
+
+    /**
+     * 상품명 자동완성 후보 조회.
+     * keyword가 공백/빈 값이면 빈 목록. 판매금지/삭제 상품은 제외한다.
+     */
+    @Transactional(readOnly = true)
+    public List<String> suggestNames(String keyword, int limit) {
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+        return productRepository.findNameSuggestions(keyword.trim(), limit);
     }
 
     /** 상품 상세 조회 — Redis Cache-Aside */

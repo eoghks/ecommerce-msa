@@ -2,6 +2,7 @@ package com.ecommerce.product.service;
 
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
+import com.ecommerce.product.domain.SortOption;
 import com.ecommerce.product.dto.request.CreateProductRequest;
 import com.ecommerce.product.dto.request.ProductSearchRequest;
 import com.ecommerce.product.dto.request.UpdateProductRequest;
@@ -240,11 +241,11 @@ class ProductServiceTest {
         PageRequest pageable = PageRequest.of(0, 20);
         Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
 
-        given(productRepository.findAllWithFilter(null, null, false, pageable))
-                .willReturn(productPage);
+        ProductSearchRequest request =
+                new ProductSearchRequest(null, null, null, null, SortOption.LATEST, pageable);
+        given(productRepository.findAllWithFilter(request, false)).willReturn(productPage);
 
-        Page<ProductSummaryResponse> result = productService.findProducts(
-                new ProductSearchRequest(null, null, pageable));
+        Page<ProductSummaryResponse> result = productService.findProducts(request);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).name()).isEqualTo("테스트 상품");
@@ -256,13 +257,32 @@ class ProductServiceTest {
         PageRequest pageable = PageRequest.of(0, 20);
         Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
 
-        given(productRepository.findAllWithFilter(1L, "테스트", false, pageable))
-                .willReturn(productPage);
+        ProductSearchRequest request =
+                new ProductSearchRequest(1L, "테스트", null, null, SortOption.LATEST, pageable);
+        given(productRepository.findAllWithFilter(request, false)).willReturn(productPage);
 
-        Page<ProductSummaryResponse> result = productService.findProducts(
-                new ProductSearchRequest(1L, "테스트", pageable));
+        Page<ProductSummaryResponse> result = productService.findProducts(request);
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).categoryId()).isEqualTo(1L);
+    }
+
+    // ── suggestNames ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("자동완성 — 빈 keyword는 빈 목록 반환 (리포지토리 미호출)")
+    void suggestNames_blankKeyword() {
+        assertThat(productService.suggestNames("  ", 10)).isEmpty();
+        assertThat(productService.suggestNames(null, 10)).isEmpty();
+        verify(productRepository, never()).findNameSuggestions(anyString(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    @DisplayName("자동완성 — keyword 트림 후 리포지토리 위임")
+    void suggestNames_delegates() {
+        given(productRepository.findNameSuggestions("갤럭시", 10))
+                .willReturn(List.of("갤럭시 S24"));
+
+        assertThat(productService.suggestNames(" 갤럭시 ", 10)).containsExactly("갤럭시 S24");
     }
 }

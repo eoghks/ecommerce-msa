@@ -15,6 +15,9 @@ export const deleteCategory = (id) =>
 export const getProducts = (params) =>
   api.get('/api/v1/products', { params });
 
+export const getProductSuggestions = (keyword, limit = 10) =>
+  api.get('/api/v1/products/suggestions', { params: { keyword, limit } });
+
 export const getProduct = (id) =>
   api.get(`/api/v1/products/${id}`);
 

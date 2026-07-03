@@ -63,6 +63,13 @@ public class ProductExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(InvalidSearchParameterException.class)
+    public ProblemDetail handleInvalidSearchParameter(InvalidSearchParameterException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        pd.setTitle("Invalid Search Parameter");
+        return pd;
+    }
+
     /**
      * 데이터 무결성 위반 처리.
      * 위시리스트 추가(POST /api/v1/wishlist/{productId}) 동시 요청으로 유니크 제약

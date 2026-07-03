@@ -3,6 +3,8 @@ package com.ecommerce.product.repository;
 import com.ecommerce.product.config.JpaConfig;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
+import com.ecommerce.product.domain.SortOption;
+import com.ecommerce.product.dto.request.ProductSearchRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -74,11 +78,18 @@ class ProductRepositoryTest {
                 .build());
     }
 
+    /** 검색 요청 조립 헬퍼 — 정렬 기본 latest */
+    private ProductSearchRequest request(Long categoryId, String keyword,
+                                         Long minPrice, Long maxPrice, SortOption sort) {
+        return new ProductSearchRequest(categoryId, keyword, minPrice, maxPrice, sort,
+                PageRequest.of(0, 20));
+    }
+
     @Test
     @DisplayName("필터 없음 — 전체 상품 조회")
     void findAllWithFilter_noFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, null, false, PageRequest.of(0, 20));
+                request(null, null, null, null, SortOption.LATEST), false);
 
         assertThat(result.getTotalElements()).isEqualTo(3);
     }
@@ -87,7 +98,7 @@ class ProductRepositoryTest {
     @DisplayName("카테고리 필터 — 전자기기만 조회")
     void findAllWithFilter_categoryFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                electronics.getId(), null, false, PageRequest.of(0, 20));
+                request(electronics.getId(), null, null, null, SortOption.LATEST), false);
 
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent())
@@ -98,7 +109,7 @@ class ProductRepositoryTest {
     @DisplayName("키워드 필터 — '갤럭시' 포함 조회")
     void findAllWithFilter_keywordFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, "갤럭시", false, PageRequest.of(0, 20));
+                request(null, "갤럭시", null, null, SortOption.LATEST), false);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("갤럭시 S24");
@@ -108,7 +119,7 @@ class ProductRepositoryTest {
     @DisplayName("카테고리 + 키워드 복합 필터")
     void findAllWithFilter_combinedFilter() {
         Page<Product> result = productRepository.findAllWithFilter(
-                electronics.getId(), "아이폰", false, PageRequest.of(0, 20));
+                request(electronics.getId(), "아이폰", null, null, SortOption.LATEST), false);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("아이폰 15");
@@ -118,7 +129,7 @@ class ProductRepositoryTest {
     @DisplayName("일치하는 상품 없음 — 빈 페이지 반환")
     void findAllWithFilter_noResult() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, "존재하지않는키워드xyz", false, PageRequest.of(0, 20));
+                request(null, "존재하지않는키워드xyz", null, null, SortOption.LATEST), false);
 
         assertThat(result.getTotalElements()).isEqualTo(0);
         assertThat(result.getContent()).isEmpty();
@@ -128,10 +139,161 @@ class ProductRepositoryTest {
     @DisplayName("페이징 — size=2, page=0")
     void findAllWithFilter_paging() {
         Page<Product> result = productRepository.findAllWithFilter(
-                null, null, false, PageRequest.of(0, 2));
+                new ProductSearchRequest(null, null, null, null, SortOption.LATEST,
+                        PageRequest.of(0, 2)), false);
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(3);
         assertThat(result.getTotalPages()).isEqualTo(2);
+    }
+
+    // ── 정렬 화이트리스트 ──────────────────────────────────────────
+
+    @Test
+    @DisplayName("정렬 latest — createdAt 내림차순")
+    void sort_latest() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, null, null, SortOption.LATEST), false);
+
+        // 마지막 저장(나이키)이 가장 최신 → 첫 번째
+        assertThat(result.getContent().get(0).getName()).isEqualTo("나이키 운동화");
+    }
+
+    @Test
+    @DisplayName("정렬 price_asc — 가격 오름차순")
+    void sort_priceAsc() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, null, null, SortOption.PRICE_ASC), false);
+
+        assertThat(result.getContent()).extracting(Product::getPrice)
+                .containsExactly(150_000L, 1_200_000L, 1_500_000L);
+    }
+
+    @Test
+    @DisplayName("정렬 price_desc — 가격 내림차순")
+    void sort_priceDesc() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, null, null, SortOption.PRICE_DESC), false);
+
+        assertThat(result.getContent()).extracting(Product::getPrice)
+                .containsExactly(1_500_000L, 1_200_000L, 150_000L);
+    }
+
+    @Test
+    @DisplayName("정렬 name — 상품명 오름차순")
+    void sort_name() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, null, null, SortOption.NAME), false);
+
+        assertThat(result.getContent()).extracting(Product::getName)
+                .containsExactly("갤럭시 S24", "나이키 운동화", "아이폰 15");
+    }
+
+    // ── 가격대 필터 ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("가격 필터 — min만 (>= 1,000,000)")
+    void priceFilter_minOnly() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, 1_000_000L, null, SortOption.PRICE_ASC), false);
+
+        assertThat(result.getContent()).extracting(Product::getPrice)
+                .containsExactly(1_200_000L, 1_500_000L);
+    }
+
+    @Test
+    @DisplayName("가격 필터 — max만 (<= 200,000)")
+    void priceFilter_maxOnly() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, null, 200_000L, SortOption.PRICE_ASC), false);
+
+        assertThat(result.getContent()).extracting(Product::getPrice)
+                .containsExactly(150_000L);
+    }
+
+    @Test
+    @DisplayName("가격 필터 — min·max 둘 다 (100,000 ~ 1,300,000)")
+    void priceFilter_minAndMax() {
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, null, 100_000L, 1_300_000L, SortOption.PRICE_ASC), false);
+
+        assertThat(result.getContent()).extracting(Product::getPrice)
+                .containsExactly(150_000L, 1_200_000L);
+    }
+
+    // ── 자동완성 ──────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("자동완성 — prefix 매칭 (판매중 한정)")
+    void suggestions_prefix() {
+        List<String> names = productRepository.findNameSuggestions("갤럭시", 10);
+
+        assertThat(names).containsExactly("갤럭시 S24");
+    }
+
+    @Test
+    @DisplayName("자동완성 — limit 제한")
+    void suggestions_limit() {
+        // '아'로 시작하는 상품 추가
+        productRepository.save(Product.builder()
+                .name("아디다스 티셔츠").price(50_000L).stock(10).category(fashion).build());
+
+        List<String> names = productRepository.findNameSuggestions("아", 1);
+
+        assertThat(names).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("자동완성 — 판매금지 상품 제외")
+    void suggestions_excludesBanned() {
+        Product banned = productRepository.save(Product.builder()
+                .name("갤럭시 워치").price(300_000L).stock(5).category(electronics).build());
+        banned.ban();
+        productRepository.saveAndFlush(banned);
+
+        List<String> names = productRepository.findNameSuggestions("갤럭시", 10);
+
+        assertThat(names).containsExactly("갤럭시 S24");
+    }
+
+    // ── LIKE 와일드카드 이스케이프 (M1) ────────────────────────────
+
+    @Test
+    @DisplayName("자동완성 — '%'는 와일드카드가 아닌 리터럴로 매칭")
+    void suggestions_escapesPercent() {
+        productRepository.save(Product.builder()
+                .name("50%할인상품").price(10_000L).stock(1).category(fashion).build());
+
+        // '%'가 와일드카드로 해석되면 전체가 매칭됨 — 이스케이프되면 '50%'로 시작하는 것만
+        List<String> names = productRepository.findNameSuggestions("50%", 10);
+
+        assertThat(names).containsExactly("50%할인상품");
+    }
+
+    @Test
+    @DisplayName("자동완성 — '_'는 와일드카드가 아닌 리터럴로 매칭")
+    void suggestions_escapesUnderscore() {
+        productRepository.save(Product.builder()
+                .name("A_B제품").price(10_000L).stock(1).category(fashion).build());
+        productRepository.save(Product.builder()
+                .name("AXB제품").price(10_000L).stock(1).category(fashion).build());
+
+        // '_'가 와일드카드면 'AXB제품'도 매칭됨 — 이스케이프되면 'A_B'만
+        List<String> names = productRepository.findNameSuggestions("A_B", 10);
+
+        assertThat(names).containsExactly("A_B제품");
+    }
+
+    @Test
+    @DisplayName("키워드 검색 — '%'는 와일드카드가 아닌 리터럴로 부분일치")
+    void keyword_escapesPercent() {
+        productRepository.save(Product.builder()
+                .name("특가 30% 세일").price(10_000L).stock(1).category(fashion).build());
+
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, "30%", null, null, SortOption.LATEST), false);
+
+        assertThat(result.getContent()).extracting(Product::getName)
+                .containsExactly("특가 30% 세일");
     }
 }
