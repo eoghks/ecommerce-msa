@@ -42,6 +42,8 @@ public class ProductController {
     /** 자동완성 후보 기본/최대 개수 */
     private static final int SUGGESTION_DEFAULT_LIMIT = 10;
     private static final int SUGGESTION_MAX_LIMIT = 20;
+    /** 자동완성 keyword 최소 길이 — trim 후 이 값 미만이면 빈 목록 (넓은 prefix 매칭 부하 방지) */
+    private static final int SUGGESTION_MIN_KEYWORD_LENGTH = 1;
 
     private final ProductService productService;
     private final FileStorageService fileStorageService;
@@ -150,6 +152,10 @@ public class ProductController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, defaultValue = "" + SUGGESTION_DEFAULT_LIMIT) int limit
     ) {
+        // keyword trim 후 최소 길이 미만(공백만 포함)이면 빈 목록 반환 (진입 검증)
+        if (keyword == null || keyword.trim().length() < SUGGESTION_MIN_KEYWORD_LENGTH) {
+            return ResponseEntity.ok(List.of());
+        }
         int cappedLimit = Math.min(Math.max(limit, 1), SUGGESTION_MAX_LIMIT);
         return ResponseEntity.ok(productService.suggestNames(keyword, cappedLimit));
     }
