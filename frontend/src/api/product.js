@@ -3,6 +3,15 @@ import api from './axios';
 export const getCategories = () =>
   api.get('/api/v1/categories');
 
+export const createCategory = (data) =>
+  api.post('/api/v1/categories', data);
+
+export const updateCategory = (id, data) =>
+  api.put(`/api/v1/categories/${id}`, data);
+
+export const deleteCategory = (id) =>
+  api.delete(`/api/v1/categories/${id}`);
+
 export const getProducts = (params) =>
   api.get('/api/v1/products', { params });
 
