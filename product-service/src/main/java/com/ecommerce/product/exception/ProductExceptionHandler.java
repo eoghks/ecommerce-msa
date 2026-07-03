@@ -49,4 +49,11 @@ public class ProductExceptionHandler {
         pd.setTitle("Unauthorized");
         return pd;
     }
+
+    @ExceptionHandler(ProductNotOnSaleException.class)
+    public ProblemDetail handleProductNotOnSale(ProductNotOnSaleException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        pd.setTitle("Product Not On Sale");
+        return pd;
+    }
 }
