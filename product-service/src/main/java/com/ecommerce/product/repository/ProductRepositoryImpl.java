@@ -53,11 +53,13 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
     @Override
     public List<String> findNameSuggestions(String keyword, int limit) {
         // 판매중 상품 한정, 상품명 prefix 일치, 중복 제거 후 limit 제한 (파라미터 바인딩)
+        // LIKE 메타문자(%,_) 이스케이프 후 ESCAPE 절 명시 (의도치 않은 광역 매칭 방지)
+        String pattern = LikePatternEscaper.startsWithPattern(keyword);
         return queryFactory
                 .select(product.name).distinct()
                 .from(product)
                 .where(product.status.eq(ProductStatus.ACTIVE)
-                        .and(product.name.startsWith(keyword)))
+                        .and(product.name.like(pattern, LikePatternEscaper.ESCAPE_CHAR)))
                 .orderBy(product.name.asc())
                 .limit(limit)
                 .fetch();
@@ -70,7 +72,9 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
             builder.and(category.id.eq(request.categoryId()));
         }
         if (request.keyword() != null && !request.keyword().isBlank()) {
-            builder.and(product.name.contains(request.keyword()));
+            // LIKE 메타문자 이스케이프 후 부분일치 + ESCAPE 절 (파라미터 바인딩)
+            String pattern = LikePatternEscaper.containsPattern(request.keyword());
+            builder.and(product.name.like(pattern, LikePatternEscaper.ESCAPE_CHAR));
         }
         if (request.minPrice() != null) {
             builder.and(product.price.goe(request.minPrice()));

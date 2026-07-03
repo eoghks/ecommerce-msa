@@ -255,4 +255,45 @@ class ProductRepositoryTest {
 
         assertThat(names).containsExactly("갤럭시 S24");
     }
+
+    // ── LIKE 와일드카드 이스케이프 (M1) ────────────────────────────
+
+    @Test
+    @DisplayName("자동완성 — '%'는 와일드카드가 아닌 리터럴로 매칭")
+    void suggestions_escapesPercent() {
+        productRepository.save(Product.builder()
+                .name("50%할인상품").price(10_000L).stock(1).category(fashion).build());
+
+        // '%'가 와일드카드로 해석되면 전체가 매칭됨 — 이스케이프되면 '50%'로 시작하는 것만
+        List<String> names = productRepository.findNameSuggestions("50%", 10);
+
+        assertThat(names).containsExactly("50%할인상품");
+    }
+
+    @Test
+    @DisplayName("자동완성 — '_'는 와일드카드가 아닌 리터럴로 매칭")
+    void suggestions_escapesUnderscore() {
+        productRepository.save(Product.builder()
+                .name("A_B제품").price(10_000L).stock(1).category(fashion).build());
+        productRepository.save(Product.builder()
+                .name("AXB제품").price(10_000L).stock(1).category(fashion).build());
+
+        // '_'가 와일드카드면 'AXB제품'도 매칭됨 — 이스케이프되면 'A_B'만
+        List<String> names = productRepository.findNameSuggestions("A_B", 10);
+
+        assertThat(names).containsExactly("A_B제품");
+    }
+
+    @Test
+    @DisplayName("키워드 검색 — '%'는 와일드카드가 아닌 리터럴로 부분일치")
+    void keyword_escapesPercent() {
+        productRepository.save(Product.builder()
+                .name("특가 30% 세일").price(10_000L).stock(1).category(fashion).build());
+
+        Page<Product> result = productRepository.findAllWithFilter(
+                request(null, "30%", null, null, SortOption.LATEST), false);
+
+        assertThat(result.getContent()).extracting(Product::getName)
+                .containsExactly("특가 30% 세일");
+    }
 }
