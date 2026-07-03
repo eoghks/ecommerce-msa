@@ -94,7 +94,7 @@ const WishlistPage = () => {
   const fetchWishlist = useCallback(() => {
     setLoading(true);
     setError('');
-    getMyWishlist({ page, size: PAGE_SIZE, sort: 'createdAt,desc' })
+    getMyWishlist({ page, size: PAGE_SIZE })
       .then((res) => {
         setItems(res.data.content ?? []);
         setTotalPages(res.data.totalPages ?? 0);
@@ -113,8 +113,11 @@ const WishlistPage = () => {
     setTotalElements((n) => Math.max(0, n - 1));
     try {
       await removeWish(productId);
-    } catch {
+    } catch (err) {
+      // 낙관적 제거 원복 + 실패 사유 노출
       setItems(prev);
+      setTotalElements((n) => n + 1);
+      setError(err?.response?.data?.detail || '찜 해제에 실패했습니다.');
       fetchWishlist();
     }
   };

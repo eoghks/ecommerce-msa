@@ -5,7 +5,6 @@ import com.ecommerce.product.service.WishlistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,11 +49,11 @@ public class WishlistController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 내 찜 목록(페이징) — userId 없으면 401 */
+    /** 내 찜 목록(페이징) — userId 없으면 401. 정렬은 서버 고정(최신순)이라 sort 파라미터를 받지 않는다. */
     @GetMapping("/me")
     public ResponseEntity<Page<WishlistItemResponse>> getMyWishlist(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
-            @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+            @PageableDefault(size = DEFAULT_PAGE_SIZE) Pageable pageable
     ) {
         if (userId == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         return ResponseEntity.ok(wishlistService.getMyWishlist(userId, pageable));
