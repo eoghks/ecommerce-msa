@@ -185,7 +185,8 @@ public class OrderService {
 
     /**
      * 사용자 주문 취소 요청 — PENDING/CONFIRMED/PARTIALLY_CANCELLED 상태 취소 가능 (M-N3).
-     * CANCELLED(이미 전체취소) 상태에서 시도 시 409 Conflict.
+     * 멱등 처리(E2E S5): 이미 전체 취소(CANCELLED)된 주문 재취소 요청은 no-op으로 성공 처리.
+     *   - 활성 항목이 없으므로 재고 복구 이벤트를 재발행하지 않는다 (중복 복구 방지).
      * 설계: 차감된 주문은 활성 항목 전체를 항목취소 처리하여 기존 재고복구 Saga(항목취소 이벤트)를 재사용.
      *   - 실제 전이가 일어난 항목만 복구 이벤트 발행 → 중복/과복구 방지
      *   - PENDING(미차감)은 항목취소 없이 단순 취소 → 복구 이벤트 없음
@@ -198,9 +199,10 @@ public class OrderService {
         if (!order.getUserId().equals(userId)) {
             throw new OrderNotFoundException(orderId);
         }
-        if (!order.isUserCancellable()) {
-            throw new IllegalStateException(
-                    "취소할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
+        // 멱등: 이미 전체 취소된 주문은 아무 작업 없이 성공(no-op) — 복구 이벤트 미발행
+        if (order.isFullyCancelled()) {
+            log.info("이미 취소된 주문 재취소 요청 — 멱등 no-op. orderId={}, userId={}", orderId, userId);
+            return;
         }
 
         String cancelReason = (reason == null || reason.isBlank()) ? USER_CANCEL_REASON : reason;
