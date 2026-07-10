@@ -125,6 +125,14 @@ public class Order {
     }
 
     /**
+     * 이미 전체 취소된 주문인지.
+     * 사용자 재취소 요청을 멱등(no-op)으로 처리할지 판정하는 데 사용한다.
+     */
+    public boolean isFullyCancelled() {
+        return this.status == OrderStatus.CANCELLED;
+    }
+
+    /**
      * M-N3: 사용자 주문 취소 — 활성(ACTIVE) 항목 전체를 사유와 함께 항목취소한다.
      * 차감된 항목만 재고 복구 이벤트가 나가도록, 실제 ACTIVE→CANCELLED 전이가 일어난 항목만 반환.
      *   - PENDING(미차감): isItemCancellable=false 이므로 항목취소 없이 단순 CANCELLED 전이 → 복구 이벤트 없음
