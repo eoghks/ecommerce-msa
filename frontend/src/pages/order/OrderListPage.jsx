@@ -15,6 +15,9 @@ const STATUS_LABEL = {
 // M-N3: 사용자가 취소 가능한 상태 (이미 전체취소된 CANCELLED 제외)
 const CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
 
+// V1.1-1: 구매 확정(재고 차감 완료) 상태 — 리뷰 작성 가능
+const REVIEWABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+
 const OrderListPage = () => {
   const location = useLocation();
   const [orders, setOrders] = useState([]);
@@ -86,6 +89,7 @@ const OrderCard = ({ order, onCancelled }) => {
     ? new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
   const cancellable = CANCELLABLE_STATUSES.includes(order.status);
+  const reviewable = REVIEWABLE_STATUSES.includes(order.status);
 
   // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)
   const handleCancel = () => {
@@ -119,6 +123,13 @@ const OrderCard = ({ order, onCancelled }) => {
         {(order.items ?? []).map((item, idx) => (
           <div key={idx} className="flex items-center justify-between text-[13px]">
             <span className="text-gray-700 truncate flex-1 mr-2">{item.productName}</span>
+            {/* V1.1-1: 구매 확정 + 활성 항목이면 리뷰 쓰기 (상세 페이지 리뷰 폼으로 이동) */}
+            {reviewable && item.status === 'ACTIVE' && (
+              <Link to={`/products/${item.productId}`}
+                className="text-[12px] text-brand-600 no-underline font-medium shrink-0 mr-3 hover:underline">
+                리뷰 쓰기
+              </Link>
+            )}
             <span className="text-gray-400 shrink-0">× {item.quantity}</span>
             <span className="text-gray-900 font-medium shrink-0 ml-3">
               {formatPrice(item.price * item.quantity)}

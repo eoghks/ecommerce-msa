@@ -46,3 +46,21 @@ export const uploadProductImage = (file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
+
+// ── 상품 리뷰·별점 (V1.1-1) ──────────────────────────────────
+
+// 리뷰 목록 (공개, 최신순 페이징)
+export const getReviews = (productId, page = 0, size = 10) =>
+  api.get(`/api/v1/products/${productId}/reviews`, { params: { page, size } });
+
+// 리뷰 작성 (구매자, 1인 1리뷰)
+export const createReview = (productId, { rating, content }) =>
+  api.post(`/api/v1/products/${productId}/reviews`, { rating, content });
+
+// 리뷰 수정 (본인)
+export const updateReview = (productId, reviewId, { rating, content }) =>
+  api.put(`/api/v1/products/${productId}/reviews/${reviewId}`, { rating, content });
+
+// 리뷰 삭제 (본인 또는 ADMIN)
+export const deleteReview = (productId, reviewId) =>
+  api.delete(`/api/v1/products/${productId}/reviews/${reviewId}`);
