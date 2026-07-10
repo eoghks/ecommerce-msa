@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProduct } from '../../api/product';
 import useCartStore from '../../store/cartStore';
+import useAuthStore from '../../store/authStore';
+import useWishlistStore from '../../store/wishlistStore';
+import WishlistButton from '../../components/common/WishlistButton';
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const ProductDetailPage = () => {
   const { id } = useParams();
   const addItem = useCartStore((s) => s.addItem);
+  const { isAuthenticated } = useAuthStore();
+  const fetchWishlistIds = useWishlistStore((s) => s.fetchIds);
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +27,11 @@ const ProductDetailPage = () => {
       .catch(() => setError('상품을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  /* 로그인 상태면 찜 ID 집합 로드 (하트 표시용) */
+  useEffect(() => {
+    if (isAuthenticated) fetchWishlistIds();
+  }, [isAuthenticated, fetchWishlistIds]);
 
   const handleQuantity = (delta) => {
     setQuantity((q) => Math.max(1, Math.min(product?.stock ?? 1, q + delta)));
@@ -88,9 +98,14 @@ const ProductDetailPage = () => {
               {product.categoryName}
             </span>
           )}
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0 leading-snug">
-            {product.name}
-          </h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0 leading-snug">
+              {product.name}
+            </h1>
+            <div className="shrink-0">
+              <WishlistButton productId={product.id} variant="detail" />
+            </div>
+          </div>
 
           {/* 가격 */}
           <p className="text-2xl sm:text-3xl font-bold text-gray-900 m-0">

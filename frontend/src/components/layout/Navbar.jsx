@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
+import useWishlistStore from '../../store/wishlistStore';
 import { logout } from '../../api/auth';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { isAuthenticated, role, logout: clearAuth } = useAuthStore();
   const totalCount = useCartStore((s) => s.totalCount());
+  const resetWishlist = useWishlistStore((s) => s.reset);
   const [myOpen, setMyOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const myRef = useRef(null);
@@ -29,6 +31,7 @@ const Navbar = () => {
   const handleLogout = async () => {
     try { await logout(); } catch (_) { /* 서버 오류 무시 */ }
     clearAuth();
+    resetWishlist();
     closeMobile();
     navigate('/login');
   };
@@ -52,6 +55,9 @@ const Navbar = () => {
             <>
               <Link to="/admin" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 관리자
+              </Link>
+              <Link to="/admin/categories" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
+                카테고리
               </Link>
               <Link to="/admin/orders" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 주문관리
@@ -130,6 +136,14 @@ const Navbar = () => {
                       </svg>
                       내 주문
                     </Link>
+                    <Link to="/my/wishlist"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors"
+                      onClick={() => setMyOpen(false)}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                      찜 목록
+                    </Link>
                     <div className="h-px bg-gray-100 mx-3" />
                     <button
                       onClick={() => { setMyOpen(false); handleLogout(); }}
@@ -173,6 +187,9 @@ const Navbar = () => {
                         <Link to="/admin" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           관리자
                         </Link>
+                        <Link to="/admin/categories" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
+                          카테고리
+                        </Link>
                         <Link to="/admin/failed" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           실패주문
                         </Link>
@@ -193,6 +210,12 @@ const Navbar = () => {
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                       </svg>
                       내 주문
+                    </Link>
+                    <Link to="/my/wishlist" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                      찜 목록
                     </Link>
                     <div className="h-px bg-gray-100 mx-3" />
                     <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors bg-transparent border-none">

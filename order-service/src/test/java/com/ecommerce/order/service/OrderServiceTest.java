@@ -258,24 +258,46 @@ class OrderServiceTest {
         orderService.cancelOrderItem(1L, 1L, "사전 취소", 7L, "SELLER");
 
         orderService.cancelByUser(1L, 1L, null);
+        // 잔여 활성 항목까지 취소되어 전체 CANCELLED — 이후 재취소는 멱등 no-op
+        orderService.cancelByUser(1L, 1L, null);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-        // item1(항목취소 1회) + item2(사용자취소 1회) = 총 2회 — item1 재발행 없음
+        // item1(항목취소 1회) + item2(사용자취소 1회) = 총 2회 — item1 재발행·재취소 재발행 없음
         then(applicationEventPublisher).should(times(2))
                 .publishEvent(any(OrderItemCancelledApplicationEvent.class));
     }
 
     @Test
-    @DisplayName("cancelByUser — 이미 CANCELLED 주문 취소 시도 → 409")
-    void cancelByUser_alreadyCancelled() {
+    @DisplayName("E2E S5: cancelByUser — 이미 CANCELLED 주문 재취소는 멱등 no-op (예외 없음, 복구 이벤트 미발행)")
+    void cancelByUser_alreadyCancelled_idempotentNoOp() {
         Long userId = 1L;
         Order order = buildOrder(userId, 10L, "상품", 10_000L, 1);
         order.cancel();
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelByUser(1L, userId, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("취소할 수 없는 주문 상태");
+        // 예외 없이 성공 처리(no-op)
+        orderService.cancelByUser(1L, userId, null);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        // 이미 활성 항목이 없으므로 재고 복구 이벤트 미발행 (중복 복구 방지)
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+    }
+
+    @Test
+    @DisplayName("E2E S5: cancelByUser — CONFIRMED 취소 후 재취소는 멱등 no-op (복구 이벤트 재발행 없음)")
+    void cancelByUser_confirmed_thenReCancel_idempotent() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        // 1회차 취소 — 활성 항목 2개 복구 이벤트
+        orderService.cancelByUser(1L, 1L, null);
+        // 2회차 재취소 — 이미 CANCELLED → no-op, 추가 발행 없음
+        orderService.cancelByUser(1L, 1L, null);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        then(applicationEventPublisher).should(times(2))
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
     }
 
     @Test
