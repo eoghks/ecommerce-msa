@@ -2,6 +2,7 @@ package com.ecommerce.product.dto.response;
 
 import com.ecommerce.product.domain.Product;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record ProductResponse(
@@ -15,6 +16,8 @@ public record ProductResponse(
         String status,
         Long categoryId,
         String categoryName,
+        BigDecimal ratingAvg,
+        int ratingCount,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -30,6 +33,8 @@ public record ProductResponse(
                 product.getStatus().name(),
                 product.getCategory().getId(),
                 product.getCategory().getName(),
+                product.getRatingAvg(),
+                product.getRatingCount(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );

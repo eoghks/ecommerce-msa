@@ -70,6 +70,41 @@ public class ProductExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ProblemDetail handleReviewNotFound(ReviewNotFoundException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        pd.setTitle("Review Not Found");
+        return pd;
+    }
+
+    @ExceptionHandler(NotReviewOwnerException.class)
+    public ProblemDetail handleNotReviewOwner(NotReviewOwnerException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setTitle("Forbidden");
+        return pd;
+    }
+
+    @ExceptionHandler(PurchaseRequiredException.class)
+    public ProblemDetail handlePurchaseRequired(PurchaseRequiredException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setTitle("Purchase Required");
+        return pd;
+    }
+
+    @ExceptionHandler(DuplicateReviewException.class)
+    public ProblemDetail handleDuplicateReview(DuplicateReviewException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        pd.setTitle("Duplicate Review");
+        return pd;
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    public ProblemDetail handleUnauthenticated(UnauthenticatedException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        pd.setTitle("Unauthorized");
+        return pd;
+    }
+
     /**
      * 데이터 무결성 위반 처리.
      * 위시리스트 추가(POST /api/v1/wishlist/{productId}) 동시 요청으로 유니크 제약
