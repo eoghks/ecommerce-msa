@@ -41,6 +41,11 @@ kafka:
     stock-decreased: stock.decreased
     stock-decrease-failed: stock.decrease.failed
 
+app:
+  internal:
+    # M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
+    token: ${INTERNAL_TOKEN:dev-internal-secret}
+
 server:
   port: 8083
 

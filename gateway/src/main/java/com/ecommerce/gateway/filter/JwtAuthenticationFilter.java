@@ -56,7 +56,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     // 서비스 간 직접 호출(내부망) 전용 — 게이트웨이(외부)로는 접근 차단
     private static final List<String> INTERNAL_ONLY_LIST = List.of(
-            "/api/v1/auth/users"   // H-1: 판매자 PII 배치 조회 (product→auth 내부 전용)
+            "/api/v1/auth/users",           // H-1: 판매자 PII 배치 조회 (product→auth 내부 전용)
+            "/api/v1/orders/internal"       // V1.1-1: 구매 인증 조회 (product→order 내부 전용)
     );
 
     private final JwksClient jwksClient;
