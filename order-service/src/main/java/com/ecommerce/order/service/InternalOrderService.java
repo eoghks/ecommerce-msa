@@ -1,12 +1,15 @@
 package com.ecommerce.order.service;
 
 import com.ecommerce.order.domain.OrderItemStatus;
+import com.ecommerce.order.domain.OrderStatus;
 import com.ecommerce.order.exception.InvalidInternalTokenException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 /**
  * V1.1-1: 서비스 간 내부 조회 전용 서비스.
@@ -15,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class InternalOrderService {
+
+    // C1: 실제 재고가 차감된 실구매 상태만 리뷰 자격으로 인정 (미차감 PENDING·전체취소 CANCELLED 제외)
+    private static final Set<OrderStatus> PURCHASED_STATUSES =
+            Set.of(OrderStatus.CONFIRMED, OrderStatus.PARTIALLY_CANCELLED);
 
     private final OrderRepository orderRepository;
 
@@ -35,6 +42,7 @@ public class InternalOrderService {
         if (userId == null || productId == null) {
             return false;
         }
-        return orderRepository.existsPurchasedProduct(userId, productId, OrderItemStatus.ACTIVE);
+        return orderRepository.existsPurchasedProduct(
+                userId, productId, OrderItemStatus.ACTIVE, PURCHASED_STATUSES);
     }
 }
