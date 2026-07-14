@@ -45,6 +45,8 @@ kafka:
 service:
   auth:
     url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  order:
+    url: ${ORDER_SERVICE_URL:http://localhost:8083}
 
 app:
   internal:

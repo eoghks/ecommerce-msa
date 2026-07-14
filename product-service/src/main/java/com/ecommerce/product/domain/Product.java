@@ -21,6 +21,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -65,6 +66,14 @@ public class Product {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    /** 평균 별점 (0.0~5.0) — 리뷰 변경 시 집계 재계산 UPDATE로 갱신 (V1.1-1) */
+    @Column(name = "rating_avg", nullable = false, precision = 2, scale = 1)
+    private BigDecimal ratingAvg;
+
+    /** 리뷰 개수 — 리뷰 변경 시 집계 재계산 UPDATE로 갱신 (V1.1-1) */
+    @Column(name = "rating_count", nullable = false)
+    private int ratingCount;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -84,6 +93,8 @@ public class Product {
         this.sellerId    = sellerId;
         this.category    = category;
         this.status      = ProductStatus.ACTIVE;
+        this.ratingAvg   = BigDecimal.ZERO.setScale(1);
+        this.ratingCount = 0;
     }
 
     /** SELLER 본인 상품인지 확인 */

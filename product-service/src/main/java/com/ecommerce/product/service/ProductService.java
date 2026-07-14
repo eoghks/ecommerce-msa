@@ -225,4 +225,9 @@ public class ProductService {
         redisTemplate.delete(CACHE_DETAIL_PREFIX + id);
         log.debug("상품 상세 캐시 삭제. id={}", id);
     }
+
+    /** 상품 상세 캐시 무효화 — 리뷰 변경 등 외부에서 별점 반영 지연 방지용으로 재사용 (V1.1-1) */
+    public void evictProductDetailCache(Long id) {
+        evictDetailCache(id);
+    }
 }

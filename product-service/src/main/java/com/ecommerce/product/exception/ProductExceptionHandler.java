@@ -14,6 +14,10 @@ public class ProductExceptionHandler {
     /** 위시리스트 추가 경로 판별용 — 이 맥락의 유니크 위반만 멱등 처리한다. */
     private static final String WISHLIST_ADD_PATH_PREFIX = "/api/v1/wishlist/";
 
+    /** 리뷰 작성 경로 판별용 — POST /api/v1/products/{productId}/reviews 의 유니크 위반(중복 리뷰) 메시지 매핑 */
+    private static final String PRODUCTS_PATH_PREFIX = "/api/v1/products/";
+    private static final String REVIEWS_PATH_SUFFIX = "/reviews";
+
     @ExceptionHandler(ProductNotFoundException.class)
     public ProblemDetail handleProductNotFound(ProductNotFoundException e) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
@@ -70,6 +74,41 @@ public class ProductExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ProblemDetail handleReviewNotFound(ReviewNotFoundException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+        pd.setTitle("Review Not Found");
+        return pd;
+    }
+
+    @ExceptionHandler(NotReviewOwnerException.class)
+    public ProblemDetail handleNotReviewOwner(NotReviewOwnerException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setTitle("Forbidden");
+        return pd;
+    }
+
+    @ExceptionHandler(PurchaseRequiredException.class)
+    public ProblemDetail handlePurchaseRequired(PurchaseRequiredException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+        pd.setTitle("Purchase Required");
+        return pd;
+    }
+
+    @ExceptionHandler(DuplicateReviewException.class)
+    public ProblemDetail handleDuplicateReview(DuplicateReviewException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+        pd.setTitle("Duplicate Review");
+        return pd;
+    }
+
+    @ExceptionHandler(UnauthenticatedException.class)
+    public ProblemDetail handleUnauthenticated(UnauthenticatedException e) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+        pd.setTitle("Unauthorized");
+        return pd;
+    }
+
     /**
      * 데이터 무결성 위반 처리.
      * 위시리스트 추가(POST /api/v1/wishlist/{productId}) 동시 요청으로 유니크 제약
@@ -82,7 +121,10 @@ public class ProductExceptionHandler {
         if (isWishlistAddRequest(request)) {
             return ResponseEntity.noContent().build();
         }
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "데이터 무결성 제약을 위반했습니다.");
+        String detail = isReviewCreateRequest(request)
+                ? "이미 이 상품에 작성한 리뷰가 있습니다."
+                : "데이터 무결성 제약을 위반했습니다.";
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, detail);
         pd.setTitle("Data Integrity Violation");
         return ResponseEntity.status(HttpStatus.CONFLICT).body(pd);
     }
@@ -91,5 +133,12 @@ public class ProductExceptionHandler {
     private boolean isWishlistAddRequest(HttpServletRequest request) {
         return "POST".equalsIgnoreCase(request.getMethod())
                 && request.getRequestURI().startsWith(WISHLIST_ADD_PATH_PREFIX);
+    }
+
+    /** POST /api/v1/products/{productId}/reviews 여부 판별 */
+    private boolean isReviewCreateRequest(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && request.getRequestURI().startsWith(PRODUCTS_PATH_PREFIX)
+                && request.getRequestURI().endsWith(REVIEWS_PATH_SUFFIX);
     }
 }

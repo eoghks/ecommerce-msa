@@ -44,6 +44,15 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /** 내부 서비스 인증 실패 → 403 Forbidden */
+    @ExceptionHandler(InvalidInternalTokenException.class)
+    public ProblemDetail handleInvalidInternalToken(InvalidInternalTokenException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Invalid Internal Token");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-internal-token"));
+        return pd;
+    }
+
     /** 본인 항목이 아닌 주문 항목 취소 시도 → 403 Forbidden */
     @ExceptionHandler(OrderItemAccessDeniedException.class)
     public ProblemDetail handleOrderItemAccessDenied(OrderItemAccessDeniedException ex) {
