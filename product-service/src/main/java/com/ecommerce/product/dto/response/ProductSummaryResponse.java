@@ -3,6 +3,8 @@ package com.ecommerce.product.dto.response;
 import com.ecommerce.product.client.UserClient;
 import com.ecommerce.product.domain.Product;
 
+import java.math.BigDecimal;
+
 public record ProductSummaryResponse(
         Long id,
         String name,
@@ -14,7 +16,9 @@ public record ProductSummaryResponse(
         String sellerEmail,  // ADMIN 조회 시에만 채워짐 (그 외 null)
         String status,
         Long categoryId,
-        String categoryName
+        String categoryName,
+        BigDecimal ratingAvg,
+        int ratingCount
 ) {
     /** 공개/일반 목록 — M-4: 판매자 식별자(sellerId)·정보 노출 안 함 */
     public static ProductSummaryResponse from(Product product) {
@@ -29,7 +33,9 @@ public record ProductSummaryResponse(
                 null,
                 product.getStatus().name(),
                 product.getCategory().getId(),
-                product.getCategory().getName()
+                product.getCategory().getName(),
+                product.getRatingAvg(),
+                product.getRatingCount()
         );
     }
 
@@ -46,7 +52,9 @@ public record ProductSummaryResponse(
                 seller != null ? seller.email() : null,
                 product.getStatus().name(),
                 product.getCategory().getId(),
-                product.getCategory().getName()
+                product.getCategory().getName(),
+                product.getRatingAvg(),
+                product.getRatingCount()
         );
     }
 }

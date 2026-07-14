@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProduct } from '../../api/product';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
 import useWishlistStore from '../../store/wishlistStore';
 import WishlistButton from '../../components/common/WishlistButton';
+import StarRating from '../../components/common/StarRating';
+import ReviewSection from '../../components/product/ReviewSection';
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
@@ -20,12 +22,19 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
-  useEffect(() => {
+  const loadProduct = useCallback(() => {
     setLoading(true);
     getProduct(id)
       .then((res) => setProduct(res.data))
       .catch(() => setError('상품을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => { loadProduct(); }, [loadProduct]);
+
+  // 리뷰 변경 시 상세(평균 별점) 재조회 — 별점 즉시 반영
+  const refreshRating = useCallback(() => {
+    getProduct(id).then((res) => setProduct(res.data)).catch(() => {});
   }, [id]);
 
   /* 로그인 상태면 찜 ID 집합 로드 (하트 표시용) */
@@ -107,6 +116,15 @@ const ProductDetailPage = () => {
             </div>
           </div>
 
+          {/* 평균 별점 (★ x.x, n개) */}
+          <div className="flex items-center gap-2">
+            <StarRating value={Number(product.ratingAvg) || 0} size="sm" />
+            <span className="text-[13px] text-gray-600">
+              {Number(product.ratingAvg ?? 0).toFixed(1)}
+              <span className="text-gray-400"> ({product.ratingCount ?? 0}개)</span>
+            </span>
+          </div>
+
           {/* 가격 */}
           <p className="text-2xl sm:text-3xl font-bold text-gray-900 m-0">
             {formatPrice(product.price)}
@@ -183,6 +201,9 @@ const ProductDetailPage = () => {
           )}
         </div>
       </div>
+
+      {/* 리뷰 탭 — 목록 + 작성/수정/삭제 */}
+      <ReviewSection productId={product.id} onChanged={refreshRating} />
     </div>
   );
 };
