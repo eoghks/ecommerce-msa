@@ -20,7 +20,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
      * V1.1-1: 상품 평균 별점/개수 재계산 UPDATE (집계).
      * 리뷰 생성/수정/삭제 후 같은 트랜잭션에서 호출한다. 증분이 아닌 재계산으로 최종 일관성 보장.
      */
-    @Modifying(clearAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
             UPDATE product p SET
               rating_count = (SELECT count(*) FROM review r WHERE r.product_id = p.id),

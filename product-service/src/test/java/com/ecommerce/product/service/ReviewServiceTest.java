@@ -153,6 +153,18 @@ class ReviewServiceTest {
                 .isInstanceOf(ReviewNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("경로 productId와 리뷰의 실제 productId 불일치 수정 — 404, 재계산 없음")
+    void updateReview_productMismatch() {
+        Review review = buildReview(USER_ID);   // 리뷰 실제 productId=PRODUCT_ID(10)
+        given(reviewRepository.findById(100L)).willReturn(Optional.of(review));
+
+        assertThatThrownBy(() -> reviewService.updateReview(
+                999L, 100L, USER_ID, new UpdateReviewRequest(3, "수정함")))
+                .isInstanceOf(ReviewNotFoundException.class);
+        verify(reviewRepository, never()).recalculateRating(any());
+    }
+
     // ── 삭제 ──────────────────────────────────────────────
 
     @Test
@@ -188,6 +200,18 @@ class ReviewServiceTest {
         assertThatThrownBy(() -> reviewService.deleteReview(PRODUCT_ID, 100L, 999L, "USER"))
                 .isInstanceOf(NotReviewOwnerException.class);
         verify(reviewRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("경로 productId와 리뷰의 실제 productId 불일치 삭제 — 404, 삭제·재계산 없음")
+    void deleteReview_productMismatch() {
+        Review review = buildReview(USER_ID);   // 리뷰 실제 productId=PRODUCT_ID(10)
+        given(reviewRepository.findById(100L)).willReturn(Optional.of(review));
+
+        assertThatThrownBy(() -> reviewService.deleteReview(999L, 100L, USER_ID, "USER"))
+                .isInstanceOf(ReviewNotFoundException.class);
+        verify(reviewRepository, never()).delete(any());
+        verify(reviewRepository, never()).recalculateRating(any());
     }
 
     private Review buildReview(Long ownerId) {

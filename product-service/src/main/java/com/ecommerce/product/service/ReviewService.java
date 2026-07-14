@@ -19,7 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @Service
@@ -49,7 +48,7 @@ public class ReviewService {
                 .productId(productId)
                 .userId(userId)
                 .rating(request.rating())
-                .content(sanitize(request.content()))
+                .content(request.content())
                 .build());
         refreshRating(productId);
         return ReviewResponse.from(review);
@@ -59,12 +58,12 @@ public class ReviewService {
     @Transactional
     public ReviewResponse updateReview(Long productId, Long reviewId, Long userId, UpdateReviewRequest request) {
         requireUser(userId);
-        Review review = loadReview(reviewId);
+        Review review = loadReviewOfProduct(reviewId, productId);
         if (!review.isOwnedBy(userId)) {
             throw new NotReviewOwnerException(reviewId);
         }
-        review.update(request.rating(), sanitize(request.content()));
-        refreshRating(productId);
+        review.update(request.rating(), request.content());
+        refreshRating(review.getProductId());
         return ReviewResponse.from(review);
     }
 
@@ -72,12 +71,12 @@ public class ReviewService {
     @Transactional
     public void deleteReview(Long productId, Long reviewId, Long userId, String role) {
         requireUser(userId);
-        Review review = loadReview(reviewId);
+        Review review = loadReviewOfProduct(reviewId, productId);
         if (!review.isOwnedBy(userId) && !ROLE_ADMIN.equals(role)) {
             throw new NotReviewOwnerException(reviewId);
         }
         reviewRepository.delete(review);
-        refreshRating(productId);
+        refreshRating(review.getProductId());
     }
 
     /** 리뷰 목록 조회 (공개, 최신순 페이징) */
@@ -112,8 +111,15 @@ public class ReviewService {
                 .orElseThrow(() -> new ReviewNotFoundException(reviewId));
     }
 
-    /** XSS 방지 — 내용 HTML 이스케이프. null이면 그대로 null */
-    private String sanitize(String content) {
-        return content == null ? null : HtmlUtils.htmlEscape(content);
+    /**
+     * H1: 경로 productId에 속한 리뷰만 로드한다.
+     * 리뷰의 실제 소속 상품과 경로가 다르면 404로 거부해, 별점 재계산이 엉뚱한 상품에 적용되는 정합 붕괴를 막는다.
+     */
+    private Review loadReviewOfProduct(Long reviewId, Long productId) {
+        Review review = loadReview(reviewId);
+        if (!review.getProductId().equals(productId)) {
+            throw new ReviewNotFoundException(reviewId);
+        }
+        return review;
     }
 }
