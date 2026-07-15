@@ -1,17 +1,23 @@
 package com.ecommerce.order.service;
 
 import com.ecommerce.order.client.ProductClient;
+import com.ecommerce.order.domain.Address;
+import com.ecommerce.order.domain.DeliveryStatus;
 import com.ecommerce.order.domain.FailedOrderLog;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
+import com.ecommerce.order.dto.ShippingInfo;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
 import com.ecommerce.order.event.OrderItemCancelledEvent;
+import com.ecommerce.order.exception.DeliveryStatusAccessDeniedException;
+import com.ecommerce.order.exception.InvalidOrderShippingException;
 import com.ecommerce.order.exception.OrderItemAccessDeniedException;
 import com.ecommerce.order.exception.OrderItemNotFoundException;
 import com.ecommerce.order.exception.OrderNotFoundException;
+import com.ecommerce.order.repository.AddressRepository;
 import com.ecommerce.order.repository.FailedOrderLogRepository;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,11 +38,16 @@ public class OrderService {
     /** 재고 확보 실패 자동취소 시 남기는 일반화된 사유 (민감정보 노출 방지) */
     private static final String AUTO_CANCEL_REASON = "재고 확보 실패(자동취소)";
 
+    /** 권한 판정용 역할 코드 */
+    private static final String ROLE_ADMIN  = "ADMIN";
+    private static final String ROLE_SELLER = "SELLER";
+
     private final OrderRepository            orderRepository;
     private final ProductClient              productClient;
     private final OrderPersistenceService    orderPersistenceService;
     private final ApplicationEventPublisher  applicationEventPublisher;
     private final FailedOrderLogRepository   failedOrderLogRepository;
+    private final AddressRepository          addressRepository;
 
     /**
      * 주문 생성.
@@ -45,12 +56,39 @@ public class OrderService {
      * 3. ApplicationEvent 등록 → AFTER_COMMIT 시 Kafka 발행 (C-01 수정)
      */
     public OrderResponse createOrder(Long userId, OrderCreateRequest request) {
+        // V1.1-3: 배송지 스냅샷 확정 — 주소록 선택(addressId) 또는 직접입력
+        ShippingInfo shipping = resolveShipping(userId, request);
+
         // @Transactional 외부에서 상품 조회 — 외부 HTTP 호출 중 DB 커넥션 점유 방지 (M-04)
         List<OrderItem> items = fetchOrderItems(request);
         long totalPrice = items.stream().mapToLong(OrderItem::subtotal).sum();
 
         // 별도 빈 호출 → 프록시 경유로 @Transactional 정상 적용 → AFTER_COMMIT 이벤트 발행 보장
-        return orderPersistenceService.saveAndPublish(userId, totalPrice, items, request);
+        return orderPersistenceService.saveAndPublish(userId, totalPrice, items, shipping);
+    }
+
+    /**
+     * 배송지 스냅샷 확정.
+     * addressId 지정 시 본인 소유 주소를 스냅샷으로 복사(무효 시 400),
+     * 미지정 시 직접입력(receiver/phone/address) 필수(누락 시 400).
+     */
+    private ShippingInfo resolveShipping(Long userId, OrderCreateRequest request) {
+        if (request.addressId() != null) {
+            Address address = addressRepository.findById(request.addressId())
+                    .filter(a -> a.isOwnedBy(userId))
+                    .orElseThrow(() -> new InvalidOrderShippingException(
+                            "유효하지 않은 배송지입니다. addressId=" + request.addressId()));
+            return new ShippingInfo(address.getReceiver(), address.getPhone(), address.getAddress());
+        }
+        if (isBlank(request.receiver()) || isBlank(request.phone()) || isBlank(request.address())) {
+            throw new InvalidOrderShippingException(
+                    "배송지를 직접 입력하거나 저장된 배송지를 선택해주세요.");
+        }
+        return new ShippingInfo(request.receiver(), request.phone(), request.address());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /** 상품 정보 조회 및 OrderItem 생성 — 트랜잭션 외부 실행 */
@@ -167,6 +205,33 @@ public class OrderService {
                     new OrderItemCancelledEvent(
                             orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
         });
+    }
+
+    /**
+     * V1.1-3: 배송상태 변경. PREPARING→SHIPPING→DELIVERED 전진만(전이 검증은 도메인).
+     * 권한: ADMIN 전체 / SELLER는 주문에 본인 상품이 포함된 경우만. 그 외 403.
+     */
+    @Transactional
+    public OrderResponse updateDeliveryStatus(Long orderId, DeliveryStatus next, Long userId, String role) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (!canManageDelivery(order, userId, role)) {
+            throw new DeliveryStatusAccessDeniedException(orderId);
+        }
+
+        order.advanceDeliveryStatus(next);
+        // TODO(V1.1-4): 배송상태 변경 알림 이벤트 발행 지점 (MVP 미구현 — 훅 자리만 표시)
+        log.info("배송상태 변경. orderId={}, next={}, by={}({})", orderId, next, userId, role);
+        return OrderResponse.from(order);
+    }
+
+    /** 배송상태 변경 권한 판정 — ADMIN 전체, SELLER는 본인 상품 포함 주문만 */
+    private boolean canManageDelivery(Order order, Long userId, String role) {
+        if (ROLE_ADMIN.equals(role)) {
+            return true;
+        }
+        return ROLE_SELLER.equals(role) && order.hasSellerItem(userId);
     }
 
     /** 주문 상세 조회 — 본인 주문만 허용 */

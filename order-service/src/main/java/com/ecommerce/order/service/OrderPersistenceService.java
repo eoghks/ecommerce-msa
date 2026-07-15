@@ -2,7 +2,7 @@ package com.ecommerce.order.service;
 
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
-import com.ecommerce.order.dto.request.OrderCreateRequest;
+import com.ecommerce.order.dto.ShippingInfo;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.event.OrderCreatedEvent;
@@ -36,13 +36,13 @@ public class OrderPersistenceService {
 
     @Transactional
     public OrderResponse saveAndPublish(Long userId, long totalPrice,
-                                        List<OrderItem> items, OrderCreateRequest request) {
+                                        List<OrderItem> items, ShippingInfo shipping) {
         Order order = Order.builder()
                 .userId(userId)
                 .totalPrice(totalPrice)
-                .receiver(request.receiver())
-                .phone(request.phone())
-                .address(request.address())
+                .receiver(shipping.receiver())
+                .phone(shipping.phone())
+                .address(shipping.address())
                 .items(items)
                 .build();
         Order savedOrder = orderRepository.save(order);

@@ -1,5 +1,6 @@
 package com.ecommerce.order.dto.response;
 
+import com.ecommerce.order.domain.DeliveryStatus;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderStatus;
 
@@ -10,6 +11,7 @@ public record OrderResponse(
         Long id,
         Long userId,
         OrderStatus status,
+        DeliveryStatus deliveryStatus,
         Long totalPrice,
         List<OrderItemResponse> items,
         String receiver,
@@ -23,6 +25,7 @@ public record OrderResponse(
                 order.getId(),
                 order.getUserId(),
                 order.getStatus(),
+                order.getDeliveryStatus(),
                 order.getTotalPrice(),
                 order.getItems().stream().map(OrderItemResponse::from).toList(),
                 order.getReceiver(),
@@ -47,6 +50,7 @@ public record OrderResponse(
                 order.getId(),
                 order.getUserId(),
                 order.getStatus(),
+                order.getDeliveryStatus(),
                 sellerTotal,
                 myItems,
                 order.getReceiver(),

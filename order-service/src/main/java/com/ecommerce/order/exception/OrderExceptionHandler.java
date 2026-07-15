@@ -70,4 +70,49 @@ public class OrderExceptionHandler {
         pd.setType(URI.create(ERROR_TYPE_BASE + "/order-state-conflict"));
         return pd;
     }
+
+    /** 배송지 조회 실패(없음/타인 소유) → 404 Not Found */
+    @ExceptionHandler(AddressNotFoundException.class)
+    public ProblemDetail handleAddressNotFound(AddressNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Address Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/address-not-found"));
+        return pd;
+    }
+
+    /** 인증 정보(X-User-Id) 부재 → 401 Unauthorized */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        pd.setTitle("Unauthorized");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/unauthorized"));
+        return pd;
+    }
+
+    /** 잘못된 배송상태 전이/대상 아닌 주문 → 400 Bad Request */
+    @ExceptionHandler(InvalidDeliveryStatusException.class)
+    public ProblemDetail handleInvalidDeliveryStatus(InvalidDeliveryStatusException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Delivery Status");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-delivery-status"));
+        return pd;
+    }
+
+    /** 배송상태 변경 권한 없음 → 403 Forbidden */
+    @ExceptionHandler(DeliveryStatusAccessDeniedException.class)
+    public ProblemDetail handleDeliveryStatusAccessDenied(DeliveryStatusAccessDeniedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Forbidden");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/delivery-status-forbidden"));
+        return pd;
+    }
+
+    /** 주문 배송지 정보 유효하지 않음(addressId 무효/직접입력 누락) → 400 Bad Request */
+    @ExceptionHandler(InvalidOrderShippingException.class)
+    public ProblemDetail handleInvalidOrderShipping(InvalidOrderShippingException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Order Shipping");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-order-shipping"));
+        return pd;
+    }
 }
