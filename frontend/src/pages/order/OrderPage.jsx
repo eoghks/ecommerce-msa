@@ -1,20 +1,57 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import useCartStore from '../../store/cartStore';
 import { createOrder } from '../../api/order';
+import { getMyAddresses } from '../../api/address';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
+// 직접입력 옵션 값 (주소록 미선택)
+const DIRECT_INPUT = '';
+
 const OrderPage = () => {
   const navigate = useNavigate();
   const { items, totalPrice, clear } = useCartStore();
+
+  const [addresses, setAddresses] = useState([]);
+  const [selectedId, setSelectedId] = useState(DIRECT_INPUT); // 선택한 주소록 id ('' = 직접입력)
 
   const [address, setAddress] = useState('');
   const [receiver, setReceiver] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 주소록 로드 후 기본 배송지 자동 선택 → 폼 자동 채움
+  useEffect(() => {
+    getMyAddresses()
+      .then((res) => {
+        const list = res.data ?? [];
+        setAddresses(list);
+        const preset = list.find((a) => a.isDefault) ?? list[0];
+        if (preset) applyAddress(preset);
+      })
+      .catch(() => {/* 주소록 없으면 직접입력으로 진행 */});
+  }, []);
+
+  const applyAddress = (a) => {
+    setSelectedId(String(a.id));
+    setReceiver(a.receiver);
+    setPhone(a.phone);
+    setAddress(a.address);
+  };
+
+  const handleSelect = (e) => {
+    const value = e.target.value;
+    setSelectedId(value);
+    if (value === DIRECT_INPUT) {
+      setReceiver(''); setPhone(''); setAddress('');
+      return;
+    }
+    const found = addresses.find((a) => String(a.id) === value);
+    if (found) applyAddress(found);
+  };
 
   if (items.length === 0) {
     return (
@@ -42,8 +79,14 @@ const OrderPage = () => {
         price: i.price,
         quantity: i.quantity,
       }));
-      // HR-05: 배송 정보 함께 전송
-      await createOrder(orderItems, { receiver, phone, address });
+      // 저장된 배송지를 선택하고 값을 수정하지 않았으면 addressId 스냅샷 사용, 그 외엔 직접입력
+      const selected = addresses.find((a) => String(a.id) === selectedId);
+      const unchanged = selected
+        && selected.receiver === receiver && selected.phone === phone && selected.address === address;
+      const payload = unchanged
+        ? { addressId: selected.id }
+        : { receiver, phone, address };
+      await createOrder(orderItems, payload);
       await clear();
       navigate('/orders', { state: { ordered: true } });
     } catch (err) {
@@ -97,8 +140,27 @@ const OrderPage = () => {
 
         {/* 배송 정보 */}
         <section className="bg-white border border-gray-100 rounded-2xl p-5">
-          <h2 className="text-[14px] font-semibold text-gray-700 mb-4 m-0">배송 정보</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-[14px] font-semibold text-gray-700 m-0">배송 정보</h2>
+            <Link to="/my/addresses" className="text-[12px] text-brand-600 no-underline hover:underline">
+              배송지 관리
+            </Link>
+          </div>
           <div className="flex flex-col gap-3">
+            {/* 주소록 선택 드롭다운 — 저장된 배송지가 있을 때만 */}
+            {addresses.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <label className="field-label">배송지 선택</label>
+                <select value={selectedId} onChange={handleSelect} className="input-field pl-3">
+                  <option value="">직접 입력</option>
+                  {addresses.map((a) => (
+                    <option key={a.id} value={String(a.id)}>
+                      {a.receiver} · {a.address}{a.isDefault ? ' (기본)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className="field-label">수령인</label>
               <input

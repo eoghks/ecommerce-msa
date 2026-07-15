@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllOrders, getSellerOrders, cancelOrderItem } from '../../api/order';
+import { getAllOrders, getSellerOrders, cancelOrderItem, updateDeliveryStatus } from '../../api/order';
 import useAuthStore from '../../store/authStore';
 
 const formatPrice = (p) =>
@@ -11,6 +11,16 @@ const STATUS_LABEL = {
   PARTIALLY_CANCELLED: { text: '부분 취소',   color: '#f97316' },
   CANCELLED:           { text: '취소됨',     color: '#9ca3af' },
 };
+
+// V1.1-3: 배송 진행 상태 라벨 + 전이 순서
+const DELIVERY_LABEL = {
+  PREPARING: { text: '배송 준비중', color: '#6366f1' },
+  SHIPPING:  { text: '배송중',     color: '#0ea5e9' },
+  DELIVERED: { text: '배송완료',   color: '#22c55e' },
+};
+// 현재 상태에서 전진 가능한 다음 상태 (없으면 완료)
+const NEXT_DELIVERY = { PREPARING: 'SHIPPING', SHIPPING: 'DELIVERED' };
+const DELIVERABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 const AdminOrderPage = () => {
   const { role } = useAuthStore();
@@ -55,6 +65,21 @@ const AdminOrderPage = () => {
     }
   };
 
+  // V1.1-3: 배송상태 전진
+  const [deliveryBusy, setDeliveryBusy] = useState(null); // 처리 중인 orderId
+  const advanceDelivery = async (orderId, next) => {
+    setDeliveryBusy(orderId);
+    setError('');
+    try {
+      await updateDeliveryStatus(orderId, next);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.detail || '배송상태 변경에 실패했습니다.');
+    } finally {
+      setDeliveryBusy(null);
+    }
+  };
+
   const formatDate = (d) =>
     d ? new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
@@ -82,6 +107,9 @@ const AdminOrderPage = () => {
         <div className="flex flex-col gap-4">
           {orders.map((order) => {
             const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
+            const deliverable = DELIVERABLE_STATUSES.includes(order.status);
+            const delivery = deliverable ? DELIVERY_LABEL[order.deliveryStatus] : null;
+            const nextDelivery = deliverable ? NEXT_DELIVERY[order.deliveryStatus] : null;
             return (
               <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-5">
                 {/* 헤더 */}
@@ -89,9 +117,25 @@ const AdminOrderPage = () => {
                   <div className="flex items-center gap-2">
                     <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
                       style={{ background: status.color }}>{status.text}</span>
+                    {/* V1.1-3: 배송상태 뱃지 */}
+                    {delivery && (
+                      <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
+                        style={{ background: delivery.color }}>{delivery.text}</span>
+                    )}
                     <span className="text-[12px] text-gray-400">{formatDate(order.createdAt)}</span>
                   </div>
-                  <span className="text-[12px] text-gray-300">#{order.id}</span>
+                  <div className="flex items-center gap-2">
+                    {/* V1.1-3: 배송상태 전진 컨트롤 — 다음 단계만 노출 */}
+                    {nextDelivery && (
+                      <button onClick={() => advanceDelivery(order.id, nextDelivery)}
+                        disabled={deliveryBusy === order.id}
+                        className="h-7 px-2.5 text-[11px] font-medium text-white rounded-lg border-none disabled:opacity-60"
+                        style={{ background: DELIVERY_LABEL[nextDelivery].color }}>
+                        {deliveryBusy === order.id ? '변경 중...' : `${DELIVERY_LABEL[nextDelivery].text}(으)로`}
+                      </button>
+                    )}
+                    <span className="text-[12px] text-gray-300">#{order.id}</span>
+                  </div>
                 </div>
 
                 {/* 배송 정보 */}
