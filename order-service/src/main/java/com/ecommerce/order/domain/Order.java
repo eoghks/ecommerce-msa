@@ -4,11 +4,14 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import com.ecommerce.order.exception.InvalidDeliveryStatusException;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -54,6 +57,11 @@ public class Order {
     @Column(length = 300)
     private String address;
 
+    // V1.1-3: 배송 진행 상태 — 준비중→배송중→배송완료. OrderStatus와 별도 축
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status", nullable = false, length = 20)
+    private DeliveryStatus deliveryStatus;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -74,6 +82,7 @@ public class Order {
         this.phone      = phone;
         this.address    = address;
         this.status     = OrderStatus.PENDING;
+        this.deliveryStatus = DeliveryStatus.PREPARING;
         if (items != null) {
             items.forEach(this::addItem);
         }
@@ -188,6 +197,37 @@ public class Order {
         }
         recalculateAfterCancel();
         return Optional.of(target);
+    }
+
+    /**
+     * V1.1-3: 배송상태 변경 대상 주문인지.
+     * 배송상태는 재고가 차감된(CONFIRMED/PARTIALLY_CANCELLED) 주문에서만 의미가 있다.
+     * PENDING(미확정)·CANCELLED(취소)는 진행 대상이 아니다.
+     */
+    public boolean isDeliverable() {
+        return this.status == OrderStatus.CONFIRMED
+                || this.status == OrderStatus.PARTIALLY_CANCELLED;
+    }
+
+    /** 주문 항목 중 해당 판매자의 상품이 있는지 — 판매자 배송상태 변경 권한 판정용 */
+    public boolean hasSellerItem(Long sellerId) {
+        return items.stream().anyMatch(item -> item.isOwnedBy(sellerId));
+    }
+
+    /**
+     * V1.1-3: 배송상태 전진. PREPARING→SHIPPING→DELIVERED 순서만 허용.
+     * 대상 아닌 주문 상태·역행/건너뜀/동일 상태 재설정은 InvalidDeliveryStatusException(400).
+     */
+    public void advanceDeliveryStatus(DeliveryStatus next) {
+        if (!isDeliverable()) {
+            throw new InvalidDeliveryStatusException(
+                    "배송상태를 변경할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
+        if (!this.deliveryStatus.canAdvanceTo(next)) {
+            throw new InvalidDeliveryStatusException(
+                    "잘못된 배송상태 전이입니다: " + this.deliveryStatus + " → " + next);
+        }
+        this.deliveryStatus = next;
     }
 
     private void recalculateAfterCancel() {
