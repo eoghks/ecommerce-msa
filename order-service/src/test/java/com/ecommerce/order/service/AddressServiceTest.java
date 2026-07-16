@@ -134,6 +134,48 @@ class AddressServiceTest {
     }
 
     @Test
+    @DisplayName("deleteAddress — 기본 배송지 삭제 시 남은 최신 주소를 기본으로 자동 승격")
+    void deleteAddress_defaultPromotesRemaining() {
+        Address target    = address(10L, USER_ID, true);
+        Address remaining = address(20L, USER_ID, false);
+        given(addressRepository.findById(10L)).willReturn(Optional.of(target));
+        given(addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(USER_ID))
+                .willReturn(List.of(remaining));
+
+        addressService.deleteAddress(USER_ID, 10L);
+
+        then(addressRepository).should().delete(target);
+        then(addressRepository).should().flush();
+        assertThat(remaining.isDefault()).isTrue();
+    }
+
+    @Test
+    @DisplayName("deleteAddress — 기본 배송지 삭제 후 남은 주소 없으면 승격 없음")
+    void deleteAddress_defaultNoRemaining() {
+        Address target = address(10L, USER_ID, true);
+        given(addressRepository.findById(10L)).willReturn(Optional.of(target));
+        given(addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(USER_ID))
+                .willReturn(List.of());
+
+        addressService.deleteAddress(USER_ID, 10L);
+
+        then(addressRepository).should().delete(target);
+        then(addressRepository).should().flush();
+    }
+
+    @Test
+    @DisplayName("deleteAddress — 기본 아닌 주소 삭제 시 승격 로직 미동작")
+    void deleteAddress_nonDefaultNoPromotion() {
+        Address target = address(10L, USER_ID, false);
+        given(addressRepository.findById(10L)).willReturn(Optional.of(target));
+
+        addressService.deleteAddress(USER_ID, 10L);
+
+        then(addressRepository).should().delete(target);
+        then(addressRepository).should(never()).flush();
+    }
+
+    @Test
     @DisplayName("deleteAddress — 존재하지 않는 주소 → 404")
     void deleteAddress_notFound() {
         given(addressRepository.findById(10L)).willReturn(Optional.empty());

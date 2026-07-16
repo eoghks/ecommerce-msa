@@ -55,11 +55,19 @@ public class AddressService {
         return AddressResponse.from(address);
     }
 
-    /** 배송지 삭제 (본인 소유만) */
+    /** 배송지 삭제 (본인 소유만) — 기본 배송지 삭제 시 남은 주소 중 최신 1건을 기본으로 자동 승격 */
     @Transactional
     public void deleteAddress(Long userId, Long addressId) {
         Address address = findOwned(userId, addressId);
+        boolean wasDefault = address.isDefault();
         addressRepository.delete(address);
+        if (wasDefault) {
+            // 유일성 인덱스 충돌 방지: 삭제를 먼저 DB 에 반영한 뒤 다른 주소를 기본으로 승격한다.
+            addressRepository.flush();
+            addressRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(userId).stream()
+                    .findFirst()
+                    .ifPresent(Address::markDefault);
+        }
     }
 
     /** 기본 배송지 지정 (본인 소유만) — 기존 기본은 해제하여 유일성 보장 */
@@ -68,7 +76,11 @@ public class AddressService {
         Address target = findOwned(userId, addressId);
         addressRepository.findByUserIdAndIsDefaultTrue(userId)
                 .filter(current -> !current.getId().equals(target.getId()))
-                .ifPresent(Address::unmarkDefault);
+                .ifPresent(current -> {
+                    current.unmarkDefault();
+                    // 유일성 인덱스 충돌 방지: 기존 기본 해제를 먼저 DB 에 반영한 뒤 신규를 지정한다.
+                    addressRepository.flush();
+                });
         target.markDefault();
         return AddressResponse.from(target);
     }

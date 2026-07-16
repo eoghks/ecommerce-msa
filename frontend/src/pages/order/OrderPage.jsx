@@ -90,7 +90,7 @@ const OrderPage = () => {
       await clear();
       navigate('/orders', { state: { ordered: true } });
     } catch (err) {
-      setError(err.response?.data?.message || '주문 처리 중 오류가 발생했습니다.');
+      setError(err.response?.data?.detail || '주문 처리 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

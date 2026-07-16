@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 
 public record AddressResponse(
         Long id,
-        Long userId,
         String receiver,
         String phone,
         String address,
@@ -17,7 +16,6 @@ public record AddressResponse(
     public static AddressResponse from(Address address) {
         return new AddressResponse(
                 address.getId(),
-                address.getUserId(),
                 address.getReceiver(),
                 address.getPhone(),
                 address.getAddress(),

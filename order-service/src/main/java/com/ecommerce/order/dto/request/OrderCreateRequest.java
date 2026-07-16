@@ -2,6 +2,7 @@ package com.ecommerce.order.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -20,7 +21,9 @@ public record OrderCreateRequest(
         @Size(max = 100)
         String receiver,
 
+        // addressId 사용 시엔 미전송(null)이라 @Pattern 을 통과. 직접 입력 시에만 형식 검증.
         @Size(max = 20)
+        @Pattern(regexp = "^0\\d{1,2}-?\\d{3,4}-?\\d{4}$", message = "올바른 전화번호 형식이 아닙니다.")
         String phone,
 
         @Size(max = 300)
