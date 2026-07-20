@@ -44,6 +44,15 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /** 알림 없음/타인 소유 알림 접근 → 404 Not Found (정보 노출 방지) */
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ProblemDetail handleNotificationNotFound(NotificationNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Notification Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/notification-not-found"));
+        return pd;
+    }
+
     /** 내부 서비스 인증 실패 → 403 Forbidden */
     @ExceptionHandler(InvalidInternalTokenException.class)
     public ProblemDetail handleInvalidInternalToken(InvalidInternalTokenException ex) {
