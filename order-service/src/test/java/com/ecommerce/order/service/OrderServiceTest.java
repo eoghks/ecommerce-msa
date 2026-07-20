@@ -3,6 +3,7 @@ package com.ecommerce.order.service;
 import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.domain.Address;
 import com.ecommerce.order.domain.DeliveryStatus;
+import com.ecommerce.order.domain.NotificationType;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.domain.OrderStatus;
@@ -59,6 +60,7 @@ class OrderServiceTest {
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private com.ecommerce.order.repository.FailedOrderLogRepository failedOrderLogRepository;
     @Mock private AddressRepository         addressRepository;
+    @Mock private NotificationService       notificationService;
 
     // ── 주문 생성 ──────────────────────────────────────────────────
 
@@ -620,6 +622,133 @@ class OrderServiceTest {
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).orderId()).isEqualTo(1L);
         assertThat(result.getContent().get(0).reason()).isEqualTo("재고 확보 실패(자동취소)");
+    }
+
+    // ── V1.1-4: 알림 생성 트리거 ──────────────────────────────────────
+
+    @Test
+    @DisplayName("알림: confirmOrder — PENDING→CONFIRMED 전이 시 ORDER_CONFIRMED 생성")
+    void notify_confirmOrder() {
+        Order order = buildOrder(5L, 10L, "상품", 10_000L, 1);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.confirmOrder(1L);
+
+        then(notificationService).should(times(1))
+                .create(5L, NotificationType.ORDER_CONFIRMED, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: confirmOrder — 이미 CONFIRMED(멱등)면 알림 미생성")
+    void notify_confirmOrder_idempotent_noNotify() {
+        Order order = buildOrder(5L, 10L, "상품", 10_000L, 1);
+        order.confirm();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.confirmOrder(1L);
+
+        then(notificationService).should(never())
+                .create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("알림: cancelOrder(Saga 자동취소) — 실제 취소 전이 시 ORDER_CANCELLED 생성")
+    void notify_cancelOrder_saga() {
+        Order order = buildOrder(5L, 10L, "상품", 10_000L, 1);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrder(1L, "재고 부족");
+
+        then(notificationService).should(times(1))
+                .create(5L, NotificationType.ORDER_CANCELLED, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: cancelOrder — 이미 CANCELLED(멱등)면 알림 미생성")
+    void notify_cancelOrder_idempotent_noNotify() {
+        Order order = buildOrder(5L, 10L, "상품", 10_000L, 1);
+        order.cancel();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrder(1L, "재고 부족");
+
+        then(notificationService).should(never())
+                .create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("알림: cancelByUser — 사용자 취소 시 ORDER_CANCELLED 생성")
+    void notify_cancelByUser() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelByUser(1L, 1L, null);
+
+        then(notificationService).should(times(1))
+                .create(1L, NotificationType.ORDER_CANCELLED, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: cancelByUser — 이미 취소된 주문 재취소(no-op)면 알림 미생성")
+    void notify_cancelByUser_alreadyCancelled_noNotify() {
+        Order order = buildOrder(1L, 10L, "상품", 10_000L, 1);
+        order.cancel();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelByUser(1L, 1L, null);
+
+        then(notificationService).should(never())
+                .create(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("알림: cancelOrderItem — 실제 항목 취소 전이 시 ORDER_ITEM_CANCELLED 생성")
+    void notify_cancelOrderItem() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "재고 소진", 7L, "SELLER");
+
+        then(notificationService).should(times(1))
+                .create(order.getUserId(), NotificationType.ORDER_ITEM_CANCELLED, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: cancelOrderItem — 이미 취소된 항목 재취소(멱등)면 알림 미생성")
+    void notify_cancelOrderItem_idempotent_noNotify() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "사유", 7L, "SELLER");
+        orderService.cancelOrderItem(1L, 1L, "재시도", 7L, "SELLER");
+
+        then(notificationService).should(times(1))
+                .create(order.getUserId(), NotificationType.ORDER_ITEM_CANCELLED, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: updateDeliveryStatus — SHIPPING 전이 시 DELIVERY_SHIPPING 생성")
+    void notify_deliveryShipping() {
+        Order order = buildMultiSellerOrder(new long[]{7L}, new long[]{20_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.updateDeliveryStatus(1L, DeliveryStatus.SHIPPING, 999L, "ADMIN");
+
+        then(notificationService).should(times(1))
+                .create(order.getUserId(), NotificationType.DELIVERY_SHIPPING, 1L);
+    }
+
+    @Test
+    @DisplayName("알림: updateDeliveryStatus — DELIVERED 전이 시 DELIVERY_DELIVERED 생성")
+    void notify_deliveryDelivered() {
+        Order order = buildMultiSellerOrder(new long[]{7L}, new long[]{20_000L});
+        order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.updateDeliveryStatus(1L, DeliveryStatus.DELIVERED, 999L, "ADMIN");
+
+        then(notificationService).should(times(1))
+                .create(order.getUserId(), NotificationType.DELIVERY_DELIVERED, 1L);
     }
 
     // ── helper ──────────────────────────────────────────────────────

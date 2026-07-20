@@ -4,6 +4,7 @@ import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.domain.Address;
 import com.ecommerce.order.domain.DeliveryStatus;
 import com.ecommerce.order.domain.FailedOrderLog;
+import com.ecommerce.order.domain.NotificationType;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.dto.ShippingInfo;
@@ -48,6 +49,7 @@ public class OrderService {
     private final ApplicationEventPublisher  applicationEventPublisher;
     private final FailedOrderLogRepository   failedOrderLogRepository;
     private final AddressRepository          addressRepository;
+    private final NotificationService        notificationService;
 
     /**
      * 주문 생성.
@@ -116,7 +118,12 @@ public class OrderService {
     public void confirmOrder(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
+        // 실제 PENDING→CONFIRMED 전이가 일어난 경우에만 알림 생성(멱등 재전달 시 중복 방지)
+        boolean wasPending = order.getStatus() == com.ecommerce.order.domain.OrderStatus.PENDING;
         order.confirm();
+        if (wasPending) {
+            notificationService.create(order.getUserId(), NotificationType.ORDER_CONFIRMED, orderId);
+        }
         log.info("주문 확정 완료. orderId={}", orderId);
     }
 
@@ -137,6 +144,7 @@ public class OrderService {
                     .userId(order.getUserId())
                     .reason(AUTO_CANCEL_REASON)   // 일반화된 사유만 기록 (원본 reason 미노출)
                     .build());
+            notificationService.create(order.getUserId(), NotificationType.ORDER_CANCELLED, orderId);
         }
         log.warn("주문 자동 취소 처리. orderId={}, reason={}", orderId, reason);
     }
@@ -204,6 +212,7 @@ public class OrderService {
             applicationEventPublisher.publishEvent(new OrderItemCancelledApplicationEvent(
                     new OrderItemCancelledEvent(
                             orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
+            notificationService.create(order.getUserId(), NotificationType.ORDER_ITEM_CANCELLED, orderId);
         });
     }
 
@@ -221,7 +230,9 @@ public class OrderService {
         }
 
         order.advanceDeliveryStatus(next);
-        // TODO(V1.1-4): 배송상태 변경 알림 이벤트 발행 지점 (MVP 미구현 — 훅 자리만 표시)
+        // V1.1-4: 배송상태 전이에 맞춰 배송 알림 생성(준비중 등 대상 아님이면 미생성)
+        NotificationType.fromDeliveryStatus(next).ifPresent(type ->
+                notificationService.create(order.getUserId(), type, orderId));
         log.info("배송상태 변경. orderId={}, next={}, by={}({})", orderId, next, userId, role);
         return OrderResponse.from(order);
     }
@@ -277,6 +288,7 @@ public class OrderService {
                         new OrderItemCancelledEvent(
                                 orderId, item.getId(), item.getProductId(), item.getQuantity()))));
 
+        notificationService.create(order.getUserId(), NotificationType.ORDER_CANCELLED, orderId);
         log.info("사용자 주문 취소. orderId={}, userId={}, 복구항목수={}",
                 orderId, userId, restockTargets.size());
     }
