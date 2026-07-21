@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
 import useWishlistStore from '../../store/wishlistStore';
+import useNotificationStore from '../../store/notificationStore';
 import { logout } from '../../api/auth';
 
 const Navbar = () => {
@@ -10,28 +11,62 @@ const Navbar = () => {
   const { isAuthenticated, role, logout: clearAuth } = useAuthStore();
   const totalCount = useCartStore((s) => s.totalCount());
   const resetWishlist = useWishlistStore((s) => s.reset);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const notifItems = useNotificationStore((s) => s.items);
+  const startPolling = useNotificationStore((s) => s.startPolling);
+  const stopPolling = useNotificationStore((s) => s.stopPolling);
+  const fetchNotifList = useNotificationStore((s) => s.fetchList);
+  const markNotifRead = useNotificationStore((s) => s.markRead);
+  const markAllNotifRead = useNotificationStore((s) => s.markAllRead);
+  const resetNotifications = useNotificationStore((s) => s.reset);
   const [myOpen, setMyOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const myRef = useRef(null);
   const mobileRef = useRef(null);
+  const notifRef = useRef(null);
 
   // 드롭다운/모바일 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const handler = (e) => {
       if (myRef.current && !myRef.current.contains(e.target)) setMyOpen(false);
       if (mobileRef.current && !mobileRef.current.contains(e.target)) setMobileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // 로그인 시에만 미읽음 폴링 시작, 로그아웃/언마운트 시 중단
+  useEffect(() => {
+    if (isAuthenticated) startPolling();
+    else stopPolling();
+    return () => stopPolling();
+  }, [isAuthenticated, startPolling, stopPolling]);
+
   // 라우트 이동 시 모바일 메뉴 닫기
   const closeMobile = () => setMobileOpen(false);
+
+  // 알림 종 토글 — 열 때 최신 목록 조회
+  const toggleNotif = () => {
+    setNotifOpen((v) => {
+      if (!v) fetchNotifList();
+      return !v;
+    });
+  };
+
+  // 알림 항목 클릭 — 읽음 처리 후 관련 주문으로 이동
+  const handleNotifClick = (notif) => {
+    markNotifRead(notif.id);
+    setNotifOpen(false);
+    if (notif.orderId) navigate('/orders');
+  };
 
   const handleLogout = async () => {
     try { await logout(); } catch (_) { /* 서버 오류 무시 */ }
     clearAuth();
     resetWishlist();
+    resetNotifications();
     closeMobile();
     navigate('/login');
   };
@@ -99,6 +134,58 @@ const Navbar = () => {
 
           {isAuthenticated ? (
             <>
+              {/* 알림 종 — 미읽음 뱃지 + 드롭다운 */}
+              <div ref={notifRef} className="relative">
+                <button
+                  onClick={toggleNotif}
+                  aria-label="알림"
+                  className="relative flex items-center justify-center w-[38px] h-[38px] rounded-lg hover:bg-gray-100 transition-colors bg-transparent border-none"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-[3px] bg-red-500 text-white text-[10px] font-bold rounded-lg flex items-center justify-center">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {notifOpen && (
+                  <div className="absolute top-[calc(100%+8px)] right-0 w-[320px] max-h-[420px] overflow-y-auto bg-white rounded-xl z-[200]"
+                    style={{ border: '1px solid #e5e7eb', boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}>
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <span className="text-[13px] font-bold text-gray-800">알림</span>
+                      {notifItems.length > 0 && (
+                        <button
+                          onClick={markAllNotifRead}
+                          className="text-[12px] font-medium text-brand-600 bg-transparent border-none hover:underline"
+                        >
+                          모두 읽음
+                        </button>
+                      )}
+                    </div>
+                    {notifItems.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-[13px] text-gray-400">알림이 없습니다.</div>
+                    ) : (
+                      notifItems.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => handleNotifClick(n)}
+                          className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors bg-transparent border-x-0 border-t-0 hover:bg-gray-50 ${n.isRead ? '' : 'bg-brand-50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {!n.isRead && <span className="w-2 h-2 rounded-full bg-brand-600 shrink-0" />}
+                            <span className="text-[13px] font-semibold text-gray-800">{n.title}</span>
+                          </div>
+                          <p className="mt-1 text-[12px] text-gray-600 leading-snug">{n.message}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* MY 드롭다운 — md 이상 */}
               <div ref={myRef} className="relative hidden md:block">
                 <button
@@ -135,6 +222,14 @@ const Navbar = () => {
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                       </svg>
                       내 주문
+                    </Link>
+                    <Link to="/my/addresses"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors"
+                      onClick={() => setMyOpen(false)}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                      </svg>
+                      배송지 관리
                     </Link>
                     <Link to="/my/wishlist"
                       className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors"
@@ -210,6 +305,12 @@ const Navbar = () => {
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                       </svg>
                       내 주문
+                    </Link>
+                    <Link to="/my/addresses" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+                      </svg>
+                      배송지 관리
                     </Link>
                     <Link to="/my/wishlist" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

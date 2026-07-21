@@ -12,6 +12,16 @@ const STATUS_LABEL = {
   CANCELLED:           { text: '취소됨',     color: '#9ca3af' },
 };
 
+// V1.1-3: 배송 진행 상태 뱃지 라벨
+const DELIVERY_LABEL = {
+  PREPARING: { text: '배송 준비중', color: '#6366f1' },
+  SHIPPING:  { text: '배송중',     color: '#0ea5e9' },
+  DELIVERED: { text: '배송완료',   color: '#22c55e' },
+};
+
+// 배송상태는 재고 차감된(확정/부분취소) 주문에서만 의미
+const DELIVERABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+
 // M-N3: 사용자가 취소 가능한 상태 (이미 전체취소된 CANCELLED 제외)
 const CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
 
@@ -90,6 +100,9 @@ const OrderCard = ({ order, onCancelled }) => {
     : '';
   const cancellable = CANCELLABLE_STATUSES.includes(order.status);
   const reviewable = REVIEWABLE_STATUSES.includes(order.status);
+  const delivery = DELIVERABLE_STATUSES.includes(order.status)
+    ? DELIVERY_LABEL[order.deliveryStatus]
+    : null;
 
   // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)
   const handleCancel = () => {
@@ -113,6 +126,13 @@ const OrderCard = ({ order, onCancelled }) => {
             style={{ background: status.color }}>
             {status.text}
           </span>
+          {/* V1.1-3: 배송상태 뱃지 */}
+          {delivery && (
+            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
+              style={{ background: delivery.color }}>
+              {delivery.text}
+            </span>
+          )}
           <span className="text-[12px] text-gray-400">{date}</span>
         </div>
         <span className="text-[12px] text-gray-300">#{order.id}</span>

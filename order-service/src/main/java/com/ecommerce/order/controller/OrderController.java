@@ -1,5 +1,6 @@
 package com.ecommerce.order.controller;
 
+import com.ecommerce.order.dto.request.DeliveryStatusUpdateRequest;
 import com.ecommerce.order.dto.request.OrderCancelRequest;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemCancelRequest;
@@ -116,5 +117,20 @@ public class OrderController {
     ) {
         orderService.cancelOrderItem(orderId, itemId, request.reason(), userId, role);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 배송상태 변경 (ADMIN 전체 / SELLER 본인 상품 포함 주문). PREPARING→SHIPPING→DELIVERED 전진만.
+     */
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SELLER')")
+    @PatchMapping("/{orderId}/delivery-status")
+    public ResponseEntity<OrderResponse> updateDeliveryStatus(
+            @RequestHeader("X-User-Id") Long userId,
+            @RequestHeader("X-User-Role") String role,
+            @PathVariable Long orderId,
+            @Valid @RequestBody DeliveryStatusUpdateRequest request
+    ) {
+        return ResponseEntity.ok(
+                orderService.updateDeliveryStatus(orderId, request.status(), userId, role));
     }
 }
