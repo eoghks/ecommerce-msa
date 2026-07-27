@@ -16,8 +16,9 @@
 
 - **JWT RS256**: RSA 비대칭키 서명 — 서비스 기동 시 2048bit 키페어 생성 (`@PostConstruct`)
 - **Access Token**: 1시간(3600000ms), Response Body로 반환
-- **Refresh Token**: 7일, UUID, Response Body로 반환, Redis 저장 + Rotation
-- **RBAC**: USER / ADMIN 두 가지 역할
+- **Refresh Token**: 7일, UUID, **HttpOnly 쿠키**로 전달(바디 미노출, XSS 방어), Redis 저장 + 원자적 회전(Rotation)
+- **RBAC**: USER / SELLER / ADMIN 세 가지 역할 (판매자 신청 시 USER→SELLER 승격)
+- **서비스 간 사용자 조회**: `X-Internal-Token`으로 인증되는 내부 전용 `/users` (product-service 판매자 정보 표시)
 - **BCrypt**: 비밀번호 해싱 (Spring Security `PasswordEncoder`)
 - **Flyway**: DB 마이그레이션 (`V1__init_schema.sql`)
 - **커스텀 예외**: `DuplicateEmailException` → 409, `InvalidCredentialsException` → 401, `InvalidTokenException` → 401 (`AuthExceptionHandler` 처리)
@@ -41,4 +42,11 @@
 - [x] Spring Security 설정 (STATELESS, CSRF disable)
 - [x] Gateway JWT 화이트리스트 필터 (`JwtAuthenticationFilter`)
 - [x] Gateway JWT 서명 검증 완성 (Week 2 Day 5)
-- [ ] `/api/v1/auth/me` 내 정보 조회 API
+- [x] `/api/v1/auth/me` 내 정보 조회 API
+
+## V1.1 확장
+- [x] Refresh Token HttpOnly 쿠키 전달 + 원자적 회전 (CR-02)
+- [x] 판매자 신청·승격 (`POST /seller/apply`) — USER→SELLER, phone 저장 (V3/V4 마이그레이션)
+- [x] 비밀번호 찾기 (`POST /forgot-password`) — 임시 비밀번호 발급
+- [x] 서비스 간 사용자 요약 조회 (`GET /users`, X-Internal-Token 내부 전용)
+- [x] JWKS 공개키 엔드포인트 (`/.well-known/jwks.json`)

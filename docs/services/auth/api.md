@@ -1,8 +1,9 @@
 # Auth Service API
 
 Base URL: `/api/v1/auth`  
-Gateway 화이트리스트 (JWT 불필요): `/login`, `/signup`, `/refresh`, `/check-email`, `/.well-known/jwks.json`  
-JWT 필요: `/logout`, `/me`, `/change-password`
+Gateway 화이트리스트 (JWT 불필요): `/login`, `/signup`, `/refresh`, `/check-email`, `/forgot-password`, `/.well-known/jwks.json`  
+JWT 필요: `/logout`, `/me`, `/change-password`, `/seller/apply`  
+내부 전용 (X-Internal-Token, 게이트웨이 화이트리스트 제외): `/users`
 
 ---
 
@@ -184,6 +185,65 @@ Set-Cookie: refreshToken=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax
 ```json
 { "available": true }
 ```
+
+---
+
+## 비밀번호 찾기
+
+### `POST /api/v1/auth/forgot-password`
+
+> 비인증 공개 엔드포인트 — 임시 비밀번호 발급 (로그인 후 변경 유도)
+
+**Request**
+```json
+{ "email": "user@example.com" }
+```
+
+**Response** `200 OK`
+```json
+{ "message": "임시 비밀번호를 발급했습니다.", "tempPassword": "..." }
+```
+> `tempPassword`는 dev 환경에서만 반환되고 운영에서는 null.
+
+---
+
+## 판매자 신청
+
+### `POST /api/v1/auth/seller/apply`
+
+> **JWT 필요** — mock 인증 통과 시 USER → SELLER 승격, 전화번호 저장
+
+**Request**
+```json
+{ "phone": "010-1234-5678" }
+```
+
+**Response** `200 OK`
+```json
+{ "message": "판매자로 승격되었습니다.", "accessToken": "eyJhbGci...", "expiresIn": 3600000 }
+```
+> 역할이 SELLER로 바뀌므로 새 role이 반영된 Access Token을 즉시 재발급.
+
+---
+
+## 서비스 간 사용자 조회 (내부 전용)
+
+### `GET /api/v1/auth/users?ids={id1,id2}`
+
+> **X-Internal-Token 필수** — product-service가 판매자 정보(요약)를 표시하기 위한 서비스 간 직접 호출.
+> 게이트웨이 화이트리스트에서 제외되어 외부 접근 불가.
+
+**Response** `200 OK`
+```json
+[
+  { "id": 1, "name": "홍길동", "email": "user@example.com" }
+]
+```
+
+**Error**
+| 상태코드 | 사유 |
+|---------|------|
+| 401 | 내부 토큰 없음/불일치 |
 
 ---
 
