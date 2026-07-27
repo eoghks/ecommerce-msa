@@ -23,7 +23,7 @@
 
 | 키 패턴 | 저장 값 | TTL | 무효화 트리거 |
 |---------|---------|-----|--------------|
-| `product:detail:{productId}` | 상품 상세 JSON | 10분 (조회 시 리셋) | 해당 상품 수정/삭제 |
+| `product:detail:{productId}` | 상품 상세 JSON | 10분 (조회 시 리셋) | 해당 상품 수정/삭제, 리뷰 변경(평균 별점 재계산) |
 
 > 조회할 때마다 TTL을 10분 리셋하여 자주 조회되는 인기 상품은 캐시에서 유지.  
 > `allkeys-lru` 정책과 조합되어 인기 상품은 메모리 부족 시에도 삭제 후순위가 됨.
@@ -45,7 +45,14 @@
   └─▶ ProductService.update/delete()
         ├─▶ DB 트랜잭션 처리
         └─▶ Redis DEL product:detail:{id}  (단건 삭제)
+
+리뷰 작성/수정/삭제 발생 (V1.1-1)
+  └─▶ ReviewService → refreshRating()
+        ├─▶ product.rating_avg / rating_count 재계산 UPDATE
+        └─▶ ProductService.evictProductDetailCache() → Redis DEL product:detail:{id}
 ```
+
+> 상세 캐시에 평균 별점이 포함되므로 리뷰 변경 시에도 반드시 무효화한다.
 
 ### 직렬화
 
