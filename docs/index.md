@@ -5,6 +5,24 @@
 
 ---
 
+## 설계 문서 (V1.1)
+
+| 문서 | 내용 |
+|------|------|
+| [design/wishlist.md](design/wishlist.md) | 위시리스트(찜) 설계 (V1.1-2) |
+| [design/search-enhancement.md](design/search-enhancement.md) | 상품 검색 고도화 — 정렬·가격필터·자동완성 (V1.1-8) |
+| [design/review-rating.md](design/review-rating.md) | 상품 리뷰·별점 (V1.1-1) |
+| [design/delivery-address.md](design/delivery-address.md) | 배송지 관리 + 배송 상태 (V1.1-3) |
+| [design/notification.md](design/notification.md) | 알림(주문·배송) (V1.1-4) |
+
+## 운영
+
+| 문서 | 내용 |
+|------|------|
+| [deploy-checklist.md](deploy-checklist.md) | 운영 배포 전 보안·설정 체크리스트 |
+
+---
+
 ## 인프라 / 공통
 
 | 기능 | 구현 파일 | 서비스 문서 | 관련 규칙 |
