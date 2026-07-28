@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { getMe, changePassword, applyForSeller } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
+import type { ApiErrorResponse, UserProfile } from '../../types';
 
-const getPasswordStrength = (pw) => {
+interface PasswordStrength {
+  level: number;
+  label: string;
+  color: string;
+}
+
+const getPasswordStrength = (pw: string): PasswordStrength => {
   if (!pw) return { level: 0, label: '', color: '' };
   let score = 0;
   if (pw.length >= 8) score++;
@@ -24,9 +32,9 @@ const MyProfilePage = () => {
 
   const { login: setToken } = useAuthStore();
 
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pwOpen, setPwOpen] = useState(forceChange);
+  const [pwOpen, setPwOpen] = useState<boolean>(forceChange);
 
   // 판매자 신청
   const [sellerPhone, setSellerPhone] = useState('');
@@ -44,7 +52,7 @@ const MyProfilePage = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const handlePwChange = (e) => {
+  const handlePwChange = (e: ChangeEvent<HTMLInputElement>) => {
     setPwError('');
     setPwForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   };
@@ -54,7 +62,7 @@ const MyProfilePage = () => {
     if (pwOpen) { setPwForm({ current: '', next: '', confirm: '' }); setPwError(''); }
   };
 
-  const handlePwSubmit = async (e) => {
+  const handlePwSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setPwError('');
     if (!pwForm.current || !pwForm.next || !pwForm.confirm) { setPwError('모든 항목을 입력해주세요.'); return; }
@@ -64,11 +72,11 @@ const MyProfilePage = () => {
     }
     setPwLoading(true);
     try {
-      await changePassword(profile.email, pwForm.current, pwForm.next);
+      await changePassword(profile!.email, pwForm.current, pwForm.next);
       clearAuth();
       navigate('/login', { state: { message: '비밀번호가 변경되었습니다. 다시 로그인해주세요.' } });
     } catch (err) {
-      setPwError(err.response?.data?.message || '현재 비밀번호가 올바르지 않습니다.');
+      setPwError((err as AxiosError<ApiErrorResponse>).response?.data?.message || '현재 비밀번호가 올바르지 않습니다.');
     } finally {
       setPwLoading(false);
     }
@@ -82,21 +90,21 @@ const MyProfilePage = () => {
       const res = await applyForSeller(sellerPhone.trim());
       const { accessToken, message } = res.data;
       setToken(accessToken);           // 새 JWT(SELLER role)로 스토어 갱신
-      setProfile((p) => ({ ...p, role: 'SELLER', phone: sellerPhone.trim() }));
+      setProfile((p) => ({ ...p!, role: 'SELLER', phone: sellerPhone.trim() }));
       setSellerMsg(message);
     } catch (err) {
-      setSellerError(err.response?.data?.detail || '판매자 신청에 실패했습니다.');
+      setSellerError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '판매자 신청에 실패했습니다.');
     } finally {
       setSellerLoading(false);
     }
   };
 
-  const formatDate = (dateStr) => {
+  const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const getInitial = (name) => (name ? name.charAt(0).toUpperCase() : '?');
+  const getInitial = (name?: string) => (name ? name.charAt(0).toUpperCase() : '?');
 
   if (loading) return (
     <div className="flex justify-center items-center h-[300px]">

@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import useCartStore from '../../store/cartStore';
 import { createOrder } from '../../api/order';
 import { getMyAddresses } from '../../api/address';
+import type { Address, ApiErrorResponse, OrderAddressPayload } from '../../types';
 
-const formatPrice = (price) =>
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 // 직접입력 옵션 값 (주소록 미선택)
@@ -14,7 +16,7 @@ const OrderPage = () => {
   const navigate = useNavigate();
   const { items, totalPrice, clear } = useCartStore();
 
-  const [addresses, setAddresses] = useState([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedId, setSelectedId] = useState(DIRECT_INPUT); // 선택한 주소록 id ('' = 직접입력)
 
   const [address, setAddress] = useState('');
@@ -35,14 +37,14 @@ const OrderPage = () => {
       .catch(() => {/* 주소록 없으면 직접입력으로 진행 */});
   }, []);
 
-  const applyAddress = (a) => {
+  const applyAddress = (a: Address) => {
     setSelectedId(String(a.id));
     setReceiver(a.receiver);
     setPhone(a.phone);
     setAddress(a.address);
   };
 
-  const handleSelect = (e) => {
+  const handleSelect = (e: ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedId(value);
     if (value === DIRECT_INPUT) {
@@ -64,7 +66,7 @@ const OrderPage = () => {
     );
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!receiver.trim() || !phone.trim() || !address.trim()) {
       setError('수령인, 연락처, 배송지를 모두 입력해주세요.');
@@ -83,14 +85,14 @@ const OrderPage = () => {
       const selected = addresses.find((a) => String(a.id) === selectedId);
       const unchanged = selected
         && selected.receiver === receiver && selected.phone === phone && selected.address === address;
-      const payload = unchanged
-        ? { addressId: selected.id }
+      const payload: OrderAddressPayload = unchanged
+        ? { addressId: selected!.id }
         : { receiver, phone, address };
       await createOrder(orderItems, payload);
       await clear();
       navigate('/orders', { state: { ordered: true } });
     } catch (err) {
-      setError(err.response?.data?.detail || '주문 처리 중 오류가 발생했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '주문 처리 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

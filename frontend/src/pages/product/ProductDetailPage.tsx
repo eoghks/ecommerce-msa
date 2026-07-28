@@ -7,7 +7,8 @@ import useWishlistStore from '../../store/wishlistStore';
 import WishlistButton from '../../components/common/WishlistButton';
 import StarRating from '../../components/common/StarRating';
 import ReviewSection from '../../components/product/ReviewSection';
-const formatPrice = (price) =>
+import type { Product } from '../../types';
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const ProductDetailPage = () => {
@@ -16,7 +17,7 @@ const ProductDetailPage = () => {
   const { isAuthenticated } = useAuthStore();
   const fetchWishlistIds = useWishlistStore((s) => s.fetchIds);
 
-  const [product, setProduct] = useState(null);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -24,7 +25,7 @@ const ProductDetailPage = () => {
 
   const loadProduct = useCallback(() => {
     setLoading(true);
-    getProduct(id)
+    getProduct(id!)
       .then((res) => setProduct(res.data))
       .catch(() => setError('상품을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
@@ -34,7 +35,7 @@ const ProductDetailPage = () => {
 
   // 리뷰 변경 시 상세(평균 별점) 재조회 — 별점 즉시 반영
   const refreshRating = useCallback(() => {
-    getProduct(id).then((res) => setProduct(res.data)).catch(() => {});
+    getProduct(id!).then((res) => setProduct(res.data)).catch(() => {});
   }, [id]);
 
   /* 로그인 상태면 찜 ID 집합 로드 (하트 표시용) */
@@ -42,11 +43,12 @@ const ProductDetailPage = () => {
     if (isAuthenticated) fetchWishlistIds();
   }, [isAuthenticated, fetchWishlistIds]);
 
-  const handleQuantity = (delta) => {
+  const handleQuantity = (delta: number) => {
     setQuantity((q) => Math.max(1, Math.min(product?.stock ?? 1, q + delta)));
   };
 
   const handleAddCart = async () => {
+    if (!product) return;
     try {
       await addItem(product, quantity);
       setAdded(true);
@@ -72,6 +74,9 @@ const ProductDetailPage = () => {
       </Link>
     </div>
   );
+
+  // 로딩·에러가 아니면 상품이 로드된 상태 — strict null 대비 방어 가드
+  if (!product) return null;
 
   return (
     <div className="max-w-[900px] mx-auto px-4">

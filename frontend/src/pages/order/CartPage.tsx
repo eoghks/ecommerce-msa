@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
+import type { CartItem as CartItemType } from '../../types';
 
-const formatPrice = (price) =>
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 const CartPage = () => {
@@ -98,8 +99,14 @@ const CartPage = () => {
   );
 };
 
+interface CartItemProps {
+  item: CartItemType;
+  onUpdateQuantity: (productId: number, quantity: number) => Promise<void>;
+  onRemove: (productId: number) => Promise<void>;
+}
+
 /** 개별 장바구니 아이템 */
-const CartItem = ({ item, onUpdateQuantity, onRemove }) => (
+const CartItem = ({ item, onUpdateQuantity, onRemove }: CartItemProps) => (
   <div className="flex items-center gap-4 bg-white border border-gray-100 rounded-2xl p-4">
     {/* 이미지 */}
     <div className="w-16 h-16 shrink-0 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-100">

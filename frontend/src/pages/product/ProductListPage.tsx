@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type FormEvent, type MouseEvent } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { getProducts, getCategories, getProductSuggestions } from '../../api/product';
 import useCartStore from '../../store/cartStore';
 import useAuthStore from '../../store/authStore';
 import useWishlistStore from '../../store/wishlistStore';
 import WishlistButton from '../../components/common/WishlistButton';
+import type { Category, Product } from '../../types';
 
-const formatPrice = (price) =>
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
 /* 정렬 옵션 — 서버 화이트리스트 키와 일치 */
@@ -20,14 +21,14 @@ const SORT_OPTIONS = [
 const SUGGEST_DEBOUNCE_MS = 250;
 
 /* 상품 카드 */
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product }: { product: Product }) => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const addItem = useCartStore((s) => s.addItem);
   const [added, setAdded] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  const handleAddCart = (e) => {
+  const handleAddCart = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
@@ -130,8 +131,14 @@ const ProductCard = ({ product }) => {
   );
 };
 
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}
+
 /* 페이지네이션 */
-const Pagination = ({ page, totalPages, onChange }) => {
+const Pagination = ({ page, totalPages, onChange }: PaginationProps) => {
   if (totalPages <= 1) return null;
 
   // 최대 7페이지 표시
@@ -192,8 +199,8 @@ const ProductListPage = () => {
   const { isAuthenticated } = useAuthStore();
   const fetchWishlistIds = useWishlistStore((s) => s.fetchIds);
 
-  const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -214,9 +221,9 @@ const ProductListPage = () => {
   const [priceError, setPriceError] = useState('');
 
   // 자동완성 상태
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestTimer = useRef(null);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* 카테고리 목록 로드 */
   useEffect(() => {
@@ -234,7 +241,7 @@ const ProductListPage = () => {
   const fetchProducts = useCallback(() => {
     setLoading(true);
     setError('');
-    const params = { page, size, sort };
+    const params: Record<string, unknown> = { page, size, sort };
     if (keyword) params.keyword = keyword;
     if (categoryId) params.categoryId = categoryId;
     if (minPrice) params.minPrice = minPrice;
@@ -265,11 +272,11 @@ const ProductListPage = () => {
         .then((res) => setSuggestions(res.data ?? []))
         .catch(() => setSuggestions([]));
     }, SUGGEST_DEBOUNCE_MS);
-    return () => clearTimeout(suggestTimer.current);
+    return () => { if (suggestTimer.current) clearTimeout(suggestTimer.current); };
   }, [inputKeyword]);
 
   /* 키워드로 검색 실행 (검색바·자동완성 공통) */
-  const runSearch = (value) => {
+  const runSearch = (value: string) => {
     setKeyword(value);
     setShowSuggestions(false);
     setSearchParams((prev) => {
@@ -281,19 +288,19 @@ const ProductListPage = () => {
     });
   };
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     runSearch(inputKeyword);
   };
 
   /* 자동완성 후보 선택 → 즉시 검색 */
-  const handleSelectSuggestion = (name) => {
+  const handleSelectSuggestion = (name: string) => {
     setInputKeyword(name);
     runSearch(name);
   };
 
   /* 정렬 변경 */
-  const handleSort = (value) => {
+  const handleSort = (value: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('sort', value);
@@ -324,29 +331,29 @@ const ProductListPage = () => {
     });
   };
 
-  const handleCategory = (id) => {
+  const handleCategory = (id: string | number) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (id) next.set('categoryId', id);
+      if (id) next.set('categoryId', String(id));
       else next.delete('categoryId');
       next.delete('page');
       return next;
     });
   };
 
-  const handlePage = (p) => {
+  const handlePage = (p: number) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set('page', p);
+      next.set('page', String(p));
       return next;
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSize = (s) => {
+  const handleSize = (s: number) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      next.set('size', s);
+      next.set('size', String(s));
       next.delete('page'); // 사이즈 변경 시 1페이지로 초기화
       return next;
     });

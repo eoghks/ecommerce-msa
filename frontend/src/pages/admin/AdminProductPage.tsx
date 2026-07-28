@@ -1,25 +1,36 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from 'react';
+import type { AxiosError } from 'axios';
 import { getCategories, getProducts, getMyProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, banProduct, unbanProduct } from '../../api/product';
 import useAuthStore from '../../store/authStore';
+import type { ApiErrorResponse, Category, Product, ProductPayload } from '../../types';
 
-const EMPTY_FORM = { name: '', description: '', price: '', stock: '', imageUrl: '', categoryId: '' };
+interface ProductFormState {
+  name: string;
+  description: string;
+  price: string | number;
+  stock: string | number;
+  imageUrl: string;
+  categoryId: string | number;
+}
+
+const EMPTY_FORM: ProductFormState = { name: '', description: '', price: '', stock: '', imageUrl: '', categoryId: '' };
 
 const AdminProductPage = () => {
   const { role } = useAuthStore();
   const isAdmin = role === 'ADMIN';
 
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // null = 신규, product = 수정
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [editing, setEditing] = useState<Product | null>(null); // null = 신규, product = 수정
+  const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [deleteId, setDeleteId] = useState(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [imgUploading, setImgUploading] = useState(false);
   const [imgPreview, setImgPreview] = useState('');
-  const fileRef = useRef(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -28,7 +39,7 @@ const AdminProductPage = () => {
         getCategories(),
         isAdmin ? getProducts({ size: 100, includeBanned: true }) : getMyProducts({ size: 100 }),
       ]);
-      setCategories(catRes.data.content ?? catRes.data ?? []);
+      setCategories(catRes.data ?? []);
       setProducts(prodRes.data.content ?? []);
     } catch {
       setError('상품 목록을 불러오지 못했습니다.');
@@ -39,7 +50,7 @@ const AdminProductPage = () => {
 
   useEffect(() => { load(); }, []);
 
-  const handleImageFile = async (e) => {
+  const handleImageFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImgPreview(URL.createObjectURL(file));
@@ -62,7 +73,7 @@ const AdminProductPage = () => {
     setFormOpen(true);
   };
 
-  const openEdit = (p) => {
+  const openEdit = (p: Product) => {
     setEditing(p);
     setImgPreview(p.imageUrl ?? '');
     setForm({
@@ -74,7 +85,7 @@ const AdminProductPage = () => {
     setFormOpen(true);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.name || !form.price || form.stock === '' || !form.categoryId) {
@@ -87,7 +98,7 @@ const AdminProductPage = () => {
       setError('재고는 0 이상이어야 합니다.'); return;
     }
     setSubmitting(true);
-    const payload = {
+    const payload: ProductPayload = {
       name: form.name, description: form.description,
       price: Number(form.price), stock: Number(form.stock),
       imageUrl: form.imageUrl || null, categoryId: Number(form.categoryId),
@@ -101,24 +112,24 @@ const AdminProductPage = () => {
       setFormOpen(false);
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '저장에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '저장에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     try {
       await deleteProduct(id);
       setDeleteId(null);
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '삭제에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '삭제에 실패했습니다.');
       setDeleteId(null);
     }
   };
 
-  const handleBanToggle = async (product) => {
+  const handleBanToggle = async (product: Product) => {
     try {
       if (product.status === 'BANNED') {
         await unbanProduct(product.id);
@@ -127,11 +138,11 @@ const AdminProductPage = () => {
       }
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '판매 상태 변경에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '판매 상태 변경에 실패했습니다.');
     }
   };
 
-  const formatPrice = (p) =>
+  const formatPrice = (p: number) =>
     new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(p);
 
   return (
@@ -184,13 +195,13 @@ const AdminProductPage = () => {
               <div className="flex flex-col gap-1.5">
                 <label className="field-label">가격 (원) *</label>
                 <input className="input-field" type="number" value={form.price}
-                  onChange={(e) => setForm(p => ({ ...p, price: Math.max(0, e.target.value) }))}
+                  onChange={(e) => setForm(p => ({ ...p, price: Math.max(0, Number(e.target.value)) }))}
                   placeholder="0" min="1" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="field-label">재고 *</label>
                 <input className="input-field" type="number" value={form.stock}
-                  onChange={(e) => setForm(p => ({ ...p, stock: Math.max(0, e.target.value) }))}
+                  onChange={(e) => setForm(p => ({ ...p, stock: Math.max(0, Number(e.target.value)) }))}
                   placeholder="0" min="0" />
               </div>
             </div>

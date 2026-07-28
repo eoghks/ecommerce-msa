@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { forgotPassword } from '../../api/auth';
+import type { ApiErrorResponse } from '../../types';
 
 const IconShop = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,7 +32,7 @@ const ForgotPasswordPage = () => {
     return () => { document.body.style.background = ''; };
   }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email) { setError('이메일을 입력해주세요.'); return; }
@@ -40,7 +42,8 @@ const ForgotPasswordPage = () => {
       setSubmitted(true);
       if (res.data.tempPassword) setTempPassword(res.data.tempPassword);
     } catch (err) {
-      setError(err.response?.data?.detail || err.response?.data?.message || '이메일 조회에 실패했습니다.');
+      const data = (err as AxiosError<ApiErrorResponse>).response?.data;
+      setError(data?.detail || data?.message || '이메일 조회에 실패했습니다.');
     } finally {
       setLoading(false);
     }

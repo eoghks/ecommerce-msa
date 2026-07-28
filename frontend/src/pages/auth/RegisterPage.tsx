@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { register, checkEmail } from '../../api/auth';
+import type { ApiErrorResponse } from '../../types';
 
 const IconUser = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -37,7 +39,13 @@ const IconShop = () => (
   </svg>
 );
 
-const getPasswordStrength = (pw) => {
+interface PasswordStrength {
+  level: number;
+  label: string;
+  color: string;
+}
+
+const getPasswordStrength = (pw: string): PasswordStrength => {
   if (!pw) return { level: 0, label: '', color: '' };
   let score = 0;
   if (pw.length >= 8) score++;
@@ -64,7 +72,7 @@ const RegisterPage = () => {
 
   const pwStrength = getPasswordStrength(form.password);
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setError('');
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -86,7 +94,7 @@ const RegisterPage = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.name || !form.email || !form.password || !form.passwordConfirm) { setError('모든 항목을 입력해주세요.'); return; }
@@ -102,13 +110,13 @@ const RegisterPage = () => {
       await register(form.email, form.password, form.name);
       navigate('/login', { state: { registered: true } });
     } catch (err) {
-      setError(err.response?.data?.message || '회원가입에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.message || '회원가입에 실패했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls = (name) =>
+  const inputCls = (name: string) =>
     `input-field ${focused === name ? 'border-brand-600 shadow-[0_0_0_3px_rgba(79,70,229,0.12)]' : ''}`;
 
   const renderEmailStatus = () => {

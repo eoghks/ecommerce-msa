@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { login } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
 import { mergeGuestCart } from '../../api/cart';
+import type { ApiErrorResponse } from '../../types';
 
 const IconEmail = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -37,7 +39,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const sessionMsg = sessionStorage.getItem('loginMessage') || '';
   if (sessionMsg) sessionStorage.removeItem('loginMessage');
-  const [info, setInfo] = useState(location.state?.message || sessionMsg);
+  const [info] = useState(location.state?.message || sessionMsg);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState('');
 
@@ -46,12 +48,12 @@ const LoginPage = () => {
     return () => { document.body.style.background = ''; };
   }, []);
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setError('');
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.email || !form.password) {
@@ -78,14 +80,14 @@ const LoginPage = () => {
         navigate(from || '/products');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.';
+      const msg = (err as AxiosError<ApiErrorResponse>).response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.';
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls = (name) =>
+  const inputCls = (name: string) =>
     `input-field ${focused === name ? 'border-brand-600 shadow-[0_0_0_3px_rgba(79,70,229,0.12)]' : ''}`;
 
   return (

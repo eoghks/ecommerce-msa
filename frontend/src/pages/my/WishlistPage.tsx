@@ -1,23 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type MouseEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { getMyWishlist } from '../../api/wishlist';
 import useWishlistStore from '../../store/wishlistStore';
+import type { ApiErrorResponse, WishlistItem } from '../../types';
 
 const PAGE_SIZE = 20;
 
-const formatPrice = (price) =>
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
-const formatDate = (dateStr) => {
+const formatDate = (dateStr?: string) => {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
+interface WishlistCardProps {
+  item: WishlistItem;
+  onRemove: (productId: number) => Promise<void>;
+}
+
 /* 찜 목록 항목 카드 */
-const WishlistCard = ({ item, onRemove }) => {
+const WishlistCard = ({ item, onRemove }: WishlistCardProps) => {
   const banned = item.status === '판매중지';
 
-  const handleRemove = async (e) => {
+  const handleRemove = async (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     await onRemove(item.productId);
@@ -83,7 +90,7 @@ const WishlistPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const removeWish = useWishlistStore((s) => s.remove);
 
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<WishlistItem[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -107,7 +114,7 @@ const WishlistPage = () => {
   useEffect(() => { fetchWishlist(); }, [fetchWishlist]);
 
   /* 해제 → 목록에서 즉시 제거(낙관적), 실패 시 재조회로 복원 */
-  const handleRemove = async (productId) => {
+  const handleRemove = async (productId: number) => {
     const prev = items;
     setItems((list) => list.filter((i) => i.productId !== productId));
     setTotalElements((n) => Math.max(0, n - 1));
@@ -117,15 +124,15 @@ const WishlistPage = () => {
       // 낙관적 제거 원복 + 실패 사유 노출
       setItems(prev);
       setTotalElements((n) => n + 1);
-      setError(err?.response?.data?.detail || '찜 해제에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>)?.response?.data?.detail || '찜 해제에 실패했습니다.');
       fetchWishlist();
     }
   };
 
-  const handlePage = (p) => {
+  const handlePage = (p: number) => {
     setSearchParams((prevParams) => {
       const next = new URLSearchParams(prevParams);
-      next.set('page', p);
+      next.set('page', String(p));
       return next;
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -1,29 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { AxiosError } from 'axios';
 import { getReviews, createReview, updateReview, deleteReview } from '../../api/product';
 import useAuthStore from '../../store/authStore';
 import StarRating from '../common/StarRating';
+import type { ApiErrorResponse, Review } from '../../types';
 
 const PAGE_SIZE = 10;
 const MAX_CONTENT = 1000;
 
 // 서버 실패 메시지 추출 — ProblemDetail(detail) 우선
-const resolveError = (err, fallback) => err?.response?.data?.detail || fallback;
+const resolveError = (err: unknown, fallback: string): string =>
+  (err as AxiosError<ApiErrorResponse>)?.response?.data?.detail || fallback;
 
-const formatDate = (v) =>
+const formatDate = (v?: string | null): string =>
   v ? new Date(v).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+interface ReviewSectionProps {
+  productId: number;
+  onChanged?: () => void;
+}
 
 /**
  * 상품 상세의 리뷰 탭 (V1.1-1).
  * 목록(페이징) + 작성/수정/삭제 폼. 구매 인증 실패(403)·중복(409) 피드백을 노출한다.
  */
-const ReviewSection = ({ productId, onChanged }) => {
+const ReviewSection = ({ productId, onChanged }: ReviewSectionProps) => {
   const { isAuthenticated, userId, role } = useAuthStore();
-  const [reviews, setReviews] = useState([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback((p) => {
+  const load = useCallback((p: number) => {
     setLoading(true);
     getReviews(productId, p, PAGE_SIZE)
       .then((res) => {
@@ -93,7 +101,13 @@ const ReviewSection = ({ productId, onChanged }) => {
   );
 };
 
-const ReviewForm = ({ productId, existing, onSaved }) => {
+interface ReviewFormProps {
+  productId: number;
+  existing?: Review;
+  onSaved?: () => void;
+}
+
+const ReviewForm = ({ productId, existing, onSaved }: ReviewFormProps) => {
   const [rating, setRating] = useState(existing?.rating ?? 5);
   const [content, setContent] = useState(existing?.content ?? '');
   const [saving, setSaving] = useState(false);
@@ -111,7 +125,7 @@ const ReviewForm = ({ productId, existing, onSaved }) => {
     setSaving(true);
     const body = { rating, content };
     const req = editing
-      ? updateReview(productId, existing.reviewId, body)
+      ? updateReview(productId, existing!.reviewId, body)
       : createReview(productId, body);
     req
       .then(() => { onSaved?.(); if (!editing) setContent(''); })
@@ -144,7 +158,14 @@ const ReviewForm = ({ productId, existing, onSaved }) => {
   );
 };
 
-const ReviewItem = ({ review, canDelete, onDeleted, productId }) => {
+interface ReviewItemProps {
+  review: Review;
+  canDelete: boolean;
+  onDeleted?: () => void;
+  productId: number;
+}
+
+const ReviewItem = ({ review, canDelete, onDeleted, productId }: ReviewItemProps) => {
   const [error, setError] = useState('');
 
   const handleDelete = () => {

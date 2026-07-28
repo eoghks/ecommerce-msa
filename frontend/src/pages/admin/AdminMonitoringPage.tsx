@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
 import { getServicesHealth } from '../../api/monitoring';
+import type { ServiceHealth } from '../../types';
 
 // 자동 폴링 주기(ms)
 const POLL_INTERVAL_MS = 15000;
 
-const STATUS_STYLE = {
+interface StatusStyle {
+  text: string;
+  bg: string;
+}
+
+const STATUS_STYLE: Record<string, StatusStyle> = {
   UP:   { text: 'UP',   bg: '#22c55e' },
   DOWN: { text: 'DOWN', bg: '#ef4444' },
 };
 
 const AdminMonitoringPage = () => {
-  const [services, setServices] = useState([]);
+  const [services, setServices] = useState<ServiceHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [updatedAt, setUpdatedAt] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   // 헬스 상태 수집 — 수동 새로고침 시 refreshing 표시
   const load = (manual = false) => {
@@ -38,7 +44,7 @@ const AdminMonitoringPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const formatTime = (d) =>
+  const formatTime = (d: Date | null) =>
     d ? d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
 
   if (loading) {

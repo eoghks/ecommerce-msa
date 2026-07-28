@@ -1,20 +1,25 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import useAuthStore from '../../store/authStore';
 import useWishlistStore from '../../store/wishlistStore';
+import type { ApiErrorResponse } from '../../types';
 
 // 서버 실패 메시지 추출 — ProblemDetail(detail) 우선, 없으면 기본 문구
-const resolveErrorMessage = (err, fallback) =>
-  err?.response?.data?.detail || fallback;
+const resolveErrorMessage = (err: unknown, fallback: string): string =>
+  (err as AxiosError<ApiErrorResponse>)?.response?.data?.detail || fallback;
+
+interface WishlistButtonProps {
+  productId: number;
+  variant?: 'card' | 'detail';
+}
 
 /**
  * 찜 하트 토글 버튼.
  * - 비로그인 시 로그인 페이지로 유도.
  * - 클릭 시 낙관적 업데이트(스토어에서 처리).
- * @param {number} productId 상품 ID
- * @param {'card'|'detail'} variant 표시 위치별 스타일
  */
-const WishlistButton = ({ productId, variant = 'card' }) => {
+const WishlistButton = ({ productId, variant = 'card' }: WishlistButtonProps) => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const isWished = useWishlistStore((s) => s.ids.has(productId));
@@ -22,7 +27,7 @@ const WishlistButton = ({ productId, variant = 'card' }) => {
   const remove = useWishlistStore((s) => s.remove);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleToggle = async (e) => {
+  const handleToggle = async (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {

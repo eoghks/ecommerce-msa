@@ -2,15 +2,18 @@ import { useState } from 'react';
 
 const MAX_STARS = 5;
 
+interface StarRatingProps {
+  value?: number;
+  onChange?: (rating: number) => void;
+  size?: 'sm' | 'md' | 'lg';
+}
+
 /**
  * 별점 표시/입력 컴포넌트 (V1.1-1).
  * - readOnly: 평균 별점 표시 (소수점 반올림 표시)
  * - interactive(onChange 제공): 클릭으로 1~5 선택
- * @param {number} value 현재 별점(0~5)
- * @param {(rating:number)=>void} [onChange] 선택 콜백 — 있으면 입력 모드
- * @param {'sm'|'md'|'lg'} [size] 크기
  */
-const StarRating = ({ value = 0, onChange, size = 'md' }) => {
+const StarRating = ({ value = 0, onChange, size = 'md' }: StarRatingProps) => {
   const [hover, setHover] = useState(0);
   const interactive = typeof onChange === 'function';
   const px = size === 'lg' ? 22 : size === 'sm' ? 14 : 18;
@@ -25,7 +28,7 @@ const StarRating = ({ value = 0, onChange, size = 'md' }) => {
             key={i}
             type="button"
             disabled={!interactive}
-            onClick={() => interactive && onChange(i + 1)}
+            onClick={() => onChange?.(i + 1)}
             onMouseEnter={() => interactive && setHover(i + 1)}
             onMouseLeave={() => interactive && setHover(0)}
             aria-label={`${i + 1}점`}

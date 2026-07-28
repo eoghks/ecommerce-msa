@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import PrivateRoute from './components/common/PrivateRoute';
@@ -27,7 +27,7 @@ import AddressBookPage from './pages/my/AddressBookPage';
 // 인증 페이지에서는 Navbar 숨김
 const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
 
-const Layout = ({ children }) => {
+const Layout = ({ children }: { children: ReactNode }) => {
   const { pathname } = useLocation();
   const isAuthPage = AUTH_PATHS.includes(pathname);
   const fetchCart = useCartStore((s) => s.fetchCart);

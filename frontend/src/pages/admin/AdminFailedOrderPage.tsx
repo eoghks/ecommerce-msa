@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getFailedOrders } from '../../api/order';
+import type { FailedOrder } from '../../types';
 
 // M-3: 재고 확보 실패 등으로 자동취소된 주문 조회 (ADMIN)
 const AdminFailedOrderPage = () => {
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<FailedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -12,7 +13,7 @@ const AdminFailedOrderPage = () => {
     if (manual) setRefreshing(true);
     return getFailedOrders(0, 20)
       .then((res) => {
-        setRows(res.data.content ?? res.data ?? []);
+        setRows(res.data.content ?? []);
         setError('');
       })
       .catch(() => setError('실패 주문 목록을 불러오지 못했습니다.'))
@@ -23,7 +24,7 @@ const AdminFailedOrderPage = () => {
     load();
   }, []);
 
-  const formatDateTime = (v) =>
+  const formatDateTime = (v?: string) =>
     v ? new Date(v).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 
   if (loading) {

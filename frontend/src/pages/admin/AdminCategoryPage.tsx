@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
+import type { AxiosError } from 'axios';
 import {
   getCategories,
   createCategory,
   updateCategory,
   deleteCategory,
 } from '../../api/product';
+import type { ApiErrorResponse, Category } from '../../types';
 
 // B-05: 카테고리 관리 (ADMIN) — 목록 + 추가 + 인라인 수정 + 삭제
 const AdminCategoryPage = () => {
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newName, setNewName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
 
   const load = () =>
@@ -42,13 +44,13 @@ const AdminCategoryPage = () => {
       setError('');
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '카테고리 추가에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '카테고리 추가에 실패했습니다.');
     } finally {
       setSaving(false);
     }
   };
 
-  const startEdit = (row) => {
+  const startEdit = (row: Category) => {
     setEditId(row.id);
     setEditName(row.name);
     setError('');
@@ -59,7 +61,7 @@ const AdminCategoryPage = () => {
     setEditName('');
   };
 
-  const handleUpdate = async (id) => {
+  const handleUpdate = async (id: number) => {
     const name = editName.trim();
     if (!name) {
       setError('카테고리명을 입력하세요.');
@@ -71,18 +73,18 @@ const AdminCategoryPage = () => {
       setError('');
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '카테고리 수정에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '카테고리 수정에 실패했습니다.');
     }
   };
 
-  const handleDelete = async (row) => {
+  const handleDelete = async (row: Category) => {
     if (!window.confirm(`'${row.name}' 카테고리를 삭제하시겠습니까?`)) return;
     try {
       await deleteCategory(row.id);
       setError('');
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '카테고리 삭제에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '카테고리 삭제에 실패했습니다.');
     }
   };
 

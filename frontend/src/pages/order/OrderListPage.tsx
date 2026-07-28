@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { getMyOrders, cancelOrder } from '../../api/order';
+import type { Order, OrderStatus } from '../../types';
 
-const formatPrice = (price) =>
+const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
 
-const STATUS_LABEL = {
+interface StatusStyle {
+  text: string;
+  color: string;
+}
+
+const STATUS_LABEL: Record<string, StatusStyle> = {
   PENDING:             { text: '결제 대기',   color: '#f59e0b' },
   CONFIRMED:           { text: '주문 확정',   color: '#22c55e' },
   PARTIALLY_CANCELLED: { text: '일부 취소',   color: '#f97316' },
@@ -13,24 +19,24 @@ const STATUS_LABEL = {
 };
 
 // V1.1-3: 배송 진행 상태 뱃지 라벨
-const DELIVERY_LABEL = {
+const DELIVERY_LABEL: Record<string, StatusStyle> = {
   PREPARING: { text: '배송 준비중', color: '#6366f1' },
   SHIPPING:  { text: '배송중',     color: '#0ea5e9' },
   DELIVERED: { text: '배송완료',   color: '#22c55e' },
 };
 
 // 배송상태는 재고 차감된(확정/부분취소) 주문에서만 의미
-const DELIVERABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+const DELIVERABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 // M-N3: 사용자가 취소 가능한 상태 (이미 전체취소된 CANCELLED 제외)
-const CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
+const CANCELLABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 // V1.1-1: 구매 확정(재고 차감 완료) 상태 — 리뷰 작성 가능
-const REVIEWABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+const REVIEWABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 const OrderListPage = () => {
   const location = useLocation();
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const justOrdered = location.state?.ordered;
@@ -38,7 +44,7 @@ const OrderListPage = () => {
   const load = () => {
     setLoading(true);
     return getMyOrders(0, 20)
-      .then((res) => setOrders(res.data.content ?? res.data ?? []))
+      .then((res) => setOrders(res.data.content ?? []))
       .catch(() => setError('주문 내역을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
   };
@@ -91,7 +97,12 @@ const OrderListPage = () => {
   );
 };
 
-const OrderCard = ({ order, onCancelled }) => {
+interface OrderCardProps {
+  order: Order;
+  onCancelled?: () => void;
+}
+
+const OrderCard = ({ order, onCancelled }: OrderCardProps) => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
@@ -101,7 +112,7 @@ const OrderCard = ({ order, onCancelled }) => {
   const cancellable = CANCELLABLE_STATUSES.includes(order.status);
   const reviewable = REVIEWABLE_STATUSES.includes(order.status);
   const delivery = DELIVERABLE_STATUSES.includes(order.status)
-    ? DELIVERY_LABEL[order.deliveryStatus]
+    ? DELIVERY_LABEL[order.deliveryStatus ?? '']
     : null;
 
   // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)

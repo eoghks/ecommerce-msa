@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import {
   getMyAddresses, addAddress, updateAddress, deleteAddress, setDefaultAddress,
 } from '../../api/address';
+import type { Address, AddressInput } from '../../types';
 
-const EMPTY_FORM = { receiver: '', phone: '', address: '' };
+const EMPTY_FORM: AddressInput = { receiver: '', phone: '', address: '' };
 
 const AddressBookPage = () => {
-  const [addresses, setAddresses] = useState([]);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [editingId, setEditingId] = useState(null); // null=닫힘, 'new'=추가, 숫자=수정
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null); // null=닫힘, 'new'=추가, 숫자=수정
+  const [form, setForm] = useState<AddressInput>(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,19 +27,19 @@ const AddressBookPage = () => {
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setEditingId('new'); setForm(EMPTY_FORM); setFormError(''); };
-  const openEdit = (a) => {
+  const openEdit = (a: Address) => {
     setEditingId(a.id);
     setForm({ receiver: a.receiver, phone: a.phone, address: a.address });
     setFormError('');
   };
   const closeForm = () => { setEditingId(null); setForm(EMPTY_FORM); setFormError(''); };
 
-  const handleChange = (e) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormError('');
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.receiver.trim() || !form.phone.trim() || !form.address.trim()) {
       setFormError('수령인, 연락처, 배송지를 모두 입력해주세요.');
@@ -49,7 +50,7 @@ const AddressBookPage = () => {
       if (editingId === 'new') {
         await addAddress(form);
       } else {
-        await updateAddress(editingId, form);
+        await updateAddress(editingId as number, form);
       }
       closeForm();
       await load();
@@ -60,7 +61,7 @@ const AddressBookPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     if (!window.confirm('이 배송지를 삭제하시겠습니까?')) return;
     try {
       await deleteAddress(id);
@@ -70,7 +71,7 @@ const AddressBookPage = () => {
     }
   };
 
-  const handleSetDefault = async (id) => {
+  const handleSetDefault = async (id: number) => {
     try {
       await setDefaultAddress(id);
       await load();

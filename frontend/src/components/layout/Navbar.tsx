@@ -5,6 +5,7 @@ import useCartStore from '../../store/cartStore';
 import useWishlistStore from '../../store/wishlistStore';
 import useNotificationStore from '../../store/notificationStore';
 import { logout } from '../../api/auth';
+import type { Notification } from '../../types';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -22,16 +23,17 @@ const Navbar = () => {
   const [myOpen, setMyOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const myRef = useRef(null);
-  const mobileRef = useRef(null);
-  const notifRef = useRef(null);
+  const myRef = useRef<HTMLDivElement>(null);
+  const mobileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   // 드롭다운/모바일 메뉴 외부 클릭 시 닫기
   useEffect(() => {
-    const handler = (e) => {
-      if (myRef.current && !myRef.current.contains(e.target)) setMyOpen(false);
-      if (mobileRef.current && !mobileRef.current.contains(e.target)) setMobileOpen(false);
-      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (myRef.current && !myRef.current.contains(target)) setMyOpen(false);
+      if (mobileRef.current && !mobileRef.current.contains(target)) setMobileOpen(false);
+      if (notifRef.current && !notifRef.current.contains(target)) setNotifOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -56,7 +58,7 @@ const Navbar = () => {
   };
 
   // 알림 항목 클릭 — 읽음 처리 후 관련 주문으로 이동
-  const handleNotifClick = (notif) => {
+  const handleNotifClick = (notif: Notification) => {
     markNotifRead(notif.id);
     setNotifOpen(false);
     if (notif.orderId) navigate('/orders');

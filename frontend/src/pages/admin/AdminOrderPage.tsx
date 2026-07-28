@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
+import type { AxiosError } from 'axios';
 import { getAllOrders, getSellerOrders, cancelOrderItem, updateDeliveryStatus } from '../../api/order';
 import useAuthStore from '../../store/authStore';
+import type { ApiErrorResponse, DeliveryStatus, Order, OrderItem, OrderStatus } from '../../types';
 
-const formatPrice = (p) =>
+const formatPrice = (p: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(p);
 
-const STATUS_LABEL = {
+interface StatusStyle {
+  text: string;
+  color: string;
+}
+
+const STATUS_LABEL: Record<string, StatusStyle> = {
   PENDING:             { text: '결제 대기',   color: '#f59e0b' },
   CONFIRMED:           { text: '주문 확정',   color: '#22c55e' },
   PARTIALLY_CANCELLED: { text: '부분 취소',   color: '#f97316' },
@@ -13,25 +20,31 @@ const STATUS_LABEL = {
 };
 
 // V1.1-3: 배송 진행 상태 라벨 + 전이 순서
-const DELIVERY_LABEL = {
+const DELIVERY_LABEL: Record<string, StatusStyle> = {
   PREPARING: { text: '배송 준비중', color: '#6366f1' },
   SHIPPING:  { text: '배송중',     color: '#0ea5e9' },
   DELIVERED: { text: '배송완료',   color: '#22c55e' },
 };
 // 현재 상태에서 전진 가능한 다음 상태 (없으면 완료)
-const NEXT_DELIVERY = { PREPARING: 'SHIPPING', SHIPPING: 'DELIVERED' };
-const DELIVERABLE_STATUSES = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+const NEXT_DELIVERY: Record<string, DeliveryStatus> = { PREPARING: 'SHIPPING', SHIPPING: 'DELIVERED' };
+const DELIVERABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
+
+interface CancelTarget {
+  orderId: number;
+  itemId: number;
+  productName: string;
+}
 
 const AdminOrderPage = () => {
   const { role } = useAuthStore();
   const isAdmin = role === 'ADMIN';
 
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // 취소 모달 상태
-  const [cancelTarget, setCancelTarget] = useState(null); // { orderId, itemId, productName }
+  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -45,7 +58,7 @@ const AdminOrderPage = () => {
 
   useEffect(() => { load(); }, []);
 
-  const openCancel = (orderId, item) => {
+  const openCancel = (orderId: number, item: OrderItem) => {
     setCancelTarget({ orderId, itemId: item.id, productName: item.productName });
     setReason('');
     setError('');
@@ -55,32 +68,32 @@ const AdminOrderPage = () => {
     if (!reason.trim()) { setError('취소 사유를 입력해주세요.'); return; }
     setSubmitting(true);
     try {
-      await cancelOrderItem(cancelTarget.orderId, cancelTarget.itemId, reason.trim());
+      await cancelOrderItem(cancelTarget!.orderId, cancelTarget!.itemId, reason.trim());
       setCancelTarget(null);
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '항목 취소에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '항목 취소에 실패했습니다.');
     } finally {
       setSubmitting(false);
     }
   };
 
   // V1.1-3: 배송상태 전진
-  const [deliveryBusy, setDeliveryBusy] = useState(null); // 처리 중인 orderId
-  const advanceDelivery = async (orderId, next) => {
+  const [deliveryBusy, setDeliveryBusy] = useState<number | null>(null); // 처리 중인 orderId
+  const advanceDelivery = async (orderId: number, next: DeliveryStatus) => {
     setDeliveryBusy(orderId);
     setError('');
     try {
       await updateDeliveryStatus(orderId, next);
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || '배송상태 변경에 실패했습니다.');
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail || '배송상태 변경에 실패했습니다.');
     } finally {
       setDeliveryBusy(null);
     }
   };
 
-  const formatDate = (d) =>
+  const formatDate = (d?: string) =>
     d ? new Date(d).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
 
   if (loading) {
@@ -108,8 +121,8 @@ const AdminOrderPage = () => {
           {orders.map((order) => {
             const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
             const deliverable = DELIVERABLE_STATUSES.includes(order.status);
-            const delivery = deliverable ? DELIVERY_LABEL[order.deliveryStatus] : null;
-            const nextDelivery = deliverable ? NEXT_DELIVERY[order.deliveryStatus] : null;
+            const delivery = deliverable ? DELIVERY_LABEL[order.deliveryStatus ?? ''] : null;
+            const nextDelivery = deliverable ? NEXT_DELIVERY[order.deliveryStatus ?? ''] : null;
             return (
               <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-5">
                 {/* 헤더 */}
