@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* 번들러(Vite) 기준 모듈 해석 — 확장자 없는 import 유지 */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* 엄격 모드 */
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* import.meta.env 타입 */
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}
