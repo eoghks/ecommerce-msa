@@ -7,8 +7,8 @@
  * Refresh Token은 auth-service에서 HttpOnly; Secure; SameSite 쿠키로 발급되며,
  * axios(withCredentials: true)가 자동 송수신한다. (구현 완료)
  */
-let _accessToken = null;
+let _accessToken: string | null = null;
 
-export const setToken  = (token) => { _accessToken = token; };
-export const getToken  = ()      => _accessToken;
-export const clearToken = ()     => { _accessToken = null; };
+export const setToken   = (token: string): void => { _accessToken = token; };
+export const getToken   = (): string | null     => _accessToken;
+export const clearToken = (): void              => { _accessToken = null; };

@@ -5,9 +5,24 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from '../api/notification';
+import type { Notification } from '../types';
 
 // 미읽음 개수 폴링 주기 (30초) — 로그인 상태에서만 동작
 const POLL_INTERVAL_MS = 30_000;
+
+interface NotificationState {
+  unreadCount: number;
+  items: Notification[];
+  loading: boolean;
+  timerId: ReturnType<typeof setInterval> | null;
+  fetchUnreadCount: () => Promise<void>;
+  fetchList: () => Promise<void>;
+  markRead: (id: number) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  startPolling: () => void;
+  stopPolling: () => void;
+  reset: () => void;
+}
 
 /**
  * 알림 전역 스토어 (V1.1-4).
@@ -15,7 +30,7 @@ const POLL_INTERVAL_MS = 30_000;
  * - 드롭다운 열 때 목록을 조회하고, 항목 클릭/모두 읽음으로 읽음 처리.
  * - 로그아웃 시 stopPolling()+reset()으로 폴링 중단·상태 초기화.
  */
-const useNotificationStore = create((set, get) => ({
+const useNotificationStore = create<NotificationState>()((set, get) => ({
   unreadCount: 0,
   items: [],
   loading: false,

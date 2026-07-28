@@ -6,8 +6,21 @@ import {
   removeCartItem,
   clearCartApi,
 } from '../api/cart';
+import type { CartItem } from '../types';
 
-const useCartStore = create((set, get) => ({
+interface CartState {
+  items: CartItem[];
+  loading: boolean;
+  fetchCart: () => Promise<void>;
+  addItem: (product: { id: number }, quantity?: number) => Promise<void>;
+  updateQuantity: (productId: number, quantity: number) => Promise<void>;
+  removeItem: (productId: number) => Promise<void>;
+  clear: () => Promise<void>;
+  totalPrice: () => number;
+  totalCount: () => number;
+}
+
+const useCartStore = create<CartState>()((set, get) => ({
   items: [],
   loading: false,
 
