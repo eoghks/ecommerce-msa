@@ -116,6 +116,51 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /** 반품 없음/타인 소유 반품 접근 → 404 Not Found (정보 노출 방지) */
+    @ExceptionHandler(ReturnRequestNotFoundException.class)
+    public ProblemDetail handleReturnRequestNotFound(ReturnRequestNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Return Request Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-not-found"));
+        return pd;
+    }
+
+    /** 반품 자격 미충족(배송완료 아님·취소된 항목·사유 누락) → 400 Bad Request */
+    @ExceptionHandler(ReturnNotAllowedException.class)
+    public ProblemDetail handleReturnNotAllowed(ReturnNotAllowedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Return Not Allowed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-not-allowed"));
+        return pd;
+    }
+
+    /** 잘못된 반품 상태 전이 → 400 Bad Request */
+    @ExceptionHandler(InvalidReturnStatusException.class)
+    public ProblemDetail handleInvalidReturnStatus(InvalidReturnStatusException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Return Status");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-return-status"));
+        return pd;
+    }
+
+    /** 동일 항목 반품 중복 신청 → 409 Conflict */
+    @ExceptionHandler(DuplicateReturnRequestException.class)
+    public ProblemDetail handleDuplicateReturnRequest(DuplicateReturnRequestException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Duplicate Return Request");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/duplicate-return-request"));
+        return pd;
+    }
+
+    /** 반품 처리·조회 권한 없음 → 403 Forbidden */
+    @ExceptionHandler(ReturnAccessDeniedException.class)
+    public ProblemDetail handleReturnAccessDenied(ReturnAccessDeniedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Forbidden");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-forbidden"));
+        return pd;
+    }
+
     /** 주문 배송지 정보 유효하지 않음(addressId 무효/직접입력 누락) → 400 Bad Request */
     @ExceptionHandler(InvalidOrderShippingException.class)
     public ProblemDetail handleInvalidOrderShipping(InvalidOrderShippingException ex) {
