@@ -309,6 +309,79 @@ class ReturnServiceTest {
     }
 
     @Test
+    @DisplayName("권한(H-1) — 멀티셀러 주문에서 타 판매자 항목 승인 시도 → 403, 재고복구·환불 미실행")
+    void approve_otherSellerItemInMultiSellerOrder_forbidden() {
+        Order order = multiSellerDeliveredOrder();
+        // 반품 대상은 판매자 8 의 항목(id=2)
+        ReturnRequest returnRequest = requestedReturn(1L, 2L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        // 같은 주문에 자기 상품(id=1)이 있는 판매자 7 이 타 판매자 항목 반품을 승인 시도
+        assertThatThrownBy(() -> returnService.approve(10L, 7L, "SELLER"))
+                .isInstanceOf(ReturnAccessDeniedException.class);
+        assertThat(returnRequest.getStatus()).isEqualTo(ReturnStatus.REQUESTED);
+        assertThat(order.getItems().get(1).getStatus()).isEqualTo(OrderItemStatus.ACTIVE);
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+        then(notificationService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("권한(H-1) — 멀티셀러 주문에서 대상 항목 소유 판매자 승인 → 성공")
+    void approve_ownerSellerItemInMultiSellerOrder_allowed() {
+        Order order = multiSellerDeliveredOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 2L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        ReturnResponse response = returnService.approve(10L, 8L, "SELLER");
+
+        assertThat(response.status()).isEqualTo(ReturnStatus.REFUNDED);
+        assertThat(order.getItems().get(1).getStatus()).isEqualTo(OrderItemStatus.CANCELLED);
+        // 타 판매자 항목(id=1)은 영향 없음
+        assertThat(order.getItems().get(0).getStatus()).isEqualTo(OrderItemStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("권한(H-1) — 멀티셀러 주문에서 타 판매자 항목 거부 시도 → 403")
+    void reject_otherSellerItemInMultiSellerOrder_forbidden() {
+        Order order = multiSellerDeliveredOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 2L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        assertThatThrownBy(() -> returnService.reject(10L, 7L, "SELLER", "사용 흔적 있음"))
+                .isInstanceOf(ReturnAccessDeniedException.class);
+        assertThat(returnRequest.getStatus()).isEqualTo(ReturnStatus.REQUESTED);
+    }
+
+    @Test
+    @DisplayName("승인(M-2) — 신청 후 다른 경로로 취소된 항목 → 400, 재고복구·환불 미실행")
+    void approve_alreadyCancelledItem_badRequest() {
+        Order order = deliveredOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 1L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+        order.cancelItem(1L, "사용자 주문 취소");   // 신청 이후 다른 경로로 취소
+
+        assertThatThrownBy(() -> returnService.approve(10L, 999L, "ADMIN"))
+                .isInstanceOf(ReturnNotAllowedException.class);
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+        then(notificationService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("승인(M-4) — 환불 시각은 refundedAt 에 기록되고 승인 시각(processedAt)은 보존")
+    void approve_keepsApprovedAtSeparateFromRefundedAt() {
+        Order order = deliveredOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 1L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        returnService.approve(10L, 999L, "ADMIN");
+
+        assertThat(returnRequest.getProcessedAt()).isNotNull();
+        assertThat(returnRequest.getRefundedAt()).isNotNull();
+    }
+
+    @Test
     @DisplayName("권한 — 일반 USER 승인/거부 시도 → 403")
     void approve_user_forbidden() {
         Order order = deliveredOrder();
@@ -417,5 +490,28 @@ class ReturnServiceTest {
         order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
         order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
         return order;
+    }
+
+    /** 멀티 셀러 배송완료 주문 — 항목1(판매자 7), 항목2(판매자 8) */
+    private Order multiSellerDeliveredOrder() {
+        List<OrderItem> items = new ArrayList<>();
+        items.add(itemOf(1L, 100L, 7L));
+        items.add(itemOf(2L, 200L, 8L));
+
+        Order order = Order.builder().userId(1L).totalPrice(40_000L).items(items).build();
+        ReflectionTestUtils.setField(order, "id", 1L);
+        order.confirm();
+        order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
+        return order;
+    }
+
+    /** 주문 항목 생성 — id 는 영속 상태를 모사해 직접 주입 */
+    private OrderItem itemOf(Long id, Long productId, Long sellerId) {
+        OrderItem item = OrderItem.builder()
+                .productId(productId).productName("상품").price(20_000L).quantity(1).sellerId(sellerId)
+                .build();
+        ReflectionTestUtils.setField(item, "id", id);
+        return item;
     }
 }

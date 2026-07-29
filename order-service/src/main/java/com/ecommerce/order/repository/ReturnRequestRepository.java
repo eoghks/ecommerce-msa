@@ -21,11 +21,15 @@ public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, Lo
     /** 전체 반품 목록 (ADMIN) — 최신순 */
     Page<ReturnRequest> findAllByOrderByRequestedAtDesc(Pageable pageable);
 
-    /** 판매자 반품 목록 (SELLER) — 본인 상품이 포함된 주문의 반품만, 최신순 */
+    /**
+     * 판매자 반품 목록 (SELLER) — 본인 상품 항목이 반품 대상인 건만, 최신순.
+     * M-3: 주문 단위로 넓히면 멀티 셀러 주문에서 타 판매자 항목의 반품 정보가 노출되므로
+     *      반품 대상 항목(order_item_id)의 판매자 기준으로 좁힌다.
+     */
     @Query("""
             select r from ReturnRequest r
-            where r.orderId in (
-                select o.id from Order o join o.items i where i.sellerId = :sellerId
+            where r.orderItemId in (
+                select i.id from OrderItem i where i.sellerId = :sellerId
             )
             order by r.requestedAt desc
             """)

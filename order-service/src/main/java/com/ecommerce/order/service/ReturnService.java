@@ -34,7 +34,7 @@ import java.time.LocalDateTime;
  * - 승인: 기존 항목취소 경로(cancelItem + OrderItemCancelledEvent)를 재사용해 재고 복구 후
  *         환불 훅(processRefund) 호출 → REFUNDED 전이.
  * - 거부: 거부 사유 필수. 거부된 항목은 재신청 허용(DB 부분 유니크가 REJECTED 제외).
- * - 권한: ADMIN 전체 / SELLER 는 주문에 본인 상품이 포함된 경우만. 그 외 403.
+ * - 권한: ADMIN 전체 / SELLER 는 반품 대상 항목이 본인 상품인 경우만. 그 외 403.
  */
 @Slf4j
 @Service
@@ -48,8 +48,8 @@ public class ReturnService {
     /** 반품 승인으로 항목을 취소할 때 남기는 사유 */
     private static final String RETURN_CANCEL_REASON = "반품 승인";
 
-    /** 반품 사유 최대 길이 */
-    private static final int MAX_REASON_LENGTH = 300;
+    /** 반품 사유 최대 길이 — 요청 DTO(@Size)와 동일 기준 사용 */
+    private static final int MAX_REASON_LENGTH = ReturnRequest.MAX_REASON_LENGTH;
 
     private final ReturnRequestRepository   returnRequestRepository;
     private final OrderRepository           orderRepository;
@@ -85,20 +85,23 @@ public class ReturnService {
     }
 
     /**
-     * 반품 승인 (ADMIN / 해당 SELLER).
+     * 반품 승인 (ADMIN / 대상 항목의 SELLER).
      * REQUESTED 에서만 가능(그 외 400). 대상 항목을 취소 처리해 기존 재고복구 Saga를 재사용하고,
      * 환불 훅(processRefund) 처리 후 REFUNDED 로 전이한다.
+     * M-2: 신청 이후 다른 경로로 취소된 항목은 이중 환불이 되므로 승인 시점에 다시 검증한다.
      */
     @Transactional
     public ReturnResponse approve(Long returnId, Long userId, String role) {
         requireUser(userId);
         ReturnRequest returnRequest = findReturn(returnId);
         Order order = findOrder(returnRequest.getOrderId());
-        requireManagePermission(order, returnId, userId, role);
+        OrderItem item = findItem(order, returnRequest.getOrderItemId());
+        requireManagePermission(item, returnId, userId, role);
 
         LocalDateTime now = LocalDateTime.now();
-        returnRequest.approve(now);
-        restockApprovedItem(order, returnRequest.getOrderItemId());
+        returnRequest.approve(now);   // REQUESTED 아니면 400
+        requireActiveItem(item);      // M-2: 이미 취소된 항목이면 400 → 트랜잭션 롤백으로 승인 취소
+        restockApprovedItem(order, item.getId());
         notificationService.create(returnRequest.getUserId(),
                 NotificationType.RETURN_APPROVED, returnRequest.getOrderId());
 
@@ -113,7 +116,7 @@ public class ReturnService {
     }
 
     /**
-     * 반품 거부 (ADMIN / 해당 SELLER). REQUESTED 에서만 가능, 거부 사유 필수.
+     * 반품 거부 (ADMIN / 대상 항목의 SELLER). REQUESTED 에서만 가능, 거부 사유 필수.
      * 거부된 항목은 재신청 허용.
      */
     @Transactional
@@ -121,7 +124,9 @@ public class ReturnService {
         requireUser(userId);
         validateRejectReason(rejectReason);
         ReturnRequest returnRequest = findReturn(returnId);
-        requireManagePermission(findOrder(returnRequest.getOrderId()), returnId, userId, role);
+        Order order = findOrder(returnRequest.getOrderId());
+        requireManagePermission(findItem(order, returnRequest.getOrderItemId()),
+                returnId, userId, role);
 
         returnRequest.reject(rejectReason, LocalDateTime.now());
         notificationService.create(returnRequest.getUserId(),
@@ -140,7 +145,7 @@ public class ReturnService {
                 .map(ReturnResponse::from);
     }
 
-    /** 반품 관리 목록 — ADMIN 전체 / SELLER 본인 상품 포함 건만. 그 외 403 */
+    /** 반품 관리 목록 — ADMIN 전체 / SELLER 는 본인 상품 항목이 대상인 건만(M-3). 그 외 403 */
     @Transactional(readOnly = true)
     public Page<ReturnResponse> getManagedReturns(Long userId, String role, Pageable pageable) {
         requireUser(userId);
@@ -183,18 +188,29 @@ public class ReturnService {
     }
 
     /** 반품 처리 권한 검증 — 권한 없으면 403 */
-    private void requireManagePermission(Order order, Long returnId, Long userId, String role) {
-        if (!canManage(order, userId, role)) {
+    private void requireManagePermission(OrderItem item, Long returnId, Long userId, String role) {
+        if (!canManage(item, userId, role)) {
             throw new ReturnAccessDeniedException("반품을 처리할 권한이 없습니다. id=" + returnId);
         }
     }
 
-    /** 반품 처리 권한 판정 — 배송상태 변경(V1.1-3)의 "주문 항목에 본인 sellerId 포함" 판정 재사용 */
-    private boolean canManage(Order order, Long userId, String role) {
+    /**
+     * 반품 처리 권한 판정 — 반품은 항목 단위 연산이므로 항목 취소(OrderService.cancelOrderItem)와
+     * 동일하게 "대상 항목의 소유 판매자"만 허용한다(H-1). ADMIN 은 전체 허용.
+     */
+    private boolean canManage(OrderItem item, Long userId, String role) {
         if (ROLE_ADMIN.equals(role)) {
             return true;
         }
-        return ROLE_SELLER.equals(role) && order.hasSellerItem(userId);
+        return ROLE_SELLER.equals(role) && item.isOwnedBy(userId);
+    }
+
+    /** M-2: 승인 시점 항목 재검증 — 이미 취소된 항목이면 400 (이중 환불 차단) */
+    private void requireActiveItem(OrderItem item) {
+        if (!item.isActive()) {
+            throw new ReturnNotAllowedException(
+                    "이미 취소된 항목은 반품을 승인할 수 없습니다. itemId=" + item.getId());
+        }
     }
 
     /** 반품 자격 검증 — 배송완료 주문 + 활성 항목만. 미충족 시 400 */
@@ -235,7 +251,8 @@ public class ReturnService {
             throw new ReturnNotAllowedException("반품 사유를 입력해주세요.");
         }
         if (reason.length() > MAX_REASON_LENGTH) {
-            throw new ReturnNotAllowedException("반품 사유는 300자 이하여야 합니다.");
+            throw new ReturnNotAllowedException(
+                    "반품 사유는 " + MAX_REASON_LENGTH + "자 이하여야 합니다.");
         }
     }
 
@@ -244,7 +261,8 @@ public class ReturnService {
             throw new ReturnNotAllowedException("거부 사유를 입력해주세요.");
         }
         if (rejectReason.length() > MAX_REASON_LENGTH) {
-            throw new ReturnNotAllowedException("거부 사유는 300자 이하여야 합니다.");
+            throw new ReturnNotAllowedException(
+                    "거부 사유는 " + MAX_REASON_LENGTH + "자 이하여야 합니다.");
         }
     }
 
