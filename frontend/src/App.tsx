@@ -20,9 +20,11 @@ import AdminCategoryPage from './pages/admin/AdminCategoryPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
 import AdminFailedOrderPage from './pages/admin/AdminFailedOrderPage';
 import AdminMonitoringPage from './pages/admin/AdminMonitoringPage';
+import AdminReturnPage from './pages/admin/AdminReturnPage';
 import MyProfilePage from './pages/my/MyProfilePage';
 import WishlistPage from './pages/my/WishlistPage';
 import AddressBookPage from './pages/my/AddressBookPage';
+import ReturnListPage from './pages/my/ReturnListPage';
 
 // 인증 페이지에서는 Navbar 숨김
 const AUTH_PATHS = ['/login', '/register', '/forgot-password'];
@@ -90,11 +92,15 @@ const App = () => {
               <Route path="/my/profile"   element={<PrivateRoute><MyProfilePage /></PrivateRoute>} />
               <Route path="/my/wishlist"  element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
               <Route path="/my/addresses" element={<PrivateRoute><AddressBookPage /></PrivateRoute>} />
+              {/* V1.1-5: 내 반품 내역 */}
+              <Route path="/my/returns"   element={<PrivateRoute><ReturnListPage /></PrivateRoute>} />
 
               {/* ADMIN 전용 */}
               <Route path="/admin"        element={<AdminRoute><AdminProductPage /></AdminRoute>} />
               <Route path="/admin/categories" element={<AdminRoute><AdminCategoryPage /></AdminRoute>} />
               <Route path="/admin/orders" element={<AdminRoute><AdminOrderPage /></AdminRoute>} />
+              {/* V1.1-5: 반품 관리 (ADMIN 전체 / SELLER 본인 상품 건) */}
+              <Route path="/admin/returns" element={<AdminRoute><AdminReturnPage /></AdminRoute>} />
               <Route path="/admin/failed" element={<AdminRoute><AdminFailedOrderPage /></AdminRoute>} />
               <Route path="/admin/monitoring" element={<AdminRoute><AdminMonitoringPage /></AdminRoute>} />
             </Routes>
