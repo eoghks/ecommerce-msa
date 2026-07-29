@@ -199,6 +199,24 @@ export interface FailedOrder {
   occurredAt?: string;
 }
 
+// ── 반품·환불 ────────────────────────────────────────
+
+/** 반품 진행 상태 (백엔드 ReturnStatus enum) — REQUESTED→APPROVED→REFUNDED / REQUESTED→REJECTED */
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'REFUNDED';
+
+/** 반품 신청 내역 (백엔드 ReturnResponse) */
+export interface ReturnRequest {
+  id: number;
+  orderId: number;
+  orderItemId: number;
+  userId: number;
+  reason: string;
+  status: ReturnStatus;
+  rejectReason?: string | null;
+  requestedAt?: string;
+  processedAt?: string | null;
+}
+
 // ── 배송지 ───────────────────────────────────────────
 
 export interface Address {
@@ -236,7 +254,10 @@ export type NotificationType =
   | 'ORDER_CANCELLED'
   | 'ORDER_ITEM_CANCELLED'
   | 'DELIVERY_SHIPPING'
-  | 'DELIVERY_DELIVERED';
+  | 'DELIVERY_DELIVERED'
+  | 'RETURN_APPROVED'
+  | 'RETURN_REJECTED'
+  | 'RETURN_REFUNDED';
 
 export interface Notification {
   id: number;
