@@ -1,5 +1,6 @@
 package com.ecommerce.order.controller;
 
+import com.ecommerce.order.domain.ReturnRequest;
 import com.ecommerce.order.domain.ReturnStatus;
 import com.ecommerce.order.dto.response.ReturnResponse;
 import com.ecommerce.order.exception.DuplicateReturnRequestException;
@@ -17,11 +18,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -108,6 +111,21 @@ class ReturnControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"제품 하자\"}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("POST 반품 신청(H-2) — 동시 신청 경쟁으로 유니크 제약 위반 → 409")
+    void requestReturn_uniqueViolation_conflict() throws Exception {
+        given(returnService.request(1L, 2L, 5L, "제품 하자"))
+                .willThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint \"uq_return_item_active\""));
+
+        mockMvc.perform(post("/api/v1/orders/1/items/2/returns")
+                        .header("X-User-Id", "5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"제품 하자\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Data Integrity Violation"));
     }
 
     @Test
@@ -223,6 +241,19 @@ class ReturnControllerTest {
                         .header("X-User-Id", "8")
                         .header("X-User-Role", "SELLER"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PATCH /returns/{id}/approve(M-1) — 동시 승인 낙관적 락 충돌 → 409")
+    void approveReturn_optimisticLockConflict() throws Exception {
+        given(returnService.approve(10L, 999L, "ADMIN"))
+                .willThrow(new ObjectOptimisticLockingFailureException(ReturnRequest.class, 10L));
+
+        mockMvc.perform(patch("/api/v1/returns/10/approve")
+                        .header("X-User-Id", "999")
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Concurrent Modification"));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.ecommerce.order.dto.request;
 
+import com.ecommerce.order.domain.ReturnRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -7,6 +8,6 @@ import jakarta.validation.constraints.Size;
 public record ReturnRejectRequest(
 
         @NotBlank(message = "거부 사유를 입력해주세요.")
-        @Size(max = 300, message = "거부 사유는 300자 이하여야 합니다.")
+        @Size(max = ReturnRequest.MAX_REASON_LENGTH, message = "거부 사유는 300자 이하여야 합니다.")
         String rejectReason
 ) {}

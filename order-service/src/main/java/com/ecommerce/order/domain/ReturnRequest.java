@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,6 +32,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class ReturnRequest {
+
+    /** 신청·거부 사유 최대 길이 — 요청 DTO 검증(@Size)과 서비스 방어 검증이 공유하는 단일 기준 */
+    public static final int MAX_REASON_LENGTH = 300;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -60,9 +64,18 @@ public class ReturnRequest {
     @Column(name = "requested_at", nullable = false, updatable = false)
     private LocalDateTime requestedAt;
 
-    // 승인/거부 처리 시각
+    // 승인/거부 처리 시각 — M-4: 환불 시각(refundedAt)과 분리해 감사 추적을 보존한다
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
+
+    // 환불 확정 시각 — APPROVED→REFUNDED 전이 시각. 승인 시각을 덮어쓰지 않는다
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    // M-1: 동시 승인/거부 경쟁으로 상태가 유실되고 환불 훅이 중복 호출되는 것을 낙관적 락으로 차단
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @Builder
     private ReturnRequest(Long orderId, Long orderItemId, Long userId, String reason) {
@@ -71,11 +84,6 @@ public class ReturnRequest {
         this.userId      = userId;
         this.reason      = reason;
         this.status      = ReturnStatus.REQUESTED;
-    }
-
-    /** 신청자 본인 여부 — 타인 반품 조회 차단 판정용 */
-    public boolean isOwnedBy(Long userId) {
-        return this.userId.equals(userId);
     }
 
     /** 승인/거부 가능한(접수) 상태인지 */
@@ -98,14 +106,17 @@ public class ReturnRequest {
         this.processedAt  = when;
     }
 
-    /** 환불 완료 — APPROVED 에서만 가능 */
+    /**
+     * 환불 완료 — APPROVED 에서만 가능.
+     * M-4: 환불 시각은 refundedAt 에만 기록하고 승인 시각(processedAt)은 유지한다.
+     */
     public void markRefunded(LocalDateTime when) {
         if (this.status != ReturnStatus.APPROVED) {
             throw new InvalidReturnStatusException(
                     "환불 처리할 수 없는 반품 상태입니다. 현재 상태: " + this.status);
         }
-        this.status      = ReturnStatus.REFUNDED;
-        this.processedAt = when;
+        this.status     = ReturnStatus.REFUNDED;
+        this.refundedAt = when;
     }
 
     private void requireRequested(String action) {

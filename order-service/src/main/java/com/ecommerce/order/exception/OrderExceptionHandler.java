@@ -1,5 +1,7 @@
 package com.ecommerce.order.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -158,6 +160,44 @@ public class OrderExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         pd.setTitle("Forbidden");
         pd.setType(URI.create(ERROR_TYPE_BASE + "/return-forbidden"));
+        return pd;
+    }
+
+    /**
+     * H-2: DB 유니크 제약 등 데이터 무결성 위반 → 409 Conflict.
+     * 반품 중복 신청은 서비스 검증(exists)과 save 사이에 원자성이 없어 동시 요청 시
+     * 부분 유니크 인덱스(uq_return_item_active)가 최종 방어선이 된다.
+     * 이때 기본 500 대신 중복 신청임을 알 수 있는 409 로 전달한다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "이미 처리 중인 요청이 있습니다. 잠시 후 다시 확인해주세요.");
+        pd.setTitle("Data Integrity Violation");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/duplicate-return-request"));
+        return pd;
+    }
+
+    /**
+     * M-1: 동시 처리 충돌(낙관적 락 버전 불일치) → 409 Conflict.
+     * 반품 승인/거부가 동시에 들어오면 뒤늦은 트랜잭션이 실패하도록 하여
+     * 상태 유실·환불 훅 중복 호출을 막는다.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "다른 처리가 먼저 완료되었습니다. 최신 상태를 확인한 뒤 다시 시도해주세요.");
+        pd.setTitle("Concurrent Modification");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/concurrent-modification"));
+        return pd;
+    }
+
+    /** L-1: 잘못된 인자(주문에 없는 항목 id 등) → 400 Bad Request */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Request");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-request"));
         return pd;
     }
 
