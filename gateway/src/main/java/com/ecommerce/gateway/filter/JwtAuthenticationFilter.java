@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -64,7 +65,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String path = exchange.getRequest().getURI().getPath();
+        // F-02: 경로 판정은 대소문자를 무시한다.
+        //       (소문자 정규화 없이 비교하면 /api/v1/orders/INTERNAL 처럼 대문자로 INTERNAL_ONLY 차단을 우회할 수 있음)
+        String path = normalizePath(exchange.getRequest().getURI().getPath());
 
         // C-1: 진입 즉시 클라이언트가 위조했을 수 있는 신뢰 헤더(X-User-*)를 무조건 제거.
         //      이후 모든 통과 분기는 sanitize된 요청을 사용하고, JWT 검증 성공 시에만 재주입한다.
@@ -146,6 +149,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             log.warn("JWT 검증 실패: {}", e.getMessage());
             return onUnauthorized(sanitized);
         }
+    }
+
+    /** 경로 판정용 정규화 — 소문자 통일(WHITE_LIST·OPTIONAL_AUTH_LIST·INTERNAL_ONLY_LIST는 모두 소문자 상수) */
+    private String normalizePath(String path) {
+        return path.toLowerCase(Locale.ROOT);
     }
 
     private boolean isWhitelisted(String path) {
