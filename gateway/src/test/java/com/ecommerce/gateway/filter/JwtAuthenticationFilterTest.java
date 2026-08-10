@@ -65,6 +65,46 @@ class JwtAuthenticationFilterTest {
         assertThat(exchange.getResponse().getStatusCode()).isNull();
     }
 
+    // ── 내부 전용 경로 차단 (F-02) ──────────────────────────────
+
+    @Test
+    @DisplayName("내부 전용 경로는 외부 요청 시 403")
+    void internal_only_path_returns_403() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/orders/internal/purchased").build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("내부 전용 경로를 대문자로 요청해도 403 (대소문자 우회 차단)")
+    void internal_only_path_uppercase_returns_403() throws Exception {
+        String token = issueToken(1L, "USER", new Date(System.currentTimeMillis() + 3600000L));
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/orders/INTERNAL/purchased")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("내부 전용 auth 경로를 혼합 대소문자로 요청해도 403")
+    void internal_only_auth_users_mixed_case_returns_403() throws Exception {
+        String token = issueToken(1L, "ADMIN", new Date(System.currentTimeMillis() + 3600000L));
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/auth/UsErS?ids=1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     // ── 헤더 검증 ──────────────────────────────────────────
 
     @Test

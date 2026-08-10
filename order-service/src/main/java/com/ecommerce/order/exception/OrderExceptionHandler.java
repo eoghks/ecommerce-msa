@@ -1,5 +1,7 @@
 package com.ecommerce.order.exception;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -9,7 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 
+/** D-14: 공통 GlobalExceptionHandler(최하위)의 catch-all보다 먼저 조회되도록 우선순위를 명시 */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class OrderExceptionHandler {
 
     private static final String ERROR_TYPE_BASE = "https://ecommerce-msa.com/errors";
@@ -136,10 +140,15 @@ public class OrderExceptionHandler {
         return pd;
     }
 
-    /** 잘못된 반품 상태 전이 → 400 Bad Request */
+    /**
+     * 잘못된 반품 상태 전이 → 409 Conflict.
+     * 요청 자체는 유효하고 현재 리소스 상태와 충돌하는 경우(이미 처리된 반품 재승인·재거부,
+     * 동시 승인 시 패자 트랜잭션)이므로 400이 아닌 409로 응답한다.
+     * 클라이언트는 재입력이 아니라 목록 새로고침으로 최신 상태를 확인해야 한다.
+     */
     @ExceptionHandler(InvalidReturnStatusException.class)
     public ProblemDetail handleInvalidReturnStatus(InvalidReturnStatusException ex) {
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         pd.setTitle("Invalid Return Status");
         pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-return-status"));
         return pd;

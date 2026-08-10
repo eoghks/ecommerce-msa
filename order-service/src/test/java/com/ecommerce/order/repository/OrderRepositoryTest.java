@@ -5,13 +5,19 @@ import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.domain.OrderItemStatus;
 import com.ecommerce.order.domain.OrderStatus;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -28,7 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(JpaConfig.class)
 @TestPropertySource(properties = {
         "spring.flyway.enabled=false",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 @DisplayName("OrderRepository 구매 인증 조회 통합 테스트")
 class OrderRepositoryTest {
@@ -38,9 +45,14 @@ class OrderRepositoryTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @Autowired private OrderRepository orderRepository;
+    @Autowired private TestEntityManager testEntityManager;
+    @Autowired private EntityManagerFactory entityManagerFactory;
 
     private static final Long USER_ID = 1L;
     private static final Long PRODUCT_ID = 10L;
+
+    /** F-04: 목록 1회 + 항목 배치 1회 + count 1회 — 페이지 크기와 무관한 상한 */
+    private static final int MAX_LIST_QUERY_COUNT = 3;
     // C1: 실제 재고가 차감된 실구매 상태만 인정
     private static final Set<OrderStatus> PURCHASED_STATUSES =
             Set.of(OrderStatus.CONFIRMED, OrderStatus.PARTIALLY_CANCELLED);
@@ -105,7 +117,33 @@ class OrderRepositoryTest {
         assertThat(purchased).isFalse();
     }
 
+    // ── F-04: 주문 목록 N+1 회귀 방지 ─────────────────────────
+
+    @Test
+    @DisplayName("주문 목록 조회 쿼리 수는 페이지 크기에 비례하지 않는다")
+    void findByUserId_doesNotTriggerNPlusOne() {
+        int orderCount = 5;
+        for (int i = 0; i < orderCount; i++) {
+            saveOrderWith(USER_ID, buildItem(PRODUCT_ID + i, false), OrderStatus.CONFIRMED);
+        }
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        Statistics statistics = statistics();
+        statistics.clear();
+
+        Page<Order> orders = orderRepository.findByUserId(USER_ID, PageRequest.of(0, orderCount));
+        orders.getContent().forEach(order -> order.getItems().size());
+
+        assertThat(orders.getContent()).hasSize(orderCount);
+        assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(MAX_LIST_QUERY_COUNT);
+    }
+
     // ── helpers ──────────────────────────────────────────────
+
+    private Statistics statistics() {
+        return entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    }
 
     private boolean existsPurchased(Long userId, Long productId) {
         return orderRepository.existsPurchasedProduct(

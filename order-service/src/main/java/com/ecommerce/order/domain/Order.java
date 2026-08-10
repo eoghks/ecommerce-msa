@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -31,6 +32,12 @@ import java.util.Optional;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
 public class Order {
+
+    /**
+     * F-04: 주문 목록 조회 N+1 방지용 항목 배치 조회 크기.
+     * 페이징 최대 크기(size)보다 크게 잡아 한 페이지의 항목을 한 번에 로드한다.
+     */
+    private static final int ITEMS_BATCH_SIZE = 100;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -62,6 +69,8 @@ public class Order {
     @Column(name = "delivery_status", nullable = false, length = 20)
     private DeliveryStatus deliveryStatus;
 
+    // F-04: 목록 조회 시 주문별 개별 조회(N+1) 대신 항목을 배치로 한 번에 로드
+    @BatchSize(size = ITEMS_BATCH_SIZE)
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
