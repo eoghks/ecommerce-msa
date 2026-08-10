@@ -1,5 +1,7 @@
 package com.ecommerce.order.exception;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -9,7 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 
+/** D-14: 공통 GlobalExceptionHandler(최하위)의 catch-all보다 먼저 조회되도록 우선순위를 명시 */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class OrderExceptionHandler {
 
     private static final String ERROR_TYPE_BASE = "https://ecommerce-msa.com/errors";
