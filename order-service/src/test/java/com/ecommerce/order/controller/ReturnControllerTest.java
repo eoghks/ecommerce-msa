@@ -220,15 +220,15 @@ class ReturnControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /returns/{id}/approve — REQUESTED 아님 → 400")
-    void approveReturn_invalidStatus_badRequest() throws Exception {
+    @DisplayName("PATCH /returns/{id}/approve — REQUESTED 아님(이미 처리됨·동시 승인 패자) → 409")
+    void approveReturn_invalidStatus_conflict() throws Exception {
         given(returnService.approve(10L, 999L, "ADMIN"))
                 .willThrow(new InvalidReturnStatusException("승인할 수 없는 반품 상태입니다."));
 
         mockMvc.perform(patch("/api/v1/returns/10/approve")
                         .header("X-User-Id", "999")
                         .header("X-User-Role", "ADMIN"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test
