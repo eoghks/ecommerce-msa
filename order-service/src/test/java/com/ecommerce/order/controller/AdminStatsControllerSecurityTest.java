@@ -67,12 +67,11 @@ class AdminStatsControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("역할 헤더 없는 요청 — 통계 조회 불가(성공 응답 아님)")
-    void noRole_notAccessible() throws Exception {
-        int status = mockMvc.perform(get(SUMMARY_URL))
-                .andReturn().getResponse().getStatus();
+    @DisplayName("역할 헤더 없는 요청 — 403 (L-3: 실제 상태코드 단정)")
+    void noRole_forbidden() throws Exception {
+        mockMvc.perform(get(SUMMARY_URL))
+                .andExpect(status().isForbidden());
 
-        assertThat(status).isNotEqualTo(200);
         then(statsService).shouldHaveNoInteractions();
     }
 }
