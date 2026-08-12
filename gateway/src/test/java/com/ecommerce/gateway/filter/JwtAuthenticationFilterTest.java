@@ -133,6 +133,16 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("관리자 통계 경로는 토큰 없으면 401 반환 (V1.1-7)")
+    void admin_stats_without_token_returns_401() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/admin/stats/summary").build());
+
+        StepVerifier.create(filter.filter(exchange, chain)).verifyComplete();
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     @DisplayName("인증 필수 경로에서 Bearer 접두사 없으면 401 반환")
     void invalid_token_format_returns_401() {
         MockServerWebExchange exchange = MockServerWebExchange.from(

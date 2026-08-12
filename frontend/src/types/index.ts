@@ -274,6 +274,54 @@ export interface UnreadCountResponse {
   count: number;
 }
 
+// ── 매출 통계 (V1.1-7) ───────────────────────────────
+
+/**
+ * 매출 요약 지표 (ADMIN).
+ * totalRevenue 는 유효 매출(집계 대상 주문의 취소되지 않은 항목 합계),
+ * cancelRate 는 소수 4자리 비율(0~1)이다.
+ */
+export interface SalesSummary {
+  from: string;
+  to: string;
+  totalRevenue: number;
+  orderCount: number;
+  averageOrderValue: number;
+  fullyCancelledCount: number;
+  partiallyCancelledCount: number;
+  cancelRate: number;
+  failedOrderCount: number;
+}
+
+/** 일별 매출 추이 항목 — 데이터 없는 날짜도 0으로 채워 내려온다 */
+export interface DailySales {
+  date: string;
+  revenue: number;
+  orderCount: number;
+}
+
+/** 상품별 매출 Top N 항목 */
+export interface ProductSales {
+  productId: number;
+  productName: string;
+  revenue: number;
+  quantity: number;
+}
+
+/** 판매자별 매출 Top N 항목 — sellerId 가 null 이면 플랫폼(관리자) 등록 상품 */
+export interface SellerSales {
+  sellerId: number | null;
+  revenue: number;
+  quantity: number;
+  orderCount: number;
+}
+
+/** 실패(자동취소) 주문 일별 추이 항목 */
+export interface FailedOrderTrend {
+  date: string;
+  count: number;
+}
+
 // ── 모니터링 ─────────────────────────────────────────
 
 export interface ServiceHealth {
