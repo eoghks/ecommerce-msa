@@ -99,6 +99,9 @@ const Navbar = () => {
               <Link to="/admin/orders" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 주문관리
               </Link>
+              <Link to="/admin/returns" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
+                반품관리
+              </Link>
               <Link to="/admin/failed" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 실패주문
               </Link>
@@ -114,6 +117,9 @@ const Navbar = () => {
               </Link>
               <Link to="/admin/orders" className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 no-underline hover:bg-emerald-50 transition-colors">
                 주문관리
+              </Link>
+              <Link to="/admin/returns" className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 no-underline hover:bg-emerald-50 transition-colors">
+                반품관리
               </Link>
             </>
           )}
@@ -225,6 +231,15 @@ const Navbar = () => {
                       </svg>
                       내 주문
                     </Link>
+                    {/* V1.1-5: 내 반품 내역 */}
+                    <Link to="/my/returns"
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors"
+                      onClick={() => setMyOpen(false)}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 2 3 8 9 8"/><path d="M3 8a9 9 0 1 0 3-6.7"/>
+                      </svg>
+                      반품 내역
+                    </Link>
                     <Link to="/my/addresses"
                       className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors"
                       onClick={() => setMyOpen(false)}>
@@ -307,6 +322,13 @@ const Navbar = () => {
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
                       </svg>
                       내 주문
+                    </Link>
+                    {/* V1.1-5: 내 반품 내역 */}
+                    <Link to="/my/returns" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 2 3 8 9 8"/><path d="M3 8a9 9 0 1 0 3-6.7"/>
+                      </svg>
+                      반품 내역
                     </Link>
                     <Link to="/my/addresses" className="flex items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-gray-700 no-underline hover:bg-gray-50 transition-colors" onClick={closeMobile}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

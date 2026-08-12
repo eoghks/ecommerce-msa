@@ -1,5 +1,9 @@
 package com.ecommerce.order.exception;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -7,7 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 
+/** D-14: 공통 GlobalExceptionHandler(최하위)의 catch-all보다 먼저 조회되도록 우선순위를 명시 */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class OrderExceptionHandler {
 
     private static final String ERROR_TYPE_BASE = "https://ecommerce-msa.com/errors";
@@ -113,6 +119,94 @@ public class OrderExceptionHandler {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         pd.setTitle("Forbidden");
         pd.setType(URI.create(ERROR_TYPE_BASE + "/delivery-status-forbidden"));
+        return pd;
+    }
+
+    /** 반품 없음/타인 소유 반품 접근 → 404 Not Found (정보 노출 방지) */
+    @ExceptionHandler(ReturnRequestNotFoundException.class)
+    public ProblemDetail handleReturnRequestNotFound(ReturnRequestNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Return Request Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-not-found"));
+        return pd;
+    }
+
+    /** 반품 자격 미충족(배송완료 아님·취소된 항목·사유 누락) → 400 Bad Request */
+    @ExceptionHandler(ReturnNotAllowedException.class)
+    public ProblemDetail handleReturnNotAllowed(ReturnNotAllowedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Return Not Allowed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-not-allowed"));
+        return pd;
+    }
+
+    /**
+     * 잘못된 반품 상태 전이 → 409 Conflict.
+     * 요청 자체는 유효하고 현재 리소스 상태와 충돌하는 경우(이미 처리된 반품 재승인·재거부,
+     * 동시 승인 시 패자 트랜잭션)이므로 400이 아닌 409로 응답한다.
+     * 클라이언트는 재입력이 아니라 목록 새로고침으로 최신 상태를 확인해야 한다.
+     */
+    @ExceptionHandler(InvalidReturnStatusException.class)
+    public ProblemDetail handleInvalidReturnStatus(InvalidReturnStatusException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Invalid Return Status");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-return-status"));
+        return pd;
+    }
+
+    /** 동일 항목 반품 중복 신청 → 409 Conflict */
+    @ExceptionHandler(DuplicateReturnRequestException.class)
+    public ProblemDetail handleDuplicateReturnRequest(DuplicateReturnRequestException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Duplicate Return Request");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/duplicate-return-request"));
+        return pd;
+    }
+
+    /** 반품 처리·조회 권한 없음 → 403 Forbidden */
+    @ExceptionHandler(ReturnAccessDeniedException.class)
+    public ProblemDetail handleReturnAccessDenied(ReturnAccessDeniedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        pd.setTitle("Forbidden");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/return-forbidden"));
+        return pd;
+    }
+
+    /**
+     * H-2: DB 유니크 제약 등 데이터 무결성 위반 → 409 Conflict.
+     * 반품 중복 신청은 서비스 검증(exists)과 save 사이에 원자성이 없어 동시 요청 시
+     * 부분 유니크 인덱스(uq_return_item_active)가 최종 방어선이 된다.
+     * 이때 기본 500 대신 중복 신청임을 알 수 있는 409 로 전달한다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "이미 처리 중인 요청이 있습니다. 잠시 후 다시 확인해주세요.");
+        pd.setTitle("Data Integrity Violation");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/duplicate-return-request"));
+        return pd;
+    }
+
+    /**
+     * M-1: 동시 처리 충돌(낙관적 락 버전 불일치) → 409 Conflict.
+     * 반품 승인/거부가 동시에 들어오면 뒤늦은 트랜잭션이 실패하도록 하여
+     * 상태 유실·환불 훅 중복 호출을 막는다.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "다른 처리가 먼저 완료되었습니다. 최신 상태를 확인한 뒤 다시 시도해주세요.");
+        pd.setTitle("Concurrent Modification");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/concurrent-modification"));
+        return pd;
+    }
+
+    /** L-1: 잘못된 인자(주문에 없는 항목 id 등) → 400 Bad Request */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Invalid Request");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/invalid-request"));
         return pd;
     }
 

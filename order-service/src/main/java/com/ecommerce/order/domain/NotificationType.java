@@ -15,7 +15,10 @@ public enum NotificationType {
     ORDER_CANCELLED("주문 취소", "주문이 취소되었습니다. (주문 #%d)"),
     ORDER_ITEM_CANCELLED("주문 항목 취소", "주문 항목이 취소되었습니다. (주문 #%d)"),
     DELIVERY_SHIPPING("배송 시작", "상품 배송이 시작되었습니다. (주문 #%d)"),
-    DELIVERY_DELIVERED("배송 완료", "상품이 배송 완료되었습니다. (주문 #%d)");
+    DELIVERY_DELIVERED("배송 완료", "상품이 배송 완료되었습니다. (주문 #%d)"),
+    RETURN_APPROVED("반품 승인", "반품 신청이 승인되었습니다. (주문 #%d)"),
+    RETURN_REJECTED("반품 거부", "반품 신청이 거부되었습니다. (주문 #%d)"),
+    RETURN_REFUNDED("환불 완료", "반품 환불이 완료되었습니다. (주문 #%d)");
 
     private final String title;
     private final String messageTemplate;

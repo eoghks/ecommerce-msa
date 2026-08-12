@@ -3,6 +3,7 @@ package com.ecommerce.auth.controller;
 import com.ecommerce.auth.domain.Role;
 import com.ecommerce.auth.domain.User;
 import com.ecommerce.auth.dto.SignupResponse;
+import com.ecommerce.auth.exception.DuplicateEmailException;
 import com.ecommerce.auth.jwt.JwtProvider;
 import com.ecommerce.auth.service.AuthService;
 import com.ecommerce.auth.support.RefreshTokenCookie;
@@ -89,11 +90,12 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /** O-02: 실제 서비스는 DuplicateEmailException → 409 를 반환하므로 실동작 기준으로 검증한다 */
     @Test
-    @DisplayName("중복 이메일 시 400 반환")
+    @DisplayName("중복 이메일 시 409 반환")
     @WithMockUser
-    void signup_duplicateEmail_returns400() throws Exception {
-        willThrow(new IllegalArgumentException("이미 사용 중인 이메일입니다."))
+    void signup_duplicateEmail_returns409() throws Exception {
+        willThrow(new DuplicateEmailException("dup@example.com"))
                 .given(authService).signup(any());
 
         Map<String, String> body = Map.of(
@@ -106,7 +108,8 @@ class AuthControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("이미 사용 중인 이메일입니다."));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Duplicate Email"))
+                .andExpect(jsonPath("$.detail").value("이미 사용 중인 이메일입니다: dup@example.com"));
     }
 }

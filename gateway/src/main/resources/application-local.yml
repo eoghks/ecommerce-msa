@@ -22,6 +22,11 @@ spring:
           predicates:
             - Path=/api/v1/orders/**
 
+        - id: return-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/v1/returns/**
+
         - id: notification-service
           uri: http://localhost:8083
           predicates:

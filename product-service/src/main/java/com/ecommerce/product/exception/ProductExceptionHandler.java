@@ -1,6 +1,8 @@
 package com.ecommerce.product.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -8,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+/** D-14: 공통 GlobalExceptionHandler(최하위)의 catch-all보다 먼저 조회되도록 우선순위를 명시 */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class ProductExceptionHandler {
 
     /** 위시리스트 추가 경로 판별용 — 이 맥락의 유니크 위반만 멱등 처리한다. */

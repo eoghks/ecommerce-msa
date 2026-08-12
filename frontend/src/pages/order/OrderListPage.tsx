@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { getMyOrders, cancelOrder } from '../../api/order';
-import type { Order, OrderStatus } from '../../types';
+import { getMyReturns, requestReturn } from '../../api/return';
+import { returnStatusStyle, blocksNewReturn } from '../../utils/returnStatus';
+import type { ApiErrorResponse, Order, OrderItem, OrderStatus, ReturnRequest } from '../../types';
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(price);
@@ -34,17 +37,47 @@ const CANCELLABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PARTIALLY_
 // V1.1-1: 구매 확정(재고 차감 완료) 상태 — 리뷰 작성 가능
 const REVIEWABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
 
+// V1.1-5: 내 반품 조회 페이지 크기 — 표시 중인 주문 항목의 반품 상태 매칭용
+const RETURN_LOOKUP_SIZE = 100;
+
+/** 주문 항목별 최신 반품 1건 매핑 (목록이 신청 최신순이므로 먼저 만난 건이 최신) */
+const toReturnsByItem = (returns: ReturnRequest[]): Record<number, ReturnRequest> => {
+  const byItem: Record<number, ReturnRequest> = {};
+  returns.forEach((r) => {
+    if (!byItem[r.orderItemId]) byItem[r.orderItemId] = r;
+  });
+  return byItem;
+};
+
+/** 반품 신청 모달 대상 */
+interface ReturnTarget {
+  orderId: number;
+  itemId: number;
+  productName: string;
+}
+
 const OrderListPage = () => {
   const location = useLocation();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [returnsByItem, setReturnsByItem] = useState<Record<number, ReturnRequest>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const justOrdered = location.state?.ordered;
 
+  // V1.1-5: 반품 신청 모달 상태
+  const [returnTarget, setReturnTarget] = useState<ReturnTarget | null>(null);
+
   const load = () => {
     setLoading(true);
-    return getMyOrders(0, 20)
-      .then((res) => setOrders(res.data.content ?? []))
+    return Promise.all([
+      getMyOrders(0, 20),
+      // 반품 조회 실패는 주문 목록 표시를 막지 않는다(반품 뱃지만 미표시)
+      getMyReturns(0, RETURN_LOOKUP_SIZE).catch(() => null),
+    ])
+      .then(([orderRes, returnRes]) => {
+        setOrders(orderRes.data.content ?? []);
+        setReturnsByItem(toReturnsByItem(returnRes?.data.content ?? []));
+      })
       .catch(() => setError('주문 내역을 불러오는 데 실패했습니다.'))
       .finally(() => setLoading(false));
   };
@@ -52,6 +85,9 @@ const OrderListPage = () => {
   useEffect(() => {
     load();
   }, []);
+
+  const openReturn = (orderId: number, item: OrderItem) =>
+    setReturnTarget({ orderId, itemId: item.id, productName: item.productName });
 
   if (loading) {
     return (
@@ -89,9 +125,19 @@ const OrderListPage = () => {
       ) : (
         <div className="flex flex-col gap-4">
           {orders.map((order) => (
-            <OrderCard key={order.id} order={order} onCancelled={load} />
+            <OrderCard key={order.id} order={order} returnsByItem={returnsByItem}
+              onCancelled={load} onRequestReturn={openReturn} />
           ))}
         </div>
+      )}
+
+      {/* V1.1-5: 반품 신청 사유 모달 */}
+      {returnTarget && (
+        <ReturnRequestModal
+          target={returnTarget}
+          onClose={() => setReturnTarget(null)}
+          onDone={async () => { setReturnTarget(null); await load(); }}
+        />
       )}
     </div>
   );
@@ -99,10 +145,12 @@ const OrderListPage = () => {
 
 interface OrderCardProps {
   order: Order;
+  returnsByItem: Record<number, ReturnRequest>;
   onCancelled?: () => void;
+  onRequestReturn: (orderId: number, item: OrderItem) => void;
 }
 
-const OrderCard = ({ order, onCancelled }: OrderCardProps) => {
+const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: OrderCardProps) => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
   const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
@@ -152,20 +200,10 @@ const OrderCard = ({ order, onCancelled }: OrderCardProps) => {
       {/* 상품 목록 */}
       <div className="flex flex-col gap-2 mb-3">
         {(order.items ?? []).map((item, idx) => (
-          <div key={idx} className="flex items-center justify-between text-[13px]">
-            <span className="text-gray-700 truncate flex-1 mr-2">{item.productName}</span>
-            {/* V1.1-1: 구매 확정 + 활성 항목이면 리뷰 쓰기 (상세 페이지 리뷰 폼으로 이동) */}
-            {reviewable && item.status === 'ACTIVE' && (
-              <Link to={`/products/${item.productId}`}
-                className="text-[12px] text-brand-600 no-underline font-medium shrink-0 mr-3 hover:underline">
-                리뷰 쓰기
-              </Link>
-            )}
-            <span className="text-gray-400 shrink-0">× {item.quantity}</span>
-            <span className="text-gray-900 font-medium shrink-0 ml-3">
-              {formatPrice(item.price * item.quantity)}
-            </span>
-          </div>
+          <OrderItemRow key={idx} item={item} reviewable={reviewable}
+            delivered={order.deliveryStatus === 'DELIVERED'}
+            itemReturn={returnsByItem[item.id]}
+            onRequestReturn={() => onRequestReturn(order.id, item)} />
         ))}
       </div>
 
@@ -188,6 +226,111 @@ const OrderCard = ({ order, onCancelled }: OrderCardProps) => {
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+interface OrderItemRowProps {
+  item: OrderItem;
+  reviewable: boolean;
+  delivered: boolean;
+  itemReturn?: ReturnRequest;
+  onRequestReturn: () => void;
+}
+
+// 주문 항목 1행 — 리뷰 쓰기(V1.1-1), 반품 뱃지·신청(V1.1-5)
+const OrderItemRow = ({ item, reviewable, delivered, itemReturn, onRequestReturn }: OrderItemRowProps) => {
+  const active = item.status === 'ACTIVE';
+  const returnBadge = itemReturn ? returnStatusStyle(itemReturn.status) : null;
+  // 반품 신청 가능: 배송완료 주문의 활성 항목 + 진행 중인 반품 없음(거부 건은 재신청 허용)
+  const returnable = delivered && active && !(itemReturn && blocksNewReturn(itemReturn.status));
+
+  return (
+    <div className="flex items-center justify-between text-[13px]">
+      <span className="text-gray-700 truncate flex-1 mr-2">{item.productName}</span>
+      {/* V1.1-5: 반품 진행 상태 뱃지 */}
+      {returnBadge && (
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white shrink-0 mr-2"
+          style={{ background: returnBadge.color }}>
+          {returnBadge.text}
+        </span>
+      )}
+      {/* V1.1-1: 구매 확정 + 활성 항목이면 리뷰 쓰기 (상세 페이지 리뷰 폼으로 이동) */}
+      {reviewable && active && (
+        <Link to={`/products/${item.productId}`}
+          className="text-[12px] text-brand-600 no-underline font-medium shrink-0 mr-3 hover:underline">
+          리뷰 쓰기
+        </Link>
+      )}
+      {/* V1.1-5: 반품 신청 */}
+      {returnable && (
+        <button onClick={onRequestReturn}
+          className="shrink-0 h-7 px-2.5 mr-3 text-[11px] font-medium text-orange-600 border border-orange-200 rounded-lg hover:bg-orange-50 bg-white transition-colors">
+          반품 신청
+        </button>
+      )}
+      <span className="text-gray-400 shrink-0">× {item.quantity}</span>
+      <span className="text-gray-900 font-medium shrink-0 ml-3">
+        {formatPrice(item.price * item.quantity)}
+      </span>
+    </div>
+  );
+};
+
+interface ReturnRequestModalProps {
+  target: ReturnTarget;
+  onClose: () => void;
+  onDone: () => Promise<void>;
+}
+
+// V1.1-5: 반품 신청 사유 입력 모달 — 자격 미충족(400)·중복(409)·권한(403) 시 서버 메시지 노출
+const ReturnRequestModal = ({ target, onClose, onDone }: ReturnRequestModalProps) => {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!reason.trim()) { setError('반품 사유를 입력해주세요.'); return; }
+    setSubmitting(true);
+    try {
+      await requestReturn(target.orderId, target.itemId, reason.trim());
+      await onDone();
+    } catch (err) {
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail
+        || '반품 신청에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-4"
+      onClick={() => !submitting && onClose()}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-[15px] font-bold text-gray-900 mb-1 m-0">반품 신청</h2>
+        <p className="text-[13px] text-gray-500 mb-4 mt-1">{target.productName}</p>
+        <label className="field-label">반품 사유 *</label>
+        <textarea
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); setError(''); }}
+          placeholder="반품 사유를 입력하세요"
+          rows={3}
+          maxLength={300}
+          className="input-field mt-1.5"
+          style={{ resize: 'vertical' }}
+        />
+        {error && <div className="error-box mt-2">{error}</div>}
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} disabled={submitting}
+            className="h-10 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-[10px]">
+            닫기
+          </button>
+          <button onClick={submit} disabled={submitting}
+            className="h-10 px-5 text-white text-sm font-semibold rounded-[10px] border-none bg-orange-500 disabled:opacity-70">
+            {submitting ? '신청 중...' : '반품 신청'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

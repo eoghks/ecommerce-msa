@@ -1,5 +1,7 @@
 package com.ecommerce.auth.exception;
 
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,8 +12,10 @@ import java.net.URI;
 /**
  * Auth Service 전용 예외 핸들러
  * GlobalExceptionHandler보다 구체적인 예외를 먼저 처리 (Spring MVC 우선순위)
+ * D-14: 공통 핸들러(최하위)의 catch-all보다 먼저 조회되도록 우선순위를 명시
  */
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 public class AuthExceptionHandler {
 
     private static final String ERROR_TYPE_BASE = "https://ecommerce-msa.com/errors";
