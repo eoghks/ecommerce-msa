@@ -24,10 +24,22 @@ const QUICK_RANGES = [7, 30, 90];
 // 기본 조회 기간 (서버 기본값과 동일한 30일)
 const DEFAULT_RANGE_DAYS = 30;
 
+// 최대 조회 기간 (서버 검증값과 동일한 366일)
+const MAX_RANGE_DAYS = 366;
+
+const MS_PER_DAY = 86_400_000;
+
 // Top N 조회 개수
 const TOP_LIMIT = 10;
 
 const EMPTY_MESSAGE = '해당 기간 데이터가 없습니다.';
+
+// 조회 실패 시 값 자리 표기 — "데이터 없음(0)"과 구분한다
+const NO_DATA = '—';
+
+// 축약 표기 단위
+const TEN_THOUSAND = 10_000;
+const HUNDRED_MILLION = 100_000_000;
 
 interface Period {
   from: string;
@@ -41,6 +53,10 @@ const isoDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+// 시작일·종료일을 포함한 조회 일수 (ISO 날짜 문자열 기준)
+const rangeDays = (from: string, to: string) =>
+  Math.round((new Date(to).getTime() - new Date(from).getTime()) / MS_PER_DAY) + 1;
+
 // 오늘을 포함한 최근 N일 기간
 const recentPeriod = (days: number): Period => {
   const to = new Date();
@@ -51,11 +67,23 @@ const recentPeriod = (days: number): Period => {
 
 const formatNumber = (value: number) => value.toLocaleString('ko-KR');
 const formatWon = (value: number) => `${value.toLocaleString('ko-KR')}원`;
+const formatCount = (value: number) => `${formatNumber(value)}건`;
 const formatRate = (rate: number) => `${(rate * 100).toFixed(2)}%`;
 
-// 만원 단위 축약 — 차트 Y축이 길어지는 것을 방지
-const formatCompact = (value: number) =>
-  value >= 10_000 ? `${Math.round(value / 10_000).toLocaleString('ko-KR')}만` : formatNumber(value);
+// 소수 1자리까지 유지하고 불필요한 .0 은 제거 — 1.5만 / 2만
+const withDecimal = (value: number) => Number(value.toFixed(1)).toLocaleString('ko-KR');
+
+// 만·억 단위 축약 — 차트 Y축처럼 공간이 좁은 곳에만 사용한다(툴팁·KPI는 정확값 표기).
+// 만 미만은 원 단위 그대로 표기해 반올림 왜곡(15,000 → "2만")을 없앤다.
+const formatCompact = (value: number) => {
+  if (value >= HUNDRED_MILLION) return `${withDecimal(value / HUNDRED_MILLION)}억`;
+  if (value >= TEN_THOUSAND)    return `${withDecimal(value / TEN_THOUSAND)}만`;
+  return formatNumber(value);
+};
+
+// 조회 실패로 값이 없으면 "—" — 0원으로 오독되지 않게 한다
+const orNoData = (value: number | undefined, format: (value: number) => string) =>
+  value === undefined ? NO_DATA : format(value);
 
 const errorDetail = (err: unknown, fallback: string) =>
   (err as AxiosError<ApiErrorResponse>).response?.data?.detail || fallback;
@@ -75,11 +103,13 @@ const AdminStatsPage = () => {
 
   const [metric, setMetric]   = useState<ChartMetric>('revenue');
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
+  const [error, setError]     = useState('');       // 조회 실패 — 지표를 렌더링하지 않는다
+  const [formError, setFormError] = useState('');   // 입력값 검증 실패 — 기존 조회 결과는 유지한다
 
   const load = useCallback(async ({ from, to }: Period) => {
     setLoading(true);
     setError('');
+    setFormError('');
     try {
       const [summaryRes, dailyRes, productRes, sellerRes, failedRes] = await Promise.all([
         getSalesSummary(from, to),
@@ -95,6 +125,12 @@ const AdminStatsPage = () => {
       setFailed(failedRes.data ?? []);
     } catch (err) {
       setError(errorDetail(err, '통계를 불러오지 못했습니다.'));
+      // 실패한 응답을 "매출 0"으로 오독하지 않도록 이전 지표를 비운다
+      setSummary(null);
+      setDaily([]);
+      setProducts([]);
+      setSellers([]);
+      setFailed([]);
     } finally {
       setLoading(false);
     }
@@ -110,9 +146,19 @@ const AdminStatsPage = () => {
 
   const applyDraft = () => {
     if (!draft.from || !draft.to) {
-      setError('조회 기간을 모두 입력해주세요.');
+      setFormError('조회 기간을 모두 입력해주세요.');
       return;
     }
+    // L-4: 서버 왕복 없이 기간 조건을 먼저 검증한다(ISO 문자열은 사전순 비교로 날짜 비교 가능)
+    if (draft.from > draft.to) {
+      setFormError('조회 시작일이 종료일보다 늦을 수 없습니다.');
+      return;
+    }
+    if (rangeDays(draft.from, draft.to) > MAX_RANGE_DAYS) {
+      setFormError(`조회 기간은 최대 ${MAX_RANGE_DAYS}일까지 가능합니다.`);
+      return;
+    }
+    setFormError('');
     setPeriod({ ...draft });
   };
 
@@ -138,10 +184,12 @@ const AdminStatsPage = () => {
         disabled={loading}
       />
 
-      {error && <div className="error-box mb-4">{error}</div>}
+      {formError && <div className="error-box mb-4">{formError}</div>}
 
       {loading ? (
         <StatsSkeleton />
+      ) : error ? (
+        <StatsErrorBox message={error} onRetry={() => load(period)} />
       ) : (
         <>
           <KpiCards summary={summary} />
@@ -162,7 +210,7 @@ const AdminStatsPage = () => {
                   <TrendBarChart
                     points={trendPoints}
                     formatValue={metric === 'revenue' ? formatCompact : formatNumber}
-                    unit={metric === 'revenue' ? '원' : '건'}
+                    formatTooltip={metric === 'revenue' ? formatWon : formatCount}
                   />
                 </div>
               </div>
@@ -240,21 +288,40 @@ const PeriodSelector = ({ period, draft, onQuick, onDraftChange, onApply, disabl
       </div>
     </div>
     <p className="text-[12px] text-gray-400 mt-2 mb-0">
-      {period.from} ~ {period.to} (최대 366일)
+      {period.from} ~ {period.to} (최대 {MAX_RANGE_DAYS}일)
     </p>
   </div>
 );
 
+// 값이 없으면(조회 실패) 0 대신 "—" 를 표기한다
 const KpiCards = ({ summary }: { summary: SalesSummary | null }) => (
   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-    <KpiCard label="유효 매출" value={formatWon(summary?.totalRevenue ?? 0)}
+    <KpiCard label="유효 매출" value={orNoData(summary?.totalRevenue, formatWon)}
       note="취소 항목 제외" />
-    <KpiCard label="주문수" value={`${formatNumber(summary?.orderCount ?? 0)}건`}
+    <KpiCard label="주문수" value={orNoData(summary?.orderCount, formatCount)}
       note="확정·부분취소 주문" />
-    <KpiCard label="평균 주문금액" value={formatWon(summary?.averageOrderValue ?? 0)}
+    <KpiCard label="평균 주문금액" value={orNoData(summary?.averageOrderValue, formatWon)}
       note="유효 매출 / 주문수" />
-    <KpiCard label="취소율" value={formatRate(summary?.cancelRate ?? 0)}
-      note={`전체취소 ${formatNumber(summary?.fullyCancelledCount ?? 0)}건 · 부분취소 ${formatNumber(summary?.partiallyCancelledCount ?? 0)}건`} />
+    <KpiCard label="취소율" value={orNoData(summary?.cancelRate, formatRate)}
+      note={summary
+        ? `전체취소 ${formatNumber(summary.fullyCancelledCount)}건 · 부분취소 ${formatNumber(summary.partiallyCancelledCount)}건`
+        : '조회된 데이터 없음'} />
+  </div>
+);
+
+// 조회 실패 — 지표 대신 에러와 재시도만 노출해 "매출 0" 오독을 막는다
+const StatsErrorBox = ({ message, onRetry }: { message: string; onRetry: () => void }) => (
+  <div className="bg-white border border-gray-100 rounded-2xl p-4">
+    <div className="error-box mb-3">{message}</div>
+    <div className="flex items-center justify-center flex-col gap-3 py-10">
+      <p className="text-gray-500 text-[13px] m-0">
+        통계를 불러오지 못해 지표를 표시할 수 없습니다. (데이터가 0인 것과 다릅니다)
+      </p>
+      <button onClick={onRetry}
+        className="h-9 px-4 text-[13px] font-semibold text-white bg-brand-600 rounded-[10px] border-none">
+        다시 시도
+      </button>
+    </div>
   </div>
 );
 

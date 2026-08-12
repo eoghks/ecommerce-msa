@@ -11,9 +11,11 @@ interface TrendBarChartProps {
   points: TrendPoint[];
   /** 막대 색상 */
   color?: string;
-  /** 값 표기 형식 (툴팁·Y축 라벨) */
+  /** Y축 라벨 표기 형식 — 공간이 좁아 축약 표기를 허용한다 */
   formatValue?: (value: number) => string;
-  /** 값 단위 설명 — 툴팁에 붙는다 */
+  /** 툴팁 표기 형식 — 축약 없이 정확한 값을 보여준다 (미지정 시 formatValue + unit) */
+  formatTooltip?: (value: number) => string;
+  /** 값 단위 설명 — 기본 툴팁에 붙는다 */
   unit?: string;
 }
 
@@ -41,9 +43,12 @@ const TrendBarChart = ({
   points,
   color = '#4f46e5',
   formatValue = defaultFormat,
+  formatTooltip,
   unit = '',
 }: TrendBarChartProps) => {
   const maxValue = points.reduce((max, point) => Math.max(max, point.value), 0);
+  // 툴팁은 정확한 값 우선 — 전용 포맷이 없으면 기본 포맷(정확값)에 단위만 붙인다
+  const tooltipText = formatTooltip ?? ((value: number) => `${defaultFormat(value)}${unit}`);
   const slotWidth = PLOT_WIDTH / Math.max(points.length, 1);
   const barWidth = Math.max(slotWidth * 0.62, 1);
   const labelStep = Math.max(1, Math.ceil(points.length / MAX_X_LABELS));
@@ -79,7 +84,7 @@ const TrendBarChart = ({
         return (
           <g key={point.date}>
             <rect x={x} y={y} width={barWidth} height={height} rx="1.5" fill={color}>
-              <title>{`${point.date} · ${formatValue(point.value)}${unit}`}</title>
+              <title>{`${point.date} · ${tooltipText(point.value)}`}</title>
             </rect>
             {index % labelStep === 0 && (
               <text x={x + barWidth / 2} y={VIEW_HEIGHT - 6} textAnchor="middle"
