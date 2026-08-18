@@ -1,6 +1,7 @@
 package com.ecommerce.order.service;
 
 import com.ecommerce.order.client.ProductClient;
+import com.ecommerce.order.config.RedisJsonMapper;
 import com.ecommerce.order.domain.CartItem;
 import com.ecommerce.order.domain.CartItemRecord;
 import com.ecommerce.order.dto.request.CartAddRequest;
@@ -10,7 +11,6 @@ import com.ecommerce.order.exception.CartItemNotFoundException;
 import com.ecommerce.order.repository.CartItemRepository;
 import com.ecommerce.order.support.CartPrincipal;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -31,7 +31,7 @@ public class CartService {
 
     private final CartItemRepository cartItemRepository;
     private final RedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper redisObjectMapper;
+    private final RedisJsonMapper redisJsonMapper;
     private final ProductClient productClient;
 
     // ── 조회 ─────────────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ public class CartService {
         try {
             String json = redisTemplate.opsForValue().get(guestKey(guestId));
             if (json == null) return new ArrayList<>();
-            return redisObjectMapper.readValue(json, new TypeReference<>() {});
+            return redisJsonMapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             log.warn("게스트 장바구니 Redis 읽기 실패: guestId={}, error={}", guestId, e.getMessage());
             return new ArrayList<>();
@@ -192,7 +192,7 @@ public class CartService {
 
     private void saveGuestItems(String guestId, List<CartItemRecord> items) {
         try {
-            String json = redisObjectMapper.writeValueAsString(items);
+            String json = redisJsonMapper.writeValueAsString(items);
             redisTemplate.opsForValue().set(guestKey(guestId), json, GUEST_TTL_DAYS, TimeUnit.DAYS);
         } catch (Exception e) {
             log.error("게스트 장바구니 Redis 저장 실패: guestId={}, error={}", guestId, e.getMessage());

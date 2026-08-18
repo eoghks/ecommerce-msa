@@ -1,5 +1,6 @@
 package com.ecommerce.product.service;
 
+import com.ecommerce.product.config.RedisJsonMapper;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.domain.SortOption;
@@ -14,7 +15,6 @@ import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +51,7 @@ class ProductServiceTest {
     @Mock private CategoryRepository categoryRepository;
     @Mock private RedisTemplate<String, String> redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
-    @Mock private ObjectMapper redisObjectMapper;
+    @Mock private RedisJsonMapper redisJsonMapper;
     @Mock private com.ecommerce.product.client.UserClient userClient;
 
     @InjectMocks private ProductService productService;
@@ -196,7 +196,7 @@ class ProductServiceTest {
         ProductResponse cached = ProductResponse.from(product);
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get("product:detail:1")).willReturn("{\"id\":1}");
-        given(redisObjectMapper.readValue("{\"id\":1}", ProductResponse.class)).willReturn(cached);
+        given(redisJsonMapper.readValue("{\"id\":1}", ProductResponse.class)).willReturn(cached);
 
         ProductResponse response = productService.getProduct(1L);
 
@@ -213,7 +213,7 @@ class ProductServiceTest {
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.get("product:detail:1")).willReturn(null);
         given(productRepository.findById(1L)).willReturn(Optional.of(product));
-        given(redisObjectMapper.writeValueAsString(any(ProductResponse.class))).willReturn("{\"id\":1}");
+        given(redisJsonMapper.writeValueAsString(any(ProductResponse.class))).willReturn("{\"id\":1}");
 
         ProductResponse response = productService.getProduct(1L);
 
