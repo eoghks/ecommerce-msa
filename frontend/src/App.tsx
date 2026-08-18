@@ -21,6 +21,7 @@ import AdminCategoryPage from './pages/admin/AdminCategoryPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
 import AdminFailedOrderPage from './pages/admin/AdminFailedOrderPage';
 import AdminMonitoringPage from './pages/admin/AdminMonitoringPage';
+import AdminStatsPage from './pages/admin/AdminStatsPage';
 import AdminReturnPage from './pages/admin/AdminReturnPage';
 import MyProfilePage from './pages/my/MyProfilePage';
 import WishlistPage from './pages/my/WishlistPage';
@@ -106,6 +107,8 @@ const App = () => {
               <Route path="/admin/categories" element={<AdminOnlyRoute><AdminCategoryPage /></AdminOnlyRoute>} />
               <Route path="/admin/failed" element={<AdminOnlyRoute><AdminFailedOrderPage /></AdminOnlyRoute>} />
               <Route path="/admin/monitoring" element={<AdminOnlyRoute><AdminMonitoringPage /></AdminOnlyRoute>} />
+              {/* V1.1-7: 매출 통계 대시보드 (ADMIN 전용) */}
+              <Route path="/admin/stats" element={<AdminOnlyRoute><AdminStatsPage /></AdminOnlyRoute>} />
             </Routes>
           </main>
         } />

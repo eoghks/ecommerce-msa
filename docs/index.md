@@ -14,12 +14,22 @@
 | [design/review-rating.md](design/review-rating.md) | 상품 리뷰·별점 (V1.1-1) |
 | [design/delivery-address.md](design/delivery-address.md) | 배송지 관리 + 배송 상태 (V1.1-3) |
 | [design/notification.md](design/notification.md) | 알림(주문·배송) (V1.1-4) |
+| [design/return-refund.md](design/return-refund.md) | 반품·환불 (V1.1-5) |
+| [design/admin-sales-stats.md](design/admin-sales-stats.md) | 관리자 매출 통계 대시보드 (V1.1-7) |
 
 ## 운영
 
 | 문서 | 내용 |
 |------|------|
 | [deploy-checklist.md](deploy-checklist.md) | 운영 배포 전 보안·설정 체크리스트 |
+| [roadmap.md](roadmap.md) | 버전별 기능 로드맵 (v1.1 / v2.0 글로벌화 트랙) |
+
+## 트레이드오프
+
+| 문서 | 내용 |
+|------|------|
+| [tradeoffs/OVERVIEW.md](tradeoffs/OVERVIEW.md) | 의도적으로 범위 밖에 둔 선택 목록 |
+| [tradeoffs/MD-06-globalization-scope.md](tradeoffs/MD-06-globalization-scope.md) | 글로벌화(타임존·다국어·통화) 미적용 — 타임존 KST 고정 (MD-06) |
 
 ---
 

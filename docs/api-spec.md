@@ -139,19 +139,62 @@
 | PATCH | `/api/v1/notifications/{id}/read` | 단건 읽음 (본인) | USER | `204 No Content` |
 | PATCH | `/api/v1/notifications/read-all` | 전체 읽음 (본인) | USER | `204 No Content` |
 
+### 반품·환불 (V1.1-5)
+
+| Method | URL | 설명 | 인증 | 성공 Status |
+|--------|-----|------|------|-------------|
+| POST | `/api/v1/orders/{orderId}/items/{itemId}/returns` | 반품 신청 (주문 소유자, 사유 필수) | USER | `201 Created` |
+| GET | `/api/v1/returns/me` | 내 반품 목록 (최신순 페이징) | USER | `200 OK` |
+| GET | `/api/v1/returns/admin` | 반품 관리 목록 (ADMIN 전체 / SELLER 본인 상품 건만) | ADMIN/SELLER | `200 OK` |
+| PATCH | `/api/v1/returns/{returnId}/approve` | 반품 승인 (재고 복구 + 환불 처리) | ADMIN/SELLER | `200 OK` |
+| PATCH | `/api/v1/returns/{returnId}/reject` | 반품 거부 (거부 사유 필수) | ADMIN/SELLER | `200 OK` |
+
+**요청 바디**: 신청 `{ "reason": "..." }` / 거부 `{ "rejectReason": "..." }` — 둘 다 필수, 300자 이하.
+**반품 상태**: `REQUESTED → APPROVED → REFUNDED`, `REQUESTED → REJECTED`(거부 건은 재신청 허용).
+
+> 신청 자격은 배송완료(`DELIVERED`) 주문의 활성(ACTIVE) 항목이며, 항목당 진행 중(REQUESTED·APPROVED·REFUNDED) 반품은 1건만 허용한다(DB 부분 유니크로 최종 방어).
+> 승인 시 기존 항목취소 경로를 재사용해 재고를 복구하고 환불 처리(mock) 후 `REFUNDED`로 전이한다. 승인·거부·환불 시 신청자에게 인앱 알림 생성.
+
+### 관리자 매출 통계 `/api/v1/admin/stats` (V1.1-7)
+
+| Method | URL | 설명 | 인증 | 성공 Status |
+|--------|-----|------|------|-------------|
+| GET | `/api/v1/admin/stats/summary` | 기간 요약 (매출·주문수·AOV·취소율·실패주문) | ADMIN | `200 OK` |
+| GET | `/api/v1/admin/stats/daily` | 일별 매출 추이 (빈 날짜 0 채움) | ADMIN | `200 OK` |
+| GET | `/api/v1/admin/stats/products` | 상품별 매출 Top N | ADMIN | `200 OK` |
+| GET | `/api/v1/admin/stats/sellers` | 판매자별 매출 Top N | ADMIN | `200 OK` |
+| GET | `/api/v1/admin/stats/failed-orders` | 실패(자동취소) 주문 일별 추이 | ADMIN | `200 OK` |
+
+**공통 파라미터**: `from`, `to` (ISO date `yyyy-MM-dd`, `to` 포함). 미지정 시 오늘 포함 최근 30일. `from > to` 또는 366일 초과는 `400`.
+**Top N 파라미터**: `limit` (`products`/`sellers` 전용, 기본 10 · 1~50 범위 밖은 `400`).
+
+> 유효 매출 = 집계 대상 주문(`CONFIRMED`/`PARTIALLY_CANCELLED`)의 ACTIVE 항목 `price × quantity` 합계 — 부분취소가 반영되지 않는 `total_price`는 쓰지 않는다.
+> 취소율 = (전체취소 + 부분취소) / `PENDING` 제외 전체 주문수. 날짜 집계 기준 타임존은 KST(`Asia/Seoul`) 고정.
+
 ### 주요 에러
 | Status | 상황 |
 |--------|------|
-| `400` | 입력값 검증 실패 / 배송상태 역행·건너뜀 |
+| `400` | 입력값 검증 실패 / 배송상태 역행·건너뜀 / 반품 자격 미충족(배송완료 아님·취소된 항목) / 통계 기간·limit 범위 초과 |
 | `401` | 인증 토큰 없음 / 내부 토큰 불일치 |
-| `403` | 본인 주문 아님 / 권한 없음 |
-| `404` | 주문/주소/알림 없음 |
-| `409` | 재고 부족 |
-| `422` | 취소 불가 상태 (이미 배송됨 등) |
+| `403` | 본인 주문 아님 / 권한 없음 (반품 대상이 본인 상품이 아닌 판매자 등) |
+| `404` | 주문/주소/알림/반품 없음 (타인 소유 리소스 포함 — 정보 노출 방지) |
+| `409` | 재고 부족 / 취소 불가 상태 (이미 배송됨 등) / 반품 중복 신청 / 반품 상태 충돌 (이미 처리된 건 재승인·재거부, 동시 처리 패자) |
 
 ---
 
 ## 응답 포맷
+
+### 공통 요청 오류 정책 (F-01 / F-05)
+
+요청 자체가 해석되지 않는 오류는 전 서비스 공통(`common` 모듈 `GlobalExceptionHandler`)으로 아래와 같이 매핑한다.
+
+| Status | 상황 |
+|--------|------|
+| `400` | 요청 본문 해석 실패(깨진 JSON·알 수 없는 enum 값) / 파라미터 타입 불일치 / 필수 파라미터·multipart 파트 누락 |
+| `404` | 매핑된 핸들러가 없는 경로 |
+| `413` | 업로드 용량 상한 초과 |
+
+> 응답·로그에 요청 본문·요청 경로 원문을 그대로 노출하지 않고 일반화된 메시지만 사용한다.
 
 ### 성공 응답
 HTTP Status Code 로 상태 표현, 응답 바디는 리소스만 포함.

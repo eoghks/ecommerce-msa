@@ -105,6 +105,10 @@ const Navbar = () => {
               <Link to="/admin/failed" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 실패주문
               </Link>
+              {/* V1.1-7: 매출 통계 (ADMIN 전용) */}
+              <Link to="/admin/stats" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
+                통계
+              </Link>
               <Link to="/admin/monitoring" className="px-3 py-1.5 rounded-lg text-sm font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors">
                 모니터링
               </Link>
@@ -304,6 +308,10 @@ const Navbar = () => {
                         </Link>
                         <Link to="/admin/failed" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           실패주문
+                        </Link>
+                        {/* V1.1-7: 매출 통계 (ADMIN 전용) — 데스크톱 메뉴와 동일하게 노출 */}
+                        <Link to="/admin/stats" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
+                          통계
                         </Link>
                         <Link to="/admin/monitoring" className="flex items-center px-4 py-3 text-[13px] font-medium text-amber-500 no-underline hover:bg-amber-50 transition-colors" onClick={closeMobile}>
                           모니터링

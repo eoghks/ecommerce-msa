@@ -1,6 +1,9 @@
 spring:
   application:
     name: order-service
+  jackson:
+    # M-3: 통계 집계 기준 타임존(KST) 고정 — JVM 기본 타임존은 OrderServiceApplication 에서 설정한다.
+    time-zone: Asia/Seoul
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/order_db}
     username: ${DB_USERNAME:eoghks}

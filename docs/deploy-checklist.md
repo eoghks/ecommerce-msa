@@ -76,6 +76,28 @@
 
 ---
 
+## 7. 서비스 타임존 KST 고정 (M-3)
+
+- [ ] order-service 컨테이너/호스트에 `TZ=Asia/Seoul` 지정 (JVM 옵션 `-Duser.timezone=Asia/Seoul` 도 가능)
+
+> **이유**: 주문 생성 시각과 매출 통계 집계가 날짜(`LocalDate`) 기준입니다. 컨테이너 기본값인 UTC로
+> 기동되면 KST 00:00~09:00 주문이 전날로 기록되어 조회 종료일 당일 데이터가 최대 9시간 누락됩니다.
+> 애플리케이션이 기동 시 KST로 고정(`ServiceTimeZone.applyDefault()`)하지만, 로그·DB 세션 시각까지
+> 일관되게 맞추기 위해 배포 환경 변수도 함께 지정합니다.
+
+---
+
+## 8. 대용량 테이블 인덱스 적용 방식 (M-4)
+
+- [ ] `orders` 행이 많은 운영 DB에서는 통계 인덱스(V12 `idx_orders_created_at_status`)를
+      `CREATE INDEX CONCURRENTLY` 로 사전 적용한 뒤 마이그레이션 실행
+
+> **이유**: 일반 `CREATE INDEX`는 인덱스 생성 동안 해당 테이블의 쓰기를 차단해 주문 생성이 실패할 수
+> 있습니다. `CONCURRENTLY` 는 쓰기를 막지 않습니다(트랜잭션 밖에서 실행해야 하므로 Flyway 대신
+> 수동 적용). 인덱스가 이미 있으면 마이그레이션의 `IF NOT EXISTS` 로 그대로 통과합니다.
+
+---
+
 ## 배포 전 최종 확인
 
 - [ ] 위 모든 항목 체크 완료
