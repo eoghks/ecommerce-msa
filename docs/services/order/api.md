@@ -113,6 +113,66 @@ PENDING/CONFIRMED에서 전체·부분 취소. 사유 선택(미입력 시 기�
 
 ---
 
+## 반품·환불 (V1.1-5)
+
+### `POST /api/v1/orders/{orderId}/items/{itemId}/returns` (USER)
+
+주문 소유자가 배송완료(`DELIVERED`) 주문의 활성(ACTIVE) 항목에 대해 신청. 항목 단위 전량 반품만 지원(부분 수량은 백로그).
+
+**Request**
+```json
+{ "reason": "상품 불량" }
+```
+
+**Response** `201 Created` — `ReturnResponse`
+```json
+{
+  "id": 1,
+  "orderId": 10,
+  "orderItemId": 21,
+  "userId": 5,
+  "reason": "상품 불량",
+  "status": "REQUESTED",
+  "rejectReason": null,
+  "requestedAt": "2026-08-01T10:00:00",
+  "processedAt": null
+}
+```
+
+### `GET /api/v1/returns/me` (USER) — 내 반품 목록 (최신순 페이징)
+### `GET /api/v1/returns/admin` (ADMIN/SELLER) — 반품 관리 목록
+
+ADMIN은 전체, SELLER는 반품 대상 항목이 본인 상품인 건만 조회한다. 그 외 역할은 `403`.
+
+### `PATCH /api/v1/returns/{returnId}/approve` (ADMIN/SELLER)
+
+`REQUESTED`에서만 가능. 기존 항목취소 경로를 재사용해 재고를 복구하고, 환불 훅(mock) 처리 후 `REFUNDED`로 전이한다.
+
+**Response** `200 OK` — `ReturnResponse` (`status: "REFUNDED"`)
+
+### `PATCH /api/v1/returns/{returnId}/reject` (ADMIN/SELLER)
+
+`REQUESTED`에서만 가능. 거부 사유 필수(300자 이하). 거부된 항목은 재신청 허용.
+
+**Request**
+```json
+{ "rejectReason": "사용 흔적 확인" }
+```
+
+**Response** `200 OK` — `ReturnResponse` (`status: "REJECTED"`)
+
+**Error**
+| 상태코드 | 사유 |
+|---------|------|
+| 400 | 사유 누락·300자 초과 / 배송완료 아님 / 이미 취소된 항목 |
+| 403 | 본인 상품이 아닌 판매자의 처리 시도 |
+| 404 | 주문·항목·반품 없음 (타인 소유 포함) |
+| 409 | 동일 항목 반품 중복 신청 / 이미 처리된 반품 재승인·재거부 / 동시 처리 충돌(낙관적 락) |
+
+> 승인·거부·환불 시 신청자에게 인앱 알림(RETURN_APPROVED / RETURN_REJECTED / RETURN_REFUNDED) 생성.
+
+---
+
 ## 실패 주문 조회 (M-3)
 
 ### `GET /api/v1/orders/admin/failed` (ADMIN)
@@ -128,6 +188,51 @@ PENDING/CONFIRMED에서 전체·부분 취소. 사유 선택(미입력 시 기�
   "totalElements": 1, "totalPages": 1
 }
 ```
+
+---
+
+## 관리자 매출 통계 (V1.1-7)
+
+> 모두 ADMIN 전용(`@PreAuthorize("hasRole('ADMIN')")`). 공통 파라미터 `from`·`to`(ISO date, `to` 포함),
+> 미지정 시 오늘 포함 최근 30일. `from > to` 또는 366일 초과는 `400`. 집계 기준 타임존은 KST 고정.
+
+| Method | URL | 설명 | 성공 Status |
+|--------|-----|------|-------------|
+| GET | `/api/v1/admin/stats/summary` | 기간 요약 지표 | `200 OK` |
+| GET | `/api/v1/admin/stats/daily` | 일별 매출 추이 (빈 날짜 0) | `200 OK` |
+| GET | `/api/v1/admin/stats/products` | 상품별 매출 Top N (`limit` 기본 10, 최대 50) | `200 OK` |
+| GET | `/api/v1/admin/stats/sellers` | 판매자별 매출 Top N (`limit` 기본 10, 최대 50) | `200 OK` |
+| GET | `/api/v1/admin/stats/failed-orders` | 실패(자동취소) 주문 일별 추이 | `200 OK` |
+
+**요약 응답** `200 OK` — `SalesSummaryResponse`
+```json
+{
+  "from": "2026-07-12", "to": "2026-08-10",
+  "totalRevenue": 5980000,
+  "orderCount": 12,
+  "averageOrderValue": 498333,
+  "fullyCancelledCount": 2,
+  "partiallyCancelledCount": 1,
+  "cancelRate": 0.25,
+  "failedOrderCount": 1
+}
+```
+
+**일별 추이 응답** — `List<DailySalesResponse>` `[{ "date": "2026-08-01", "revenue": 120000, "orderCount": 2 }]`
+**상품 Top N** — `List<ProductSalesResponse>` `[{ "productId": 1, "productName": "상품A", "revenue": 120000, "quantity": 3 }]`
+**판매자 Top N** — `List<SellerSalesResponse>` `[{ "sellerId": 7, "revenue": 120000, "quantity": 3, "orderCount": 2 }]`
+**실패주문 추이** — `List<FailedOrderTrendResponse>` `[{ "date": "2026-08-01", "count": 1 }]`
+
+- 유효 매출 = 집계 대상 주문(`CONFIRMED`/`PARTIALLY_CANCELLED`)의 ACTIVE 항목 `price × quantity` 합계.
+  주문의 `total_price`는 생성 시점 금액이라 부분취소가 반영되지 않아 쓰지 않는다.
+- 취소율 = (전체취소 + 부분취소) / `PENDING` 제외 전체 주문수 (분모 0이면 0).
+- `sellerId`가 `null`이면 판매자 없이 등록된 플랫폼(ADMIN) 상품이다.
+
+**Error**
+| 상태코드 | 사유 |
+|---------|------|
+| 400 | `from > to` / 366일 초과 / `limit` 범위(1~50) 밖 / 날짜 형식 오류 |
+| 403 | ADMIN 아님 |
 
 ---
 

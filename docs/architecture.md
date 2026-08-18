@@ -32,9 +32,9 @@
 | API Gateway | 8080 | - | 라우팅, 인증 토큰 검증, 내부 전용 경로 차단 |
 | Auth Service | 8081 | auth_db | 회원가입/로그인/RBAC(USER·SELLER·ADMIN), 판매자 승격, 서비스 간 사용자 조회 |
 | Product Service | 8082 | product_db | 상품 CRUD + 캐싱 + 재고 이벤트, 카테고리 관리, 검색 고도화(정렬·가격필터·자동완성), 리뷰·별점, 위시리스트 |
-| Order Service | 8083 | order_db | 주문 처리 + 이벤트 발행/구독 (Saga Choreography), 장바구니, 배송지 주소록, 배송상태, 알림, 실패주문 로그 |
+| Order Service | 8083 | order_db | 주문 처리 + 이벤트 발행/구독 (Saga Choreography), 장바구니, 배송지 주소록, 배송상태, 알림, 반품·환불, 관리자 매출 통계 집계, 실패주문 로그 |
 | Monitoring | 8084 | - | 헬스체크, 지표 수집 |
-| Frontend | 3000 | - | React SPA |
+| Frontend | 3000 | - | React + TypeScript SPA |
 
 ## 서비스 간 내부 통신 (X-Internal-Token)
 
@@ -86,8 +86,18 @@
 | Order | `order_item` | 주문 항목 (판매자·항목상태·항목취소) |
 | Order | `cart_item` | 장바구니 항목 (사용자/게스트) |
 | Order | `address` | 저장형 배송지 주소록 (기본배송지 부분 유니크) |
-| Order | `notification` | 인앱 알림 (주문·배송) |
+| Order | `notification` | 인앱 알림 (주문·배송·반품) |
+| Order | `return_request` | 반품 요청 (상태·사유, 활성 상태 항목당 1건 부분 유니크, 낙관적 락 version) |
 | Order | `failed_order_log` | 실패(자동취소) 주문 로그 (ADMIN 조회) |
+
+## 서비스 타임존 (KST 고정)
+
+주문 생성 시각(`@CreatedDate LocalDateTime`)과 매출 통계 집계(`LocalDate` 기준)는 JVM 기본 타임존에 좌우된다.
+컨테이너 기본값인 UTC로 기동되면 KST 00:00~09:00 주문이 전날로 기록되어 당일 집계가 최대 9시간 누락되므로,
+order-service는 기동 시 JVM 기본 타임존을 `Asia/Seoul`로 고정한다(`support/ServiceTimeZone.applyDefault()`).
+배포 환경에서는 로그·DB 세션 시각까지 일관되도록 `TZ=Asia/Seoul`도 함께 지정한다([배포 체크리스트](deploy-checklist.md) 7번).
+
+> 다국어·통화·다중 타임존 대응은 적용 범위 밖이며 Roadmap v2.0 글로벌화 트랙으로 분리했다([MD-06](tradeoffs/MD-06-globalization-scope.md)).
 
 ## 기술 스택
 
@@ -96,5 +106,5 @@
 - **DB**: PostgreSQL 16.x
 - **Cache**: Redis 7.x
 - **Message Broker**: Apache Kafka
-- **Frontend**: React 18, Axios
+- **Frontend**: React 19 + TypeScript, Vite, Axios, Zustand, React Router, Tailwind CSS
 - **Infra**: Docker, Docker Compose
