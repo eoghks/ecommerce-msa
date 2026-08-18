@@ -4,6 +4,10 @@ spring:
   jackson:
     # M-3: 통계 집계 기준 타임존(KST) 고정 — JVM 기본 타임존은 OrderServiceApplication 에서 설정한다.
     time-zone: Asia/Seoul
+    deserialization:
+      # F-01: 정의되지 않은 요청 필드는 400으로 거부 — 오타·잘못된 계약을 조용히 무시하지 않는다.
+      # (Redis 전용 매퍼를 빈으로 노출하지 않게 되면서 Boot 기본값(무시)으로 돌아가므로 명시 설정으로 고정)
+      fail-on-unknown-properties: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/order_db}
     username: ${DB_USERNAME:eoghks}
