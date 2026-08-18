@@ -1,6 +1,7 @@
 package com.ecommerce.product.service;
 
 import com.ecommerce.product.client.UserClient;
+import com.ecommerce.product.config.RedisJsonMapper;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.dto.request.CreateProductRequest;
@@ -15,7 +16,6 @@ import com.ecommerce.product.exception.ProductNotFoundException;
 import com.ecommerce.product.repository.CategoryRepository;
 import com.ecommerce.product.repository.ProductRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,7 +40,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final RedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper redisObjectMapper;
+    private final RedisJsonMapper redisJsonMapper;
     private final UserClient userClient;
 
     /** 상품 등록 (ADMIN/SELLER) */
@@ -185,7 +185,7 @@ public class ProductService {
 
     private String serialize(ProductResponse response) {
         try {
-            return redisObjectMapper.writeValueAsString(response);
+            return redisJsonMapper.writeValueAsString(response);
         } catch (JsonProcessingException e) {
             // DTO 직렬화 실패 — 프로그래밍 오류
             throw new IllegalStateException("상품 캐시 직렬화 실패. id=" + response.id(), e);
@@ -195,7 +195,7 @@ public class ProductService {
     /** 캐시 역직렬화 — 실패 시 null 반환(캐시 미스 폴백). */
     private ProductResponse tryDeserialize(String json) {
         try {
-            return redisObjectMapper.readValue(json, ProductResponse.class);
+            return redisJsonMapper.readValue(json, ProductResponse.class);
         } catch (JsonProcessingException e) {
             log.warn("상품 캐시 역직렬화 실패: {}", e.getMessage());
             return null;
