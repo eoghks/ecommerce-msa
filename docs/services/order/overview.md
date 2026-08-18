@@ -1,8 +1,9 @@
 # Order Service Overview
 
 ## 역할
-주문 생성·조회·취소, 장바구니, 배송지 주소록, 배송상태 관리, 인앱 알림,
-실패주문 로그를 담당하는 서비스. 재고 확보는 product-service와의 이벤트 기반 Saga(Choreography)로 처리한다.
+주문 생성·조회·취소, 장바구니, 배송지 주소록, 배송상태 관리, 인앱 알림, 반품·환불,
+관리자 매출 통계 집계, 실패주문 로그를 담당하는 서비스.
+재고 확보는 product-service와의 이벤트 기반 Saga(Choreography)로 처리한다.
 
 ## 기본 정보
 
@@ -16,12 +17,13 @@
 
 ## 주요 기술
 
-- **JPA + PostgreSQL**: 주문·주문항목·장바구니·주소·알림·실패로그 엔티티 관리
-- **Flyway**: DB 마이그레이션 (V1~V8)
+- **JPA + PostgreSQL**: 주문·주문항목·장바구니·주소·알림·반품요청·실패로그 엔티티 관리
+- **Flyway**: DB 마이그레이션 (V1~V12 — V9·V10 반품요청, V11·V12 통계 집계 인덱스)
 - **Kafka (Saga Choreography)**: 주문 생성 → 재고 확보 → 확정/취소를 이벤트로 조율
 - **Redis**: 게스트/사용자 장바구니 저장, 병합
 - **Spring Security `@PreAuthorize`**: ADMIN/SELLER 권한 체크 (`X-User-Role`)
 - **X-Internal-Token**: 서비스 간 구매 인증 내부 엔드포인트 보호
+- **타임존 KST 고정**: 기동 시 JVM 기본 타임존을 `Asia/Seoul`로 고정(`ServiceTimeZone`) — 주문 시각 기록·통계 집계 기준 통일
 
 ## 주문 Saga (Choreography)
 
@@ -48,6 +50,21 @@
 | 주문상태(OrderStatus) | PENDING → CONFIRMED / (부분)취소 | PENDING/CONFIRMED에서 전체·부분 취소 가능 |
 | 배송상태(DeliveryStatus) | PREPARING → SHIPPING → DELIVERED | 전진만 허용(역행·건너뜀 불가) |
 
+## 반품 상태 (V1.1-5)
+
+| 상태 | 의미 | 다음 전이 |
+|------|------|----------|
+| REQUESTED | 신청 접수 | APPROVED / REJECTED |
+| APPROVED | 승인 — 재고 복구 완료 | REFUNDED |
+| REJECTED | 거부(사유 필수) — 재신청 허용 | (종료) |
+| REFUNDED | 환불 완료 | (종료) |
+
+- 신청 자격: 배송완료(DELIVERED) 주문의 활성(ACTIVE) 항목, 주문 소유자 본인. 미충족 시 400.
+- 중복 방지: 활성 상태(REQUESTED·APPROVED·REFUNDED)는 항목당 1건 — 서비스 검증 + 부분 유니크 인덱스(`uq_return_item_active`)로 409.
+- 상태 충돌(이미 처리된 건 재승인·재거부, 동시 처리 패자)은 409. 동시성은 낙관적 락(`version`)으로 방어한다.
+- 처리 권한: ADMIN 전체 / SELLER는 반품 대상 항목이 본인 상품인 건만. 그 외 403.
+- 환불은 현재 mock 훅(`processRefund`) — PG 연동(V1.1-6) 시 교체 지점.
+
 ## 알림 트리거 (V1.1-4)
 
 | 이벤트 | NotificationType |
@@ -57,6 +74,9 @@
 | 주문 항목 취소 | ORDER_ITEM_CANCELLED |
 | 배송 시작(SHIPPING) | DELIVERY_SHIPPING |
 | 배송 완료(DELIVERED) | DELIVERY_DELIVERED |
+| 반품 승인 | RETURN_APPROVED |
+| 반품 거부 | RETURN_REJECTED |
+| 반품 환불 완료 | RETURN_REFUNDED |
 
 > title/message는 타입별 상수 템플릿으로 조립 — 개인정보 미포함(주문번호 수준만).
 
@@ -74,3 +94,5 @@
 - [x] 실패주문 로그·관리자 조회 (M-3)
 - [x] 판매자 주문 조회 (본인 상품 항목만) + 항목 취소/배송상태 변경
 - [x] 구매 인증 내부 엔드포인트 (`/orders/internal/purchased`, X-Internal-Token)
+- [x] 반품·환불 (V1.1-5) — 신청·승인(재고 복구 + 환불 훅)·거부, 관리자/판매자 처리
+- [x] 관리자 매출 통계 (V1.1-7) — 요약·일별 추이·상품/판매자 Top N·실패주문 추이 (ADMIN 전용)
