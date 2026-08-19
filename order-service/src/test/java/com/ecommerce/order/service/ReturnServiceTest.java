@@ -31,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -103,8 +104,7 @@ class ReturnServiceTest {
     @Test
     @DisplayName("신청 — 구매확정된 주문은 반품 불가 → 400 (payment-foundation 3.2)")
     void request_purchaseConfirmed_badRequest() {
-        Order order = deliveredOrder();
-        order.confirmPurchase(java.time.LocalDateTime.now());
+        Order order = purchaseConfirmedOrder();
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
         assertThatThrownBy(() -> returnService.request(1L, 1L, 1L, "제품 하자"))
@@ -383,6 +383,37 @@ class ReturnServiceTest {
     }
 
     @Test
+    @DisplayName("승인(H-2) — 신청 후 구매확정된 주문은 승인 불가 → 400, 재고복구·환불 미실행")
+    void approve_purchaseConfirmedOrder_badRequest() {
+        Order order = purchaseConfirmedOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 1L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        assertThatThrownBy(() -> returnService.approve(10L, 999L, "ADMIN"))
+                .isInstanceOf(ReturnNotAllowedException.class)
+                .hasMessageContaining("구매확정");
+        assertThat(returnRequest.getStatus()).isEqualTo(ReturnStatus.REQUESTED);
+        assertThat(order.getItems().get(0).getStatus()).isEqualTo(OrderItemStatus.ACTIVE);
+        then(applicationEventPublisher).should(never())
+                .publishEvent(any(OrderItemCancelledApplicationEvent.class));
+        then(notificationService).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("거부(H-2) — 구매확정된 주문의 반품은 거부 처리도 불가 → 400")
+    void reject_purchaseConfirmedOrder_badRequest() {
+        Order order = purchaseConfirmedOrder();
+        ReturnRequest returnRequest = requestedReturn(1L, 1L, 1L);
+        givenReturnAndOrder(returnRequest, order);
+
+        assertThatThrownBy(() -> returnService.reject(10L, 999L, "ADMIN", "사유 불충분"))
+                .isInstanceOf(ReturnNotAllowedException.class)
+                .hasMessageContaining("구매확정");
+        assertThat(returnRequest.getStatus()).isEqualTo(ReturnStatus.REQUESTED);
+        then(notificationService).shouldHaveNoInteractions();
+    }
+
+    @Test
     @DisplayName("승인(M-2) — 신청 후 다른 경로로 취소된 항목 → 400, 재고복구·환불 미실행")
     void approve_alreadyCancelledItem_badRequest() {
         Order order = deliveredOrder();
@@ -518,6 +549,13 @@ class ReturnServiceTest {
         Order order = confirmedOrder();
         order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
         order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
+        return order;
+    }
+
+    /** 구매확정된 배송완료 주문 — 확정 기록은 조건부 UPDATE 가 담당하므로 필드를 직접 주입한다 */
+    private Order purchaseConfirmedOrder() {
+        Order order = deliveredOrder();
+        ReflectionTestUtils.setField(order, "purchaseConfirmedAt", LocalDateTime.now());
         return order;
     }
 

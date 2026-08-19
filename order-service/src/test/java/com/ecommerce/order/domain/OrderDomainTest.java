@@ -206,43 +206,96 @@ class OrderDomainTest {
                 .hasMessageContaining("0원 미만");
     }
 
-    // ── 구매확정 (payment-foundation §3.2) ────────────────────────
+    // ── 금액 모델 (payment-foundation §1) ─────────────────────────
 
     @Test
-    @DisplayName("구매확정 — 배송완료 주문은 확정 시각이 기록된다")
-    void confirmPurchase_delivered_recordsTime() {
-        Order order = deliveredOrder();
-        LocalDateTime confirmedAt = LocalDateTime.of(2026, 8, 19, 10, 0);
+    @DisplayName("생성(M-3) — 합계는 항목에서 계산되며 금액 모델이 함께 채워진다")
+    void createOrder_amountsFromItems() {
+        Order order = buildOrder();
 
-        order.confirmPurchase(confirmedAt);
-
-        assertThat(order.isPurchaseConfirmed()).isTrue();
-        assertThat(order.getPurchaseConfirmedAt()).isEqualTo(confirmedAt);
+        assertThat(order.getItemsTotal()).isEqualTo(1_500_000L);
+        assertThat(order.getTotalPrice()).isEqualTo(1_500_000L);
+        assertThat(order.getPayableAmount()).isEqualTo(1_500_000L);
     }
 
     @Test
-    @DisplayName("구매확정 — 배송완료 전(준비중·배송중)이면 400")
-    void confirmPurchase_notDelivered_throws() {
+    @DisplayName("생성(M-3) — 전달된 합계가 항목 합계와 다르면 생성 자체를 막는다")
+    void createOrder_totalPriceMismatch_throws() {
+        OrderItem item = OrderItem.builder()
+                .productId(1L).productName("갤럭시 S24").price(1_200_000L).quantity(1)
+                .build();
+
+        assertThatThrownBy(() -> Order.builder()
+                .userId(10L)
+                .totalPrice(999L)          // 항목 합계(1,200,000)와 불일치
+                .items(List.of(item))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("항목 합계");
+    }
+
+    // ── 구매확정 (payment-foundation §3.2) ────────────────────────
+
+    @Test
+    @DisplayName("구매확정 자격 — 배송완료 + 미확정 주문은 통과한다")
+    void validateConfirmable_delivered_passes() {
+        Order order = deliveredOrder();
+
+        order.validateConfirmable();
+
+        assertThat(order.isConfirmable()).isTrue();
+        assertThat(order.isPurchaseConfirmed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("구매확정 자격 — 배송완료 전(준비중·배송중)이면 400")
+    void validateConfirmable_notDelivered_throws() {
         Order preparing = buildOrder();
         preparing.confirm();
-        assertThatThrownBy(() -> preparing.confirmPurchase(LocalDateTime.now()))
+        assertThatThrownBy(preparing::validateConfirmable)
                 .isInstanceOf(PurchaseConfirmNotAllowedException.class);
 
         Order shipping = buildOrder();
         shipping.confirm();
         shipping.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
-        assertThatThrownBy(() -> shipping.confirmPurchase(LocalDateTime.now()))
+        assertThatThrownBy(shipping::validateConfirmable)
                 .isInstanceOf(PurchaseConfirmNotAllowedException.class);
     }
 
     @Test
-    @DisplayName("구매확정 — 이미 확정된 주문 재확정은 409")
-    void confirmPurchase_alreadyConfirmed_throws() {
+    @DisplayName("구매확정 자격 — 이미 확정된 주문 재확정은 409")
+    void validateConfirmable_alreadyConfirmed_throws() {
         Order order = deliveredOrder();
-        order.confirmPurchase(LocalDateTime.now());
+        ReflectionTestUtils.setField(order, "purchaseConfirmedAt", LocalDateTime.now());
 
-        assertThatThrownBy(() -> order.confirmPurchase(LocalDateTime.now()))
+        assertThatThrownBy(order::validateConfirmable)
                 .isInstanceOf(PurchaseAlreadyConfirmedException.class);
+    }
+
+    @Test
+    @DisplayName("구매확정 자격(H-1) — 전 항목 취소(CANCELLED)된 주문은 배송완료여도 400")
+    void validateConfirmable_cancelledOrder_throws() {
+        Order order = deliveredOrder();
+        order.cancelItem(1L, "반품 승인");
+        order.cancelItem(2L, "반품 승인");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(order.isConfirmable()).isFalse();
+        assertThatThrownBy(order::validateConfirmable)
+                .isInstanceOf(PurchaseConfirmNotAllowedException.class)
+                .hasMessageContaining("CANCELLED");
+    }
+
+    @Test
+    @DisplayName("구매확정 자격(H-1) — 일부만 취소된(PARTIALLY_CANCELLED) 주문은 확정 가능")
+    void validateConfirmable_partiallyCancelledOrder_passes() {
+        Order order = deliveredOrder();
+        order.cancelItem(2L, "반품 승인");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_CANCELLED);
+        order.validateConfirmable();
+        assertThat(order.isConfirmable()).isTrue();
     }
 
     @Test

@@ -133,10 +133,25 @@ public class Order {
         this.couponDiscount = 0L;
         this.mileageUsed    = 0L;
         this.mileageEarned  = 0L;
-        applyAmounts(totalPrice == null ? 0L : totalPrice);
         if (items != null) {
             items.forEach(this::addItem);
         }
+        applyAmounts(resolveItemsTotal(totalPrice));
+    }
+
+    /**
+     * M-3: 금액의 단일 진실원천은 주문 항목이다.
+     * 합계는 항목에서 직접 계산하고, 전달된 totalPrice 는 대조용으로만 쓴다.
+     * 값이 다르면 잘못된 합계가 금액 모델(itemsTotal/payableAmount)까지 오염시키기 전에 막는다.
+     */
+    private long resolveItemsTotal(Long requestedTotal) {
+        long calculated = items.stream().mapToLong(OrderItem::subtotal).sum();
+        if (requestedTotal != null && requestedTotal != calculated) {
+            throw new IllegalArgumentException(
+                    "주문 합계가 항목 합계와 일치하지 않습니다. 전달=" + requestedTotal
+                            + ", 항목합계=" + calculated);
+        }
+        return calculated;
     }
 
     /**
@@ -291,12 +306,20 @@ public class Order {
     }
 
     /**
-     * 구매확정 (§3.2). 자격: 배송완료(DELIVERED) + 미확정.
-     * 배송완료 전이면 400(PurchaseConfirmNotAllowedException),
+     * 구매확정 자격 검증 (§3.2). 자격: 확정 대상 주문상태(CONFIRMED/PARTIALLY_CANCELLED)
+     * + 배송완료(DELIVERED) + 미확정.
+     * 자격 미충족이면 400(PurchaseConfirmNotAllowedException),
      * 이미 확정됐으면 409(PurchaseAlreadyConfirmedException).
-     * 확정 시 반품 자격이 사라지며, 마일리지 적립도 이 시점을 기준으로 한다.
+     *
+     * H-1: 전체 취소·전체 반품된 주문은 deliveryStatus 가 DELIVERED 로 남으므로 주문상태를 함께 본다.
+     * H-3: 실제 확정 기록은 조건부 UPDATE(OrderRepository)가 담당한다 — 동시 요청에서 1건만 성공하도록
+     *      읽기-수정-쓰기 대신 원자적 UPDATE 를 쓰며, 이 메서드는 사용자에게 돌려줄 사유 판정만 한다.
      */
-    public void confirmPurchase(LocalDateTime confirmedAt) {
+    public void validateConfirmable() {
+        if (!isConfirmable()) {
+            throw new PurchaseConfirmNotAllowedException(
+                    "구매확정할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
         if (this.deliveryStatus != DeliveryStatus.DELIVERED) {
             throw new PurchaseConfirmNotAllowedException(
                     "배송 완료된 주문만 구매확정할 수 있습니다. 현재 배송상태: " + this.deliveryStatus);
@@ -304,7 +327,11 @@ public class Order {
         if (isPurchaseConfirmed()) {
             throw new PurchaseAlreadyConfirmedException(this.id);
         }
-        this.purchaseConfirmedAt = confirmedAt;
+    }
+
+    /** H-1: 구매확정 대상 주문 상태인지 — 취소(CANCELLED)·미차감(PENDING) 주문은 확정 불가 */
+    public boolean isConfirmable() {
+        return OrderStatus.confirmableStatuses().contains(this.status);
     }
 
     private void recalculateAfterCancel() {
