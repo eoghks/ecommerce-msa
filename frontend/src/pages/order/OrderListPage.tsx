@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
-import { getMyOrders, cancelOrder } from '../../api/order';
+import { getMyOrders, cancelOrder, confirmPurchase } from '../../api/order';
 import { getMyReturns, requestReturn } from '../../api/return';
 import { returnStatusStyle, blocksNewReturn } from '../../utils/returnStatus';
 import type { ApiErrorResponse, Order, OrderItem, OrderStatus, ReturnRequest } from '../../types';
@@ -27,6 +27,9 @@ const DELIVERY_LABEL: Record<string, StatusStyle> = {
   SHIPPING:  { text: '배송중',     color: '#0ea5e9' },
   DELIVERED: { text: '배송완료',   color: '#22c55e' },
 };
+
+// 구매확정 뱃지 — 확정된 주문에만 노출 (payment-foundation §3.2)
+const PURCHASE_CONFIRMED_LABEL: StatusStyle = { text: '구매확정', color: '#7c3aed' };
 
 // 배송상태는 재고 차감된(확정/부분취소) 주문에서만 의미
 const DELIVERABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
@@ -153,6 +156,8 @@ interface OrderCardProps {
 const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: OrderCardProps) => {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  // 구매확정 확인 모달 노출 여부
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const status = STATUS_LABEL[order.status] ?? { text: order.status, color: '#6b7280' };
   const date = order.createdAt
     ? new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -162,6 +167,12 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
   const delivery = DELIVERABLE_STATUSES.includes(order.status)
     ? DELIVERY_LABEL[order.deliveryStatus ?? '']
     : null;
+  // 구매확정 — 배송완료 + 미확정 주문만 확정 가능. 확정 후에는 반품 자격이 사라진다
+  const purchaseConfirmed = Boolean(order.purchaseConfirmedAt);
+  // M-4: 배송 뱃지와 동일하게 주문상태까지 본다 — 취소된 배송완료 주문에는 확정 버튼을 노출하지 않는다
+  const confirmable = DELIVERABLE_STATUSES.includes(order.status)
+    && order.deliveryStatus === 'DELIVERED'
+    && !purchaseConfirmed;
 
   // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)
   const handleCancel = () => {
@@ -192,6 +203,13 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
               {delivery.text}
             </span>
           )}
+          {/* 구매확정 뱃지 */}
+          {purchaseConfirmed && (
+            <span className="text-[12px] font-bold px-2 py-0.5 rounded-full text-white"
+              style={{ background: PURCHASE_CONFIRMED_LABEL.color }}>
+              {PURCHASE_CONFIRMED_LABEL.text}
+            </span>
+          )}
           <span className="text-[12px] text-gray-400">{date}</span>
         </div>
         <span className="text-[12px] text-gray-300">#{order.id}</span>
@@ -202,6 +220,7 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
         {(order.items ?? []).map((item, idx) => (
           <OrderItemRow key={idx} item={item} reviewable={reviewable}
             delivered={order.deliveryStatus === 'DELIVERED'}
+            purchaseConfirmed={purchaseConfirmed}
             itemReturn={returnsByItem[item.id]}
             onRequestReturn={() => onRequestReturn(order.id, item)} />
         ))}
@@ -216,16 +235,84 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
         </span>
       </div>
 
-      {/* M-N3: 주문 취소 버튼 — 취소 가능 상태에서만 노출 */}
-      {cancellable && (
+      {/* M-N3: 주문 취소 버튼(취소 가능 상태) · 구매확정 버튼(배송완료 + 미확정) */}
+      {(cancellable || confirmable) && (
         <div className="mt-4 flex flex-col items-end gap-1">
           {cancelError && <span className="text-[12px] text-red-500">{cancelError}</span>}
-          <button onClick={handleCancel} disabled={cancelling}
-            className="h-9 px-4 text-[13px] font-medium text-red-600 border border-red-200 rounded-[10px] hover:bg-red-50 bg-white transition-colors disabled:opacity-60">
-            {cancelling ? '취소 중...' : '주문 취소'}
-          </button>
+          <div className="flex gap-2">
+            {cancellable && (
+              <button onClick={handleCancel} disabled={cancelling}
+                className="h-9 px-4 text-[13px] font-medium text-red-600 border border-red-200 rounded-[10px] hover:bg-red-50 bg-white transition-colors disabled:opacity-60">
+                {cancelling ? '취소 중...' : '주문 취소'}
+              </button>
+            )}
+            {confirmable && (
+              <button onClick={() => setConfirmOpen(true)}
+                className="h-9 px-4 text-[13px] font-semibold text-white border-none rounded-[10px] bg-violet-600 hover:bg-violet-700 transition-colors">
+                구매확정
+              </button>
+            )}
+          </div>
         </div>
       )}
+
+      {/* 구매확정 확인 모달 — 확정 시 반품·교환이 어렵다는 점을 고지한다 */}
+      {confirmOpen && (
+        <PurchaseConfirmModal
+          orderId={order.id}
+          onClose={() => setConfirmOpen(false)}
+          onDone={() => { setConfirmOpen(false); onCancelled?.(); }}
+        />
+      )}
+    </div>
+  );
+};
+
+interface PurchaseConfirmModalProps {
+  orderId: number;
+  onClose: () => void;
+  onDone: () => void;
+}
+
+// 구매확정 확인 모달 — 자격 미충족(400)·이미 확정(409) 시 서버 메시지(ProblemDetail detail) 노출
+const PurchaseConfirmModal = ({ orderId, onClose, onDone }: PurchaseConfirmModalProps) => {
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await confirmPurchase(orderId);
+      onDone();
+    } catch (err) {
+      setError((err as AxiosError<ApiErrorResponse>).response?.data?.detail
+        || '구매확정에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 px-4"
+      onClick={() => !submitting && onClose()}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-[400px]" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-[15px] font-bold text-gray-900 mb-1 m-0">구매확정</h2>
+        <p className="text-[13px] text-gray-600 mt-2 mb-0">
+          주문 #{orderId} 을(를) 구매확정하시겠습니까?
+        </p>
+        <p className="text-[13px] text-red-600 mt-2 mb-0">확정하면 반품·교환이 어렵습니다.</p>
+        {error && <div className="error-box mt-3">{error}</div>}
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onClose} disabled={submitting}
+            className="h-10 px-4 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-[10px]">
+            닫기
+          </button>
+          <button onClick={submit} disabled={submitting}
+            className="h-10 px-5 text-white text-sm font-semibold rounded-[10px] border-none bg-violet-600 disabled:opacity-70">
+            {submitting ? '확정 중...' : '구매확정'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
@@ -234,16 +321,18 @@ interface OrderItemRowProps {
   item: OrderItem;
   reviewable: boolean;
   delivered: boolean;
+  purchaseConfirmed: boolean;
   itemReturn?: ReturnRequest;
   onRequestReturn: () => void;
 }
 
 // 주문 항목 1행 — 리뷰 쓰기(V1.1-1), 반품 뱃지·신청(V1.1-5)
-const OrderItemRow = ({ item, reviewable, delivered, itemReturn, onRequestReturn }: OrderItemRowProps) => {
+const OrderItemRow = ({ item, reviewable, delivered, purchaseConfirmed, itemReturn, onRequestReturn }: OrderItemRowProps) => {
   const active = item.status === 'ACTIVE';
   const returnBadge = itemReturn ? returnStatusStyle(itemReturn.status) : null;
-  // 반품 신청 가능: 배송완료 주문의 활성 항목 + 진행 중인 반품 없음(거부 건은 재신청 허용)
-  const returnable = delivered && active && !(itemReturn && blocksNewReturn(itemReturn.status));
+  // 반품 신청 가능: 배송완료 + 구매확정 전 주문의 활성 항목 + 진행 중인 반품 없음(거부 건은 재신청 허용)
+  const returnable = delivered && !purchaseConfirmed && active
+    && !(itemReturn && blocksNewReturn(itemReturn.status));
 
   return (
     <div className="flex items-center justify-between text-[13px]">

@@ -12,6 +12,7 @@ import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
+import com.ecommerce.order.dto.response.SellerOrderResponse;
 import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
 import com.ecommerce.order.exception.DeliveryStatusAccessDeniedException;
 import com.ecommerce.order.exception.InvalidDeliveryStatusException;
@@ -352,14 +353,14 @@ class OrderServiceTest {
 
         given(orderRepository.findBySellerId(sellerId, pageable)).willReturn(page);
 
-        Page<OrderResponse> result = orderService.getSellerOrders(sellerId, pageable);
+        Page<SellerOrderResponse> result = orderService.getSellerOrders(sellerId, pageable);
 
-        OrderResponse res = result.getContent().get(0);
+        SellerOrderResponse res = result.getContent().get(0);
         // 판매자 7 항목만 보여야 함
         assertThat(res.items()).hasSize(1);
         assertThat(res.items().get(0).sellerId()).isEqualTo(7L);
-        // 합계도 판매자 7 항목(2만원)만
-        assertThat(res.totalPrice()).isEqualTo(20_000L);
+        // 합계도 판매자 7 항목(2만원)만 — M-6: 실결제액(payableAmount)이 아닌 본인 항목 정가 합계
+        assertThat(res.sellerItemsTotal()).isEqualTo(20_000L);
     }
 
     // ── 주문 상세 조회 ──────────────────────────────────────────────

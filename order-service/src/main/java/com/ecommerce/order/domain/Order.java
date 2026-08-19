@@ -12,6 +12,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import com.ecommerce.order.exception.InvalidDeliveryStatusException;
+import com.ecommerce.order.exception.PurchaseAlreadyConfirmedException;
+import com.ecommerce.order.exception.PurchaseConfirmNotAllowedException;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -51,8 +53,36 @@ public class Order {
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
+    /**
+     * ACTIVE 항목의 정가 합계. 결제·할인 도입 전부터 쓰던 값으로 itemsTotal 과 항상 같은 값을 가진다.
+     * 실제 결제금액은 payableAmount 이며, 화면·정산에서 결제금액이 필요하면 totalPrice 가 아닌
+     * payableAmount 를 사용한다(payment-foundation §1).
+     */
     @Column(nullable = false)
     private Long totalPrice;
+
+    // ── 금액 모델 (payment-foundation §1) ──────────────────────
+    // 불변식: payableAmount = itemsTotal - couponDiscount - mileageUsed, payableAmount >= 0
+
+    /** 항목 정가 합계(ACTIVE 항목) — totalPrice 와 동일 기준 */
+    @Column(name = "items_total", nullable = false)
+    private Long itemsTotal;
+
+    /** 쿠폰 할인액 — 쿠폰 미도입(V1.1-10) 이므로 현재는 항상 0 */
+    @Column(name = "coupon_discount", nullable = false)
+    private Long couponDiscount;
+
+    /** 마일리지 사용액 — 마일리지 미도입(V1.1-9) 이므로 현재는 항상 0 */
+    @Column(name = "mileage_used", nullable = false)
+    private Long mileageUsed;
+
+    /** 실 결제금액 = itemsTotal - couponDiscount - mileageUsed */
+    @Column(name = "payable_amount", nullable = false)
+    private Long payableAmount;
+
+    /** 적립 마일리지 — 구매확정 시점에 적립(V1.1-9). 현재는 항상 0 */
+    @Column(name = "mileage_earned", nullable = false)
+    private Long mileageEarned;
 
     // HR-05: 배송 정보 — 주문 시 수령인·연락처·주소 저장
     @Column(length = 100)
@@ -68,6 +98,14 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_status", nullable = false, length = 20)
     private DeliveryStatus deliveryStatus;
+
+    /** 배송완료(DELIVERED) 전이 시각 — 자동 구매확정 기준일 계산에 사용 (§3.2) */
+    @Column(name = "delivered_at")
+    private LocalDateTime deliveredAt;
+
+    /** 구매확정 시각. null 이면 미확정(= 반품 가능 구간) (§3.2) */
+    @Column(name = "purchase_confirmed_at")
+    private LocalDateTime purchaseConfirmedAt;
 
     // F-04: 목록 조회 시 주문별 개별 조회(N+1) 대신 항목을 배치로 한 번에 로드
     @BatchSize(size = ITEMS_BATCH_SIZE)
@@ -86,15 +124,34 @@ public class Order {
     private Order(Long userId, Long totalPrice, String receiver, String phone,
                   String address, List<OrderItem> items) {
         this.userId     = userId;
-        this.totalPrice = totalPrice;
         this.receiver   = receiver;
         this.phone      = phone;
         this.address    = address;
         this.status     = OrderStatus.PENDING;
         this.deliveryStatus = DeliveryStatus.PREPARING;
+        // 할인 수단(쿠폰·마일리지) 미도입 — 항목 합계가 그대로 결제금액이 된다 (§1)
+        this.couponDiscount = 0L;
+        this.mileageUsed    = 0L;
+        this.mileageEarned  = 0L;
         if (items != null) {
             items.forEach(this::addItem);
         }
+        applyAmounts(resolveItemsTotal(totalPrice));
+    }
+
+    /**
+     * M-3: 금액의 단일 진실원천은 주문 항목이다.
+     * 합계는 항목에서 직접 계산하고, 전달된 totalPrice 는 대조용으로만 쓴다.
+     * 값이 다르면 잘못된 합계가 금액 모델(itemsTotal/payableAmount)까지 오염시키기 전에 막는다.
+     */
+    private long resolveItemsTotal(Long requestedTotal) {
+        long calculated = items.stream().mapToLong(OrderItem::subtotal).sum();
+        if (requestedTotal != null && requestedTotal != calculated) {
+            throw new IllegalArgumentException(
+                    "주문 합계가 항목 합계와 일치하지 않습니다. 전달=" + requestedTotal
+                            + ", 항목합계=" + calculated);
+        }
+        return calculated;
     }
 
     /**
@@ -237,6 +294,44 @@ public class Order {
                     "잘못된 배송상태 전이입니다: " + this.deliveryStatus + " → " + next);
         }
         this.deliveryStatus = next;
+        // 자동 구매확정 기준일(배송완료 + N일) 계산을 위해 전이 시각을 기록한다 (§3.2)
+        if (next == DeliveryStatus.DELIVERED) {
+            this.deliveredAt = LocalDateTime.now();
+        }
+    }
+
+    /** 구매확정 여부 — 확정된 주문은 반품 자격이 없다 (§3.2) */
+    public boolean isPurchaseConfirmed() {
+        return this.purchaseConfirmedAt != null;
+    }
+
+    /**
+     * 구매확정 자격 검증 (§3.2). 자격: 확정 대상 주문상태(CONFIRMED/PARTIALLY_CANCELLED)
+     * + 배송완료(DELIVERED) + 미확정.
+     * 자격 미충족이면 400(PurchaseConfirmNotAllowedException),
+     * 이미 확정됐으면 409(PurchaseAlreadyConfirmedException).
+     *
+     * H-1: 전체 취소·전체 반품된 주문은 deliveryStatus 가 DELIVERED 로 남으므로 주문상태를 함께 본다.
+     * H-3: 실제 확정 기록은 조건부 UPDATE(OrderRepository)가 담당한다 — 동시 요청에서 1건만 성공하도록
+     *      읽기-수정-쓰기 대신 원자적 UPDATE 를 쓰며, 이 메서드는 사용자에게 돌려줄 사유 판정만 한다.
+     */
+    public void validateConfirmable() {
+        if (!isConfirmable()) {
+            throw new PurchaseConfirmNotAllowedException(
+                    "구매확정할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
+        if (this.deliveryStatus != DeliveryStatus.DELIVERED) {
+            throw new PurchaseConfirmNotAllowedException(
+                    "배송 완료된 주문만 구매확정할 수 있습니다. 현재 배송상태: " + this.deliveryStatus);
+        }
+        if (isPurchaseConfirmed()) {
+            throw new PurchaseAlreadyConfirmedException(this.id);
+        }
+    }
+
+    /** H-1: 구매확정 대상 주문 상태인지 — 취소(CANCELLED)·미차감(PENDING) 주문은 확정 불가 */
+    public boolean isConfirmable() {
+        return OrderStatus.confirmableStatuses().contains(this.status);
     }
 
     private void recalculateAfterCancel() {
@@ -248,11 +343,29 @@ public class Order {
         } else if (anyCancelled) {
             this.status = OrderStatus.PARTIALLY_CANCELLED;
         }
-        // 합계는 살아있는 항목만 반영
-        this.totalPrice = items.stream()
+        // 합계는 살아있는 항목만 반영 — 금액 모델(itemsTotal/payableAmount)도 함께 갱신
+        applyAmounts(items.stream()
                 .filter(OrderItem::isActive)
                 .mapToLong(OrderItem::subtotal)
-                .sum();
+                .sum());
+    }
+
+    /**
+     * 금액 모델 일괄 갱신 — 불변식 유지 지점 (§1).
+     * payableAmount = itemsTotal - couponDiscount - mileageUsed 이며 음수가 될 수 없다.
+     * totalPrice 는 itemsTotal 과 같은 값(정가 합계)으로 유지한다.
+     */
+    private void applyAmounts(long newItemsTotal) {
+        long payable = newItemsTotal - this.couponDiscount - this.mileageUsed;
+        if (payable < 0) {
+            throw new IllegalStateException(
+                    "결제금액은 0원 미만이 될 수 없습니다. itemsTotal=" + newItemsTotal
+                            + ", couponDiscount=" + this.couponDiscount
+                            + ", mileageUsed=" + this.mileageUsed);
+        }
+        this.itemsTotal    = newItemsTotal;
+        this.totalPrice    = newItemsTotal;
+        this.payableAmount = payable;
     }
 
     private void addItem(OrderItem item) {

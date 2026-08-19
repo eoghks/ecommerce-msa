@@ -18,7 +18,8 @@ public enum NotificationType {
     DELIVERY_DELIVERED("배송 완료", "상품이 배송 완료되었습니다. (주문 #%d)"),
     RETURN_APPROVED("반품 승인", "반품 신청이 승인되었습니다. (주문 #%d)"),
     RETURN_REJECTED("반품 거부", "반품 신청이 거부되었습니다. (주문 #%d)"),
-    RETURN_REFUNDED("환불 완료", "반품 환불이 완료되었습니다. (주문 #%d)");
+    RETURN_REFUNDED("환불 완료", "반품 환불이 완료되었습니다. (주문 #%d)"),
+    PURCHASE_CONFIRMED("구매확정", "구매가 확정되었습니다. (주문 #%d)");
 
     private final String title;
     private final String messageTemplate;

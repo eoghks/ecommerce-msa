@@ -97,6 +97,7 @@ public class ReturnService {
         Order order = findOrder(returnRequest.getOrderId());
         OrderItem item = findItem(order, returnRequest.getOrderItemId());
         requireManagePermission(item, returnId, userId, role);
+        requireNotPurchaseConfirmed(order);   // H-2: 확정된 주문에 환불이 진행되지 않게 재검증
 
         LocalDateTime now = LocalDateTime.now();
         returnRequest.approve(now);   // REQUESTED 아니면 400
@@ -127,6 +128,7 @@ public class ReturnService {
         Order order = findOrder(returnRequest.getOrderId());
         requireManagePermission(findItem(order, returnRequest.getOrderItemId()),
                 returnId, userId, role);
+        requireNotPurchaseConfirmed(order);   // H-2: 확정된 주문의 반품은 고객센터 경로로만 처리
 
         returnRequest.reject(rejectReason, LocalDateTime.now());
         notificationService.create(returnRequest.getUserId(),
@@ -205,6 +207,18 @@ public class ReturnService {
         return ROLE_SELLER.equals(role) && item.isOwnedBy(userId);
     }
 
+    /**
+     * H-2: 처리 시점 구매확정 재검증 — 신청 이후 자동확정·수동확정이 먼저 일어났을 수 있다.
+     * 확정된 주문은 반품 구간을 벗어났으므로 승인·거부 모두 400 으로 막아
+     * "구매확정 = 반품 불가"(§3.2)가 신청·처리 양방향에서 성립하게 한다.
+     */
+    private void requireNotPurchaseConfirmed(Order order) {
+        if (order.isPurchaseConfirmed()) {
+            throw new ReturnNotAllowedException(
+                    "구매확정된 주문의 반품은 처리할 수 없습니다. 확정 후 처리는 고객센터로 문의해주세요.");
+        }
+    }
+
     /** M-2: 승인 시점 항목 재검증 — 이미 취소된 항목이면 400 (이중 환불 차단) */
     private void requireActiveItem(OrderItem item) {
         if (!item.isActive()) {
@@ -213,11 +227,16 @@ public class ReturnService {
         }
     }
 
-    /** 반품 자격 검증 — 배송완료 주문 + 활성 항목만. 미충족 시 400 */
+    /** 반품 자격 검증 — 배송완료 + 구매확정 전 주문의 활성 항목만. 미충족 시 400 */
     private void validateEligible(Order order, OrderItem item) {
         if (order.getDeliveryStatus() != DeliveryStatus.DELIVERED) {
             throw new ReturnNotAllowedException(
                     "배송 완료된 주문만 반품할 수 있습니다. 현재 배송상태: " + order.getDeliveryStatus());
+        }
+        // payment-foundation §3.2: 반품 가능 구간은 배송완료 ~ 구매확정 전까지
+        if (order.isPurchaseConfirmed()) {
+            throw new ReturnNotAllowedException(
+                    "구매확정된 주문은 반품할 수 없습니다. 확정 후 처리는 고객센터로 문의해주세요.");
         }
         if (!item.isActive()) {
             throw new ReturnNotAllowedException(

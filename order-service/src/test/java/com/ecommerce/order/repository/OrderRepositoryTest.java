@@ -1,10 +1,14 @@
 package com.ecommerce.order.repository;
 
 import com.ecommerce.order.config.JpaConfig;
+import com.ecommerce.order.domain.DeliveryStatus;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.domain.OrderItemStatus;
 import com.ecommerce.order.domain.OrderStatus;
+import com.ecommerce.order.domain.ReturnRequest;
+import com.ecommerce.order.domain.ReturnStatus;
+import com.ecommerce.order.dto.AutoConfirmTarget;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -19,10 +23,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -139,7 +145,127 @@ class OrderRepositoryTest {
         assertThat(statistics.getPrepareStatementCount()).isLessThanOrEqualTo(MAX_LIST_QUERY_COUNT);
     }
 
+    // ── 구매확정 자격 쿼리 (payment-foundation §3.2, 리뷰 H-1·H-2·H-3) ──
+
+    @Test
+    @DisplayName("자동확정 대상(H-1) — 배송완료·미확정·기준일 경과 주문은 조회된다")
+    void findAutoConfirmTargets_eligible() {
+        Order order = saveDeliveredOrder(OrderStatus.CONFIRMED);
+
+        List<AutoConfirmTarget> targets = findTargets();
+
+        assertThat(targets).extracting(AutoConfirmTarget::orderId).containsExactly(order.getId());
+    }
+
+    @Test
+    @DisplayName("자동확정 대상(H-1) — 전체 취소(CANCELLED)된 배송완료 주문은 제외된다")
+    void findAutoConfirmTargets_cancelledOrder_excluded() {
+        Order order = saveDeliveredOrder(OrderStatus.CANCELLED);
+
+        assertThat(findTargets()).isEmpty();
+        assertThat(confirmIfEligible(order.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("자동확정 대상(H-2) — 진행 중(REQUESTED) 반품이 걸린 주문은 제외된다")
+    void findAutoConfirmTargets_pendingReturn_excluded() {
+        Order order = saveDeliveredOrder(OrderStatus.CONFIRMED);
+        saveReturnRequest(order);
+
+        assertThat(findTargets()).isEmpty();
+        assertThat(confirmIfEligible(order.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("자동확정(H-3) — 조건부 UPDATE 는 첫 실행만 1건, 재실행은 0건(중복 확정 차단)")
+    void confirmPurchaseIfEligible_onlyOnce() {
+        Order order = saveDeliveredOrder(OrderStatus.CONFIRMED);
+
+        assertThat(confirmIfEligible(order.getId())).isEqualTo(1);
+        assertThat(confirmIfEligible(order.getId())).isZero();
+        assertThat(reload(order).getPurchaseConfirmedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("수동확정(H-3) — 조건부 UPDATE 는 동시 요청 중 1건만 성공한다")
+    void confirmPurchaseNow_onlyOnce() {
+        Order order = saveDeliveredOrder(OrderStatus.CONFIRMED);
+
+        assertThat(confirmNow(order.getId())).isEqualTo(1);
+        assertThat(confirmNow(order.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("수동확정(H-1·H-2) — 취소된 주문·진행 중 반품이 있는 주문은 갱신 0건")
+    void confirmPurchaseNow_ineligible() {
+        Order cancelled = saveDeliveredOrder(OrderStatus.CANCELLED);
+        Order withReturn = saveDeliveredOrder(OrderStatus.CONFIRMED);
+        saveReturnRequest(withReturn);
+
+        assertThat(confirmNow(cancelled.getId())).isZero();
+        assertThat(confirmNow(withReturn.getId())).isZero();
+    }
+
     // ── helpers ──────────────────────────────────────────────
+
+    private List<AutoConfirmTarget> findTargets() {
+        return orderRepository.findAutoConfirmTargets(DeliveryStatus.DELIVERED,
+                OrderStatus.confirmableStatuses(), ReturnStatus.pendingStatuses(),
+                LocalDateTime.now(), PageRequest.of(0, 100));
+    }
+
+    private int confirmIfEligible(Long orderId) {
+        return orderRepository.confirmPurchaseIfEligible(orderId, DeliveryStatus.DELIVERED,
+                OrderStatus.confirmableStatuses(), ReturnStatus.pendingStatuses(),
+                LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    private int confirmNow(Long orderId) {
+        return orderRepository.confirmPurchaseNow(orderId, DeliveryStatus.DELIVERED,
+                OrderStatus.confirmableStatuses(), ReturnStatus.pendingStatuses(),
+                LocalDateTime.now());
+    }
+
+    private Order reload(Order order) {
+        testEntityManager.flush();
+        testEntityManager.clear();
+        return orderRepository.findById(order.getId()).orElseThrow();
+    }
+
+    /**
+     * 배송완료 주문 저장 — 기준일 경과 상태를 만들기 위해 배송완료 시각을 과거로 앞당긴다.
+     * CANCELLED 는 전 항목 취소(반품 승인 경로)로 만들어 배송상태가 DELIVERED 로 남는 상황을 재현한다.
+     */
+    private Order saveDeliveredOrder(OrderStatus status) {
+        OrderItem item = buildItem(PRODUCT_ID, false);
+        Order order = Order.builder()
+                .userId(USER_ID)
+                .totalPrice(item.subtotal())
+                .receiver("홍길동")
+                .phone("010-1234-5678")
+                .address("서울시 강남구")
+                .items(List.of(item))
+                .build();
+        order.confirm();
+        order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
+        Order saved = orderRepository.saveAndFlush(order);
+        if (status == OrderStatus.CANCELLED) {
+            saved.cancelItem(saved.getItems().get(0).getId(), "반품 승인");
+        }
+        ReflectionTestUtils.setField(saved, "deliveredAt", LocalDateTime.now().minusDays(8));
+        return orderRepository.saveAndFlush(saved);
+    }
+
+    /** 진행 중(REQUESTED) 반품 1건 저장 */
+    private void saveReturnRequest(Order order) {
+        testEntityManager.persistAndFlush(ReturnRequest.builder()
+                .orderId(order.getId())
+                .orderItemId(order.getItems().get(0).getId())
+                .userId(order.getUserId())
+                .reason("제품 하자")
+                .build());
+    }
 
     private Statistics statistics() {
         return entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
