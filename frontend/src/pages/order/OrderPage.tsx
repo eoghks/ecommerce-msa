@@ -88,7 +88,14 @@ const OrderPage = () => {
       const payload: OrderAddressPayload = unchanged
         ? { addressId: selected!.id }
         : { receiver, phone, address };
-      await createOrder(orderItems, payload);
+      const { data: order } = await createOrder(orderItems, payload);
+      // V1.1-6: 주문은 PAYMENT_PENDING 으로 생성된다 → 결제위젯 화면으로 이동해 승인을 받는다.
+      // 장바구니는 결제 승인이 끝난 뒤(성공 화면) 비운다 — 승인 실패 시 담은 상품이 남아야 한다.
+      if (order.status === 'PAYMENT_PENDING') {
+        navigate(`/payments/${order.id}`);
+        return;
+      }
+      // payableAmount == 0 이면 서버가 PG 없이 즉시 결제완료 처리한다(payment-foundation 11-3)
       await clear();
       navigate('/orders', { state: { ordered: true } });
     } catch (err) {
@@ -190,13 +197,12 @@ const OrderPage = () => {
           </div>
         </section>
 
-        {/* 결제 수단 (데모 고정) */}
+        {/* V1.1-6: 결제 수단은 다음 단계(토스 결제위젯)에서 선택한다 */}
         <section className="bg-white border border-gray-100 rounded-2xl p-5">
           <h2 className="text-[14px] font-semibold text-gray-700 mb-3 m-0">결제 수단</h2>
-          <div className="flex items-center gap-2 text-[13px] text-gray-600">
-            <div className="w-4 h-4 rounded-full border-[5px] border-brand-600" />
-            무통장입금
-          </div>
+          <p className="text-[13px] text-gray-600 m-0">
+            주문서 확인 후 결제 화면에서 카드·계좌 등 결제 수단을 선택합니다.
+          </p>
         </section>
 
         {error && <div className="error-box">{error}</div>}
@@ -209,7 +215,7 @@ const OrderPage = () => {
         >
           {loading
             ? <><span className="spinner" />처리 중...</>
-            : `${formatPrice(totalPrice())} 주문 확정`}
+            : `${formatPrice(totalPrice())} 결제하기`}
         </button>
       </form>
     </div>

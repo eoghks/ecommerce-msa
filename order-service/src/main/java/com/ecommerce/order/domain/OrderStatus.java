@@ -11,6 +11,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public enum OrderStatus {
 
+    PAYMENT_PENDING("PAYMENT_PENDING"),          // 결제 승인 대기 — 재고 미차감 (payment-foundation §5)
     PENDING("PENDING"),
     CONFIRMED("CONFIRMED"),
     PARTIALLY_CANCELLED("PARTIALLY_CANCELLED"),  // 일부 항목만 취소됨

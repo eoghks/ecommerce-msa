@@ -16,6 +16,9 @@ import ProductDetailPage from './pages/product/ProductDetailPage';
 import CartPage from './pages/order/CartPage';
 import OrderPage from './pages/order/OrderPage';
 import OrderListPage from './pages/order/OrderListPage';
+import PaymentPage from './pages/order/PaymentPage';
+import PaymentSuccessPage from './pages/order/PaymentSuccessPage';
+import PaymentFailPage from './pages/order/PaymentFailPage';
 import AdminProductPage from './pages/admin/AdminProductPage';
 import AdminCategoryPage from './pages/admin/AdminCategoryPage';
 import AdminOrderPage from './pages/admin/AdminOrderPage';
@@ -91,6 +94,10 @@ const App = () => {
               <Route path="/cart"         element={<CartPage />} />
               <Route path="/order"        element={<PrivateRoute><OrderPage /></PrivateRoute>} />
               <Route path="/orders"       element={<PrivateRoute><OrderListPage /></PrivateRoute>} />
+              {/* V1.1-6: PG 결제 — 결제위젯 화면과 성공/실패 리다이렉트 처리 */}
+              <Route path="/payments/success"   element={<PrivateRoute><PaymentSuccessPage /></PrivateRoute>} />
+              <Route path="/payments/fail"      element={<PrivateRoute><PaymentFailPage /></PrivateRoute>} />
+              <Route path="/payments/:orderId"  element={<PrivateRoute><PaymentPage /></PrivateRoute>} />
               <Route path="/my/profile"   element={<PrivateRoute><MyProfilePage /></PrivateRoute>} />
               <Route path="/my/wishlist"  element={<PrivateRoute><WishlistPage /></PrivateRoute>} />
               <Route path="/my/addresses" element={<PrivateRoute><AddressBookPage /></PrivateRoute>} />

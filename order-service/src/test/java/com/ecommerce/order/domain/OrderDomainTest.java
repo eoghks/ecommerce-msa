@@ -31,18 +31,60 @@ class OrderDomainTest {
                 .quantity(2)
                 .build();
 
-        return Order.builder()
+        Order order = Order.builder()
                 .userId(10L)
                 .totalPrice(1_500_000L)
                 .items(List.of(item1, item2))
                 .build();
+        // V1.1-6: 주문은 PAYMENT_PENDING 으로 생성되므로 결제 승인 후 상태(PENDING)를 기본 전제로 둔다
+        order.markPaid();
+        return order;
+    }
+
+    /** 결제 승인 전(PAYMENT_PENDING) 주문 — 선생성 상태 검증용 */
+    private Order unpaidOrder() {
+        OrderItem item = OrderItem.builder()
+                .productId(1L)
+                .productName("갤럭시 S24")
+                .price(1_200_000L)
+                .quantity(1)
+                .build();
+        return Order.builder()
+                .userId(10L)
+                .totalPrice(1_200_000L)
+                .items(List.of(item))
+                .build();
     }
 
     @Test
-    @DisplayName("주문 생성 시 초기 상태는 PENDING")
-    void createOrder_statusIsPending() {
-        Order order = buildOrder();
+    @DisplayName("V1.1-6: 주문 생성 시 초기 상태는 PAYMENT_PENDING (승인 전 재고 미차감)")
+    void createOrder_statusIsPaymentPending() {
+        Order order = unpaidOrder();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(order.isAwaitingPayment()).isTrue();
+    }
+
+    @Test
+    @DisplayName("V1.1-6: markPaid — PAYMENT_PENDING → PENDING, 이미 PENDING 이면 멱등 skip")
+    void markPaid_transitionsToPending() {
+        Order order = unpaidOrder();
+
+        order.markPaid();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+
+        order.markPaid();   // 멱등 — 예외 없이 유지
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("V1.1-6: markPaid — 결제 단계가 아닌 주문(CONFIRMED)은 전이 불가")
+    void markPaid_invalidStatus_throws() {
+        Order order = buildOrder();
+        order.confirm();
+
+        assertThatThrownBy(order::markPaid)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("결제 완료 처리할 수 없는");
     }
 
     @Test
@@ -70,8 +112,10 @@ class OrderDomainTest {
     }
 
     @Test
-    @DisplayName("PENDING 상태에서만 취소 가능")
-    void isCancellable_onlyWhenPending() {
+    @DisplayName("재고 차감 전(PAYMENT_PENDING/PENDING)에만 취소 가능")
+    void isCancellable_beforeStockDecrease() {
+        assertThat(unpaidOrder().isCancellable()).isTrue();
+
         Order order = buildOrder();
         assertThat(order.isCancellable()).isTrue();
 
@@ -82,6 +126,8 @@ class OrderDomainTest {
     @Test
     @DisplayName("M-N3: isUserCancellable — PENDING/CONFIRMED/PARTIALLY_CANCELLED 가능, CANCELLED 불가")
     void isUserCancellable_states() {
+        assertThat(unpaidOrder().isUserCancellable()).isTrue();   // PAYMENT_PENDING
+
         Order pending = buildOrder();
         assertThat(pending.isUserCancellable()).isTrue();   // PENDING
 
@@ -319,6 +365,7 @@ class OrderDomainTest {
 
         Order order = Order.builder().userId(10L).totalPrice(1_500_000L).items(items).build();
         ReflectionTestUtils.setField(order, "id", 1L);
+        order.markPaid();   // V1.1-6: 결제 승인 완료 상태(PENDING)를 기본 전제로 둔다
         return order;
     }
 
