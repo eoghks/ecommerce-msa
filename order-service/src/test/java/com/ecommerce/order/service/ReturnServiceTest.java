@@ -101,6 +101,35 @@ class ReturnServiceTest {
     }
 
     @Test
+    @DisplayName("신청 — 구매확정된 주문은 반품 불가 → 400 (payment-foundation 3.2)")
+    void request_purchaseConfirmed_badRequest() {
+        Order order = deliveredOrder();
+        order.confirmPurchase(java.time.LocalDateTime.now());
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> returnService.request(1L, 1L, 1L, "제품 하자"))
+                .isInstanceOf(ReturnNotAllowedException.class)
+                .hasMessageContaining("구매확정");
+        then(returnRequestRepository).should(never()).save(any(ReturnRequest.class));
+    }
+
+    @Test
+    @DisplayName("신청 — 구매확정 전(배송완료)이면 기존대로 신청 가능")
+    void request_beforePurchaseConfirm_success() {
+        Order order = deliveredOrder();
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+        given(returnRequestRepository.existsByOrderItemIdAndStatusIn(anyLong(), anyCollection()))
+                .willReturn(false);
+        given(returnRequestRepository.save(any(ReturnRequest.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        ReturnResponse response = returnService.request(1L, 1L, 1L, "제품 하자");
+
+        assertThat(order.isPurchaseConfirmed()).isFalse();
+        assertThat(response.status()).isEqualTo(ReturnStatus.REQUESTED);
+    }
+
+    @Test
     @DisplayName("신청 — 타인 주문 반품 시도 → 404")
     void request_otherUserOrder_notFound() {
         Order order = deliveredOrder();

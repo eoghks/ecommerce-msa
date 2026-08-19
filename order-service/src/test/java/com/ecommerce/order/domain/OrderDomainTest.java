@@ -1,11 +1,17 @@
 package com.ecommerce.order.domain;
 
+import com.ecommerce.order.exception.PurchaseAlreadyConfirmedException;
+import com.ecommerce.order.exception.PurchaseConfirmNotAllowedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("Order 도메인 단위 테스트")
 class OrderDomainTest {
@@ -140,5 +146,143 @@ class OrderDomainTest {
                 IllegalArgumentException.class,
                 () -> OrderStatus.fromCode("UNKNOWN")
         );
+    }
+
+    // ── 금액 모델 (payment-foundation §1) ──────────────────────────
+
+    @Test
+    @DisplayName("금액모델 — 주문 생성 시 itemsTotal = payableAmount = 항목 합계, 할인·적립은 0")
+    void createOrder_amountsInitialized() {
+        Order order = buildOrder();
+
+        assertThat(order.getItemsTotal()).isEqualTo(1_500_000L);
+        assertThat(order.getPayableAmount()).isEqualTo(1_500_000L);
+        assertThat(order.getTotalPrice()).isEqualTo(1_500_000L);
+        assertThat(order.getCouponDiscount()).isZero();
+        assertThat(order.getMileageUsed()).isZero();
+        assertThat(order.getMileageEarned()).isZero();
+    }
+
+    @Test
+    @DisplayName("금액모델 — 항목 취소 시 ACTIVE 항목 기준으로 itemsTotal·payableAmount 재계산")
+    void cancelItem_recalculatesAmounts() {
+        Order order = identifiedOrder();
+        order.confirm();
+
+        order.cancelItem(2L, "판매자 취소");   // 나이키 운동화 300,000 취소
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PARTIALLY_CANCELLED);
+        assertThat(order.getItemsTotal()).isEqualTo(1_200_000L);
+        assertThat(order.getPayableAmount()).isEqualTo(1_200_000L);
+        assertThat(order.getTotalPrice()).isEqualTo(order.getItemsTotal());
+    }
+
+    @Test
+    @DisplayName("금액모델 — 불변식 payableAmount = itemsTotal - couponDiscount - mileageUsed 유지")
+    void recalculate_keepsPayableInvariant() {
+        Order order = identifiedOrder();
+        order.confirm();
+        // 쿠폰·마일리지 도입 전이라 setter 가 없으므로 할인이 있는 상태를 모사한다
+        ReflectionTestUtils.setField(order, "couponDiscount", 50_000L);
+        ReflectionTestUtils.setField(order, "mileageUsed", 30_000L);
+
+        order.cancelItem(2L, "판매자 취소");
+
+        assertThat(order.getPayableAmount())
+                .isEqualTo(order.getItemsTotal() - order.getCouponDiscount() - order.getMileageUsed());
+        assertThat(order.getPayableAmount()).isEqualTo(1_120_000L);
+    }
+
+    @Test
+    @DisplayName("금액모델 — 재계산 결과 payableAmount 가 음수면 예외 (payableAmount >= 0)")
+    void recalculate_negativePayable_throws() {
+        Order order = identifiedOrder();
+        order.confirm();
+        ReflectionTestUtils.setField(order, "couponDiscount", 1_400_000L);
+
+        // 1,200,000 항목만 남아 할인액(1,400,000)에 못 미치므로 불변식 위반
+        assertThatThrownBy(() -> order.cancelItem(2L, "판매자 취소"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("0원 미만");
+    }
+
+    // ── 구매확정 (payment-foundation §3.2) ────────────────────────
+
+    @Test
+    @DisplayName("구매확정 — 배송완료 주문은 확정 시각이 기록된다")
+    void confirmPurchase_delivered_recordsTime() {
+        Order order = deliveredOrder();
+        LocalDateTime confirmedAt = LocalDateTime.of(2026, 8, 19, 10, 0);
+
+        order.confirmPurchase(confirmedAt);
+
+        assertThat(order.isPurchaseConfirmed()).isTrue();
+        assertThat(order.getPurchaseConfirmedAt()).isEqualTo(confirmedAt);
+    }
+
+    @Test
+    @DisplayName("구매확정 — 배송완료 전(준비중·배송중)이면 400")
+    void confirmPurchase_notDelivered_throws() {
+        Order preparing = buildOrder();
+        preparing.confirm();
+        assertThatThrownBy(() -> preparing.confirmPurchase(LocalDateTime.now()))
+                .isInstanceOf(PurchaseConfirmNotAllowedException.class);
+
+        Order shipping = buildOrder();
+        shipping.confirm();
+        shipping.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        assertThatThrownBy(() -> shipping.confirmPurchase(LocalDateTime.now()))
+                .isInstanceOf(PurchaseConfirmNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("구매확정 — 이미 확정된 주문 재확정은 409")
+    void confirmPurchase_alreadyConfirmed_throws() {
+        Order order = deliveredOrder();
+        order.confirmPurchase(LocalDateTime.now());
+
+        assertThatThrownBy(() -> order.confirmPurchase(LocalDateTime.now()))
+                .isInstanceOf(PurchaseAlreadyConfirmedException.class);
+    }
+
+    @Test
+    @DisplayName("구매확정 — DELIVERED 전이 시 deliveredAt 이 기록된다(자동확정 기준 시각)")
+    void advanceDeliveryStatus_recordsDeliveredAt() {
+        Order order = buildOrder();
+        order.confirm();
+        order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        assertThat(order.getDeliveredAt()).isNull();
+
+        order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
+
+        assertThat(order.getDeliveredAt()).isNotNull();
+    }
+
+    /** 항목 id 가 부여된(영속 상태 모사) 주문 — 항목 취소 테스트용 */
+    private Order identifiedOrder() {
+        List<OrderItem> items = new ArrayList<>();
+        items.add(itemOf(1L, 1L, "갤럭시 S24", 1_200_000L, 1));
+        items.add(itemOf(2L, 2L, "나이키 운동화", 150_000L, 2));
+
+        Order order = Order.builder().userId(10L).totalPrice(1_500_000L).items(items).build();
+        ReflectionTestUtils.setField(order, "id", 1L);
+        return order;
+    }
+
+    /** 배송완료 주문 — 구매확정 자격 충족 상태 */
+    private Order deliveredOrder() {
+        Order order = identifiedOrder();
+        order.confirm();
+        order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
+        order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
+        return order;
+    }
+
+    private OrderItem itemOf(Long id, Long productId, String name, Long price, int quantity) {
+        OrderItem item = OrderItem.builder()
+                .productId(productId).productName(name).price(price).quantity(quantity)
+                .build();
+        ReflectionTestUtils.setField(item, "id", id);
+        return item;
     }
 }

@@ -122,6 +122,27 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /** 구매확정 자격 미충족(배송완료 전) → 400 Bad Request */
+    @ExceptionHandler(PurchaseConfirmNotAllowedException.class)
+    public ProblemDetail handlePurchaseConfirmNotAllowed(PurchaseConfirmNotAllowedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Purchase Confirm Not Allowed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/purchase-confirm-not-allowed"));
+        return pd;
+    }
+
+    /**
+     * 이미 구매확정된 주문 재확정 → 409 Conflict.
+     * 요청 자체는 유효하고 현재 리소스 상태와 충돌하는 경우이므로 반품 상태충돌(409)과 동일하게 처리한다.
+     */
+    @ExceptionHandler(PurchaseAlreadyConfirmedException.class)
+    public ProblemDetail handlePurchaseAlreadyConfirmed(PurchaseAlreadyConfirmedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Purchase Already Confirmed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/purchase-already-confirmed"));
+        return pd;
+    }
+
     /** 반품 없음/타인 소유 반품 접근 → 404 Not Found (정보 노출 방지) */
     @ExceptionHandler(ReturnRequestNotFoundException.class)
     public ProblemDetail handleReturnRequestNotFound(ReturnRequestNotFoundException ex) {

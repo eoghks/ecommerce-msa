@@ -49,6 +49,12 @@ kafka:
     stock-decrease-failed: stock.decrease.failed
 
 app:
+  order:
+    # payment-foundation §3.2: 배송완료 후 자동 구매확정까지의 대기 일수(정책값).
+    # 정책 테이블(mileage_policy) 이관은 마일리지 단계(V1.1-9)에서 진행한다.
+    auto-confirm-days: ${ORDER_AUTO_CONFIRM_DAYS:7}
+    # 자동확정 1회 실행당 처리 상한 — 대량 적체 시 트랜잭션이 길어지지 않게 제한
+    auto-confirm-batch-size: ${ORDER_AUTO_CONFIRM_BATCH_SIZE:500}
   internal:
     # M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
     token: ${INTERNAL_TOKEN:dev-internal-secret}

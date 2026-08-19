@@ -213,11 +213,16 @@ public class ReturnService {
         }
     }
 
-    /** 반품 자격 검증 — 배송완료 주문 + 활성 항목만. 미충족 시 400 */
+    /** 반품 자격 검증 — 배송완료 + 구매확정 전 주문의 활성 항목만. 미충족 시 400 */
     private void validateEligible(Order order, OrderItem item) {
         if (order.getDeliveryStatus() != DeliveryStatus.DELIVERED) {
             throw new ReturnNotAllowedException(
                     "배송 완료된 주문만 반품할 수 있습니다. 현재 배송상태: " + order.getDeliveryStatus());
+        }
+        // payment-foundation §3.2: 반품 가능 구간은 배송완료 ~ 구매확정 전까지
+        if (order.isPurchaseConfirmed()) {
+            throw new ReturnNotAllowedException(
+                    "구매확정된 주문은 반품할 수 없습니다. 확정 후 처리는 고객센터로 문의해주세요.");
         }
         if (!item.isActive()) {
             throw new ReturnNotAllowedException(

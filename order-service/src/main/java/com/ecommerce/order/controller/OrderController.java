@@ -7,6 +7,7 @@ import com.ecommerce.order.dto.request.OrderItemCancelRequest;
 import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.service.OrderService;
+import com.ecommerce.order.service.PurchaseConfirmService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,7 +31,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderService orderService;
+    private final OrderService           orderService;
+    private final PurchaseConfirmService purchaseConfirmService;
 
     /** 주문 생성 */
     @PostMapping
@@ -117,6 +119,19 @@ public class OrderController {
     ) {
         orderService.cancelOrderItem(orderId, itemId, request.reason(), userId, role);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 구매확정 (주문 소유자 본인). 배송완료(DELIVERED) + 미확정 주문만 가능.
+     * 자격 미충족 400, 이미 확정 409, 타인 주문 404, 인증 정보 부재 401.
+     * 확정 후에는 반품 자격이 사라진다 (payment-foundation §3.2).
+     */
+    @PatchMapping("/{orderId}/purchase-confirm")
+    public ResponseEntity<OrderResponse> confirmPurchase(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(purchaseConfirmService.confirm(orderId, userId));
     }
 
     /**
