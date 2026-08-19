@@ -235,11 +235,16 @@ class PaymentServiceTest {
 
         LocalDateTime before = LocalDateTime.now();
         paymentService.expireUnpaidOrders();
+        LocalDateTime after = LocalDateTime.now();
 
         ArgumentCaptor<LocalDateTime> threshold = ArgumentCaptor.forClass(LocalDateTime.class);
         then(orderRepository).should().findExpirableOrders(any(), anyCollection(),
                 threshold.capture(), any(Pageable.class));
-        assertThat(threshold.getValue()).isBeforeOrEqualTo(before.minusMinutes(30));
+        // 서비스 내부 now() 는 before~after 사이에 잡히므로 기준 시각도 그 구간에서 30분을 뺀 값이어야 한다.
+        // (단일 시점과 비교하면 실행 중 흐른 시간 때문에 CI 에서 깨지는 flaky 단언이 된다)
+        assertThat(threshold.getValue())
+                .isAfterOrEqualTo(before.minusMinutes(30))
+                .isBeforeOrEqualTo(after.minusMinutes(30));
     }
 
     // ── helper ───────────────────────────────────────────────────
