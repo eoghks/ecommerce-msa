@@ -39,6 +39,12 @@ spring:
           predicates:
             - Path=/api/v1/cart/**
 
+        # V1.1-6: 결제 API — 인증 필수(화이트리스트·선택인증 목록에 없음), 본인 주문만 서비스에서 검증
+        - id: payment-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/payments/**
+
         - id: return-service
           uri: ${ORDER_SERVICE_URL:http://localhost:8083}
           predicates:

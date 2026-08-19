@@ -246,6 +246,7 @@ class OrderRepositoryTest {
                 .address("서울시 강남구")
                 .items(List.of(item))
                 .build();
+        order.markPaid();   // V1.1-6: 주문은 PAYMENT_PENDING 으로 생성 → 결제 승인 후 확정 흐름
         order.confirm();
         order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
         order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);
@@ -289,12 +290,15 @@ class OrderRepositoryTest {
         orderRepository.save(order);
     }
 
-    /** 주문 상태를 도메인 전이 메서드로 세팅 (PENDING은 기본 상태) */
+    /** 주문 상태를 도메인 전이 메서드로 세팅 (V1.1-6: 생성 직후는 PAYMENT_PENDING) */
     private void applyStatus(Order order, OrderStatus status) {
         if (status == OrderStatus.CONFIRMED) {
+            order.markPaid();
             order.confirm();
         } else if (status == OrderStatus.CANCELLED) {
             order.cancel();
+        } else if (status == OrderStatus.PENDING) {
+            order.markPaid();
         }
     }
 

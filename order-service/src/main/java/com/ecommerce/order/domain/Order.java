@@ -127,7 +127,9 @@ public class Order {
         this.receiver   = receiver;
         this.phone      = phone;
         this.address    = address;
-        this.status     = OrderStatus.PENDING;
+        // §5: 주문을 결제 대기로 선생성한 뒤 승인되면 PENDING 으로 전이한다.
+        //     ("승인은 됐는데 주문 생성 실패" 차단 — 모든 결제 시도가 주문으로 추적된다)
+        this.status     = OrderStatus.PAYMENT_PENDING;
         this.deliveryStatus = DeliveryStatus.PREPARING;
         // 할인 수단(쿠폰·마일리지) 미도입 — 항목 합계가 그대로 결제금액이 된다 (§1)
         this.couponDiscount = 0L;
@@ -152,6 +154,27 @@ public class Order {
                             + ", 항목합계=" + calculated);
         }
         return calculated;
+    }
+
+    /** 결제 승인 대기 상태인지 — 재고 차감 전이라 만료·재결제 대상이 된다 (§5) */
+    public boolean isAwaitingPayment() {
+        return this.status == OrderStatus.PAYMENT_PENDING;
+    }
+
+    /**
+     * 결제 승인 완료 — PAYMENT_PENDING → PENDING (§5).
+     * 이 전이 이후에야 재고 차감 Saga(order.created)가 시작된다.
+     * 멱등 처리: 이미 PENDING 이면 skip (승인 재요청·웹훅 재전달 대응)
+     */
+    public void markPaid() {
+        if (this.status == OrderStatus.PENDING) {
+            return;
+        }
+        if (this.status != OrderStatus.PAYMENT_PENDING) {
+            throw new IllegalStateException(
+                    "결제 완료 처리할 수 없는 주문 상태입니다. 현재 상태: " + this.status);
+        }
+        this.status = OrderStatus.PENDING;
     }
 
     /**
@@ -184,17 +207,20 @@ public class Order {
         this.status = OrderStatus.CANCELLED;
     }
 
+    /** 재고 차감 전(결제 대기·승인 완료) 주문인지 — 차감 없이 바로 취소할 수 있다 */
     public boolean isCancellable() {
-        return this.status == OrderStatus.PENDING;
+        return this.status == OrderStatus.PAYMENT_PENDING
+                || this.status == OrderStatus.PENDING;
     }
 
     /**
      * M-N3: 사용자가 취소 가능한 주문인지.
-     * PENDING(차감 전) + CONFIRMED/PARTIALLY_CANCELLED(차감 후) 모두 사용자 취소 허용.
+     * PAYMENT_PENDING/PENDING(차감 전) + CONFIRMED/PARTIALLY_CANCELLED(차감 후) 모두 사용자 취소 허용.
      * 이미 전체 취소된(CANCELLED) 주문만 불가.
      */
     public boolean isUserCancellable() {
-        return this.status == OrderStatus.PENDING
+        return this.status == OrderStatus.PAYMENT_PENDING
+                || this.status == OrderStatus.PENDING
                 || this.status == OrderStatus.CONFIRMED
                 || this.status == OrderStatus.PARTIALLY_CANCELLED;
     }

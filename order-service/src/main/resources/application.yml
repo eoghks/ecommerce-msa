@@ -55,9 +55,23 @@ app:
     auto-confirm-days: ${ORDER_AUTO_CONFIRM_DAYS:7}
     # 자동확정 1회 실행당 처리 상한 — 대량 적체 시 트랜잭션이 길어지지 않게 제한
     auto-confirm-batch-size: ${ORDER_AUTO_CONFIRM_BATCH_SIZE:500}
+    # payment-foundation §11.1: 결제 대기(PAYMENT_PENDING) 주문을 만료 처리하기까지의 대기 분(정책값)
+    payment-expire-minutes: ${ORDER_PAYMENT_EXPIRE_MINUTES:30}
   internal:
     # M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
     token: ${INTERNAL_TOKEN:dev-internal-secret}
+
+# V1.1-6: 토스페이먼츠 샌드박스 (payment-foundation §11-1)
+# 시크릿키는 반드시 env(TOSS_SECRET_KEY)로 주입한다. 아래 기본값은 토스가 공개한 샌드박스 테스트키이며
+# 운영 배포 시 절대 사용하지 않는다. 키는 로그·응답 어디에도 출력하지 않는다(§11.1 키 관리).
+# 프론트의 결제위젯 클라이언트 키(VITE_TOSS_CLIENT_KEY=test_gck_docs_...)와 같은
+# "결제위젯 연동" 키 쌍이어야 승인이 성립한다 — 연동 유형이 다른 키를 섞으면 승인이 거부된다.
+toss:
+  api-base-url: ${TOSS_API_BASE_URL:https://api.tosspayments.com}
+  secret-key: ${TOSS_SECRET_KEY:test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6}
+  # 결제 승인은 카드사 왕복이 있어 read 타임아웃을 넉넉히 잡되 무한 대기는 두지 않는다
+  connect-timeout-ms: ${TOSS_CONNECT_TIMEOUT_MS:3000}
+  read-timeout-ms: ${TOSS_READ_TIMEOUT_MS:10000}
 
 server:
   port: 8083

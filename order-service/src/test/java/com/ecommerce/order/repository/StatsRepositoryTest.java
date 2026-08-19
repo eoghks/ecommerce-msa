@@ -281,17 +281,22 @@ class StatsRepositoryTest {
         return order;
     }
 
-    /** 주문 상태를 도메인 전이 메서드로 세팅 (PENDING 은 기본 상태) */
+    /** 주문 상태를 도메인 전이 메서드로 세팅 (V1.1-6: 생성 직후는 PAYMENT_PENDING) */
     private void applyStatus(Order order, OrderStatus status) {
         switch (status) {
-            case CONFIRMED -> order.confirm();
+            case CONFIRMED -> {
+                order.markPaid();
+                order.confirm();
+            }
             case PARTIALLY_CANCELLED -> {
+                order.markPaid();
                 order.confirm();
                 List<OrderItem> items = order.getItems();
                 order.cancelItem(items.get(items.size() - 1).getId(), "테스트 항목 취소");
             }
             case CANCELLED -> order.cancel();
-            case PENDING -> { /* 기본 상태 유지 */ }
+            case PENDING -> order.markPaid();
+            case PAYMENT_PENDING -> { /* 생성 직후 상태 유지 */ }
         }
     }
 

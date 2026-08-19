@@ -231,6 +231,57 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /** 결제 정보 없음/타인 결제 접근 → 404 Not Found (정보 노출 방지) */
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ProblemDetail handlePaymentNotFound(PaymentNotFoundException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        pd.setTitle("Payment Not Found");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-not-found"));
+        return pd;
+    }
+
+    /** V1.1-6: 승인 요청 금액이 서버 계산 결제금액과 불일치 → 400 Bad Request (위변조 차단) */
+    @ExceptionHandler(PaymentAmountMismatchException.class)
+    public ProblemDetail handlePaymentAmountMismatch(PaymentAmountMismatchException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Payment Amount Mismatch");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-amount-mismatch"));
+        return pd;
+    }
+
+    /** V1.1-6: 이미 승인된 주문의 재승인 → 409 Conflict (주문당 승인 1건) */
+    @ExceptionHandler(PaymentAlreadyApprovedException.class)
+    public ProblemDetail handlePaymentAlreadyApproved(PaymentAlreadyApprovedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Payment Already Approved");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-already-approved"));
+        return pd;
+    }
+
+    /**
+     * V1.1-6: PG 승인 실패(카드 거절·통신 오류) → 400 Bad Request.
+     * 사용자가 다른 결제수단으로 재시도할 수 있도록 PG 사유 메시지를 그대로 전달한다.
+     */
+    @ExceptionHandler(PaymentApprovalFailedException.class)
+    public ProblemDetail handlePaymentApprovalFailed(PaymentApprovalFailedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        pd.setTitle("Payment Approval Failed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-approval-failed"));
+        return pd;
+    }
+
+    /**
+     * V1.1-6: PG 취소·환불 실패 → 502 Bad Gateway.
+     * 우리 요청은 유효했고 외부 PG 처리가 실패한 경우이므로 재시도 대상임을 상태코드로 구분한다.
+     */
+    @ExceptionHandler(PaymentCancelFailedException.class)
+    public ProblemDetail handlePaymentCancelFailed(PaymentCancelFailedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        pd.setTitle("Payment Cancel Failed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-cancel-failed"));
+        return pd;
+    }
+
     /** 주문 배송지 정보 유효하지 않음(addressId 무효/직접입력 누락) → 400 Bad Request */
     @ExceptionHandler(InvalidOrderShippingException.class)
     public ProblemDetail handleInvalidOrderShipping(InvalidOrderShippingException ex) {

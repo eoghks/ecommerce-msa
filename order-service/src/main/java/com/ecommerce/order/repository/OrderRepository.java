@@ -135,4 +135,22 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                            @Param("confirmableStatuses") Collection<OrderStatus> confirmableStatuses,
                            @Param("pendingReturnStatuses") Collection<ReturnStatus> pendingReturnStatuses,
                            @Param("confirmedAt") LocalDateTime confirmedAt);
+
+    /**
+     * V1.1-6: 미완료 주문 만료 (payment-foundation §11.1) — 결제 대기로 방치된 주문을 일괄 취소한다.
+     * 조건부 벌크 UPDATE 라 다중 인스턴스가 동시에 실행해도 같은 주문이 두 번 취소되지 않는다.
+     * 승인 전 단계라 재고 복구·환불 대상이 없어 건별 후처리가 필요 없다.
+     * 벌크 연산은 감사(@LastModifiedDate)를 우회하므로 updatedAt 도 함께 갱신한다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Order o
+            set o.status = :cancelledStatus, o.updatedAt = :now
+            where o.status = :paymentPendingStatus
+              and o.createdAt <= :threshold
+            """)
+    int expirePaymentPendingOrders(@Param("paymentPendingStatus") OrderStatus paymentPendingStatus,
+                                   @Param("cancelledStatus") OrderStatus cancelledStatus,
+                                   @Param("threshold") LocalDateTime threshold,
+                                   @Param("now") LocalDateTime now);
 }

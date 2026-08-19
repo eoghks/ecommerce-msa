@@ -124,10 +124,13 @@ class OrderSagaIntegrationTest {
                 .price(10_000L)
                 .quantity(1)
                 .build();
-        return Order.builder()
+        Order order = Order.builder()
                 .userId(userId)
                 .totalPrice(10_000L)
                 .items(List.of(item))
                 .build();
+        // V1.1-6: 주문은 PAYMENT_PENDING 으로 생성된다 — 재고 차감 Saga 는 결제 승인(PENDING) 이후 시작
+        order.markPaid();
+        return order;
     }
 }
