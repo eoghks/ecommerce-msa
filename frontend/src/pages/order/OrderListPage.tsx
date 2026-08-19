@@ -169,7 +169,10 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
     : null;
   // 구매확정 — 배송완료 + 미확정 주문만 확정 가능. 확정 후에는 반품 자격이 사라진다
   const purchaseConfirmed = Boolean(order.purchaseConfirmedAt);
-  const confirmable = order.deliveryStatus === 'DELIVERED' && !purchaseConfirmed;
+  // M-4: 배송 뱃지와 동일하게 주문상태까지 본다 — 취소된 배송완료 주문에는 확정 버튼을 노출하지 않는다
+  const confirmable = DELIVERABLE_STATUSES.includes(order.status)
+    && order.deliveryStatus === 'DELIVERED'
+    && !purchaseConfirmed;
 
   // M-N3: 주문 취소 — 사유 입력은 선택(비우면 서버 기본 사유)
   const handleCancel = () => {

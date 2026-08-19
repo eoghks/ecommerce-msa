@@ -190,6 +190,16 @@ export interface Order {
   createdAt?: string;
 }
 
+/**
+ * 판매자 주문 목록 응답 (M-6).
+ * 본인 상품 항목만 포함하고, 금액은 본인 항목 정가 합계(sellerItemsTotal)만 내려온다.
+ * 주문 전체의 실결제액(payableAmount)은 판매자에게 노출하지 않는다.
+ */
+export interface SellerOrder extends Omit<Order,
+  'totalPrice' | 'itemsTotal' | 'couponDiscount' | 'mileageUsed' | 'payableAmount' | 'mileageEarned'> {
+  sellerItemsTotal: number;
+}
+
 /** 주문 생성 시 전달하는 상품 항목 */
 export interface OrderRequestItem {
   productId: number;
