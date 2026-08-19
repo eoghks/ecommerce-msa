@@ -105,7 +105,9 @@ const ProductDetailPage = () => {
         </div>
 
         {/* 정보 */}
-        <div className="flex flex-col gap-4 flex-1">
+        {/* min-w-0: flex 자식은 기본 min-width:auto 라 내용이 길면 줄어들지 않는다 —
+            공백 없는 긴 상품명이 컨테이너를 밀어 버튼이 잘리는 것을 막는다 */}
+        <div className="flex flex-col gap-4 flex-1 min-w-0">
           {/* 카테고리 + 상품명 */}
           {product.categoryName && (
             <span className="text-[12px] font-semibold text-brand-600 uppercase tracking-wide">
@@ -113,7 +115,8 @@ const ProductDetailPage = () => {
             </span>
           )}
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0 leading-snug">
+            {/* break-words: 공백 없는 긴 상품명이 컨테이너를 밀어 버튼을 잘라내는 것을 막는다 */}
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0 leading-snug break-words min-w-0">
               {product.name}
             </h1>
             <div className="shrink-0">
