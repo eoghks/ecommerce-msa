@@ -11,6 +11,7 @@ import com.ecommerce.order.dto.ShippingInfo;
 import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
+import com.ecommerce.order.dto.response.SellerOrderResponse;
 import com.ecommerce.order.event.OrderItemCancelledApplicationEvent;
 import com.ecommerce.order.event.OrderItemCancelledEvent;
 import com.ecommerce.order.exception.DeliveryStatusAccessDeniedException;
@@ -170,11 +171,11 @@ public class OrderService {
                 .map(OrderResponse::from);
     }
 
-    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목만 노출 */
+    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목·본인 항목 합계만 노출 (M-6) */
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getSellerOrders(Long sellerId, Pageable pageable) {
+    public Page<SellerOrderResponse> getSellerOrders(Long sellerId, Pageable pageable) {
         return orderRepository.findBySellerId(sellerId, pageable)
-                .map(order -> OrderResponse.forSeller(order, sellerId));
+                .map(order -> SellerOrderResponse.from(order, sellerId));
     }
 
     /**

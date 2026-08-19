@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react';
 import type { AxiosError } from 'axios';
 import { getAllOrders, getSellerOrders, cancelOrderItem, updateDeliveryStatus } from '../../api/order';
 import useAuthStore from '../../store/authStore';
-import type { ApiErrorResponse, DeliveryStatus, Order, OrderItem, OrderStatus } from '../../types';
+import type { ApiErrorResponse, DeliveryStatus, Order, OrderItem, OrderStatus, SellerOrder } from '../../types';
+
+/** 관리자 응답(Order)과 판매자 응답(SellerOrder)을 함께 렌더링한다 — M-6 */
+type ManagedOrder = Order | SellerOrder;
+
+/** 화면에 표시할 금액 — 관리자는 주문 결제금액, 판매자는 본인 항목 합계 */
+const displayAmount = (order: ManagedOrder): number =>
+  'sellerItemsTotal' in order ? order.sellerItemsTotal : order.totalPrice;
 
 const formatPrice = (p: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(p);
@@ -39,7 +46,7 @@ const AdminOrderPage = () => {
   const { role } = useAuthStore();
   const isAdmin = role === 'ADMIN';
 
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<ManagedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -199,7 +206,7 @@ const AdminOrderPage = () => {
                   <span className="text-[13px] text-gray-500">
                     {isAdmin ? '결제금액(유효)' : '내 상품 합계'}
                   </span>
-                  <span className="text-[15px] font-bold text-gray-900">{formatPrice(order.totalPrice)}</span>
+                  <span className="text-[15px] font-bold text-gray-900">{formatPrice(displayAmount(order))}</span>
                 </div>
               </div>
             );

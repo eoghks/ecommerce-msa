@@ -15,6 +15,9 @@ public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, Lo
     /** 동일 항목에 진행 중(활성)인 반품이 있는지 — 중복 신청 차단(409) 판정용 */
     boolean existsByOrderItemIdAndStatusIn(Long orderItemId, Collection<ReturnStatus> statuses);
 
+    /** H-2: 주문에 처리 진행 중인 반품이 있는지 — 구매확정 차단(400) 판정용 */
+    boolean existsByOrderIdAndStatusIn(Long orderId, Collection<ReturnStatus> statuses);
+
     /** 내 반품 목록 — 최신순 */
     Page<ReturnRequest> findByUserIdOrderByRequestedAtDesc(Long userId, Pageable pageable);
 

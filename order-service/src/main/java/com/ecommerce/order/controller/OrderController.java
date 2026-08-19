@@ -6,7 +6,9 @@ import com.ecommerce.order.dto.request.OrderCreateRequest;
 import com.ecommerce.order.dto.request.OrderItemCancelRequest;
 import com.ecommerce.order.dto.response.FailedOrderResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
+import com.ecommerce.order.dto.response.SellerOrderResponse;
 import com.ecommerce.order.service.OrderService;
+import com.ecommerce.order.service.PurchaseConfirmService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,7 +32,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class OrderController {
 
-    private final OrderService orderService;
+    private final OrderService           orderService;
+    private final PurchaseConfirmService purchaseConfirmService;
 
     /** 주문 생성 */
     @PostMapping
@@ -69,10 +72,10 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getFailedOrders(pageable));
     }
 
-    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목만 노출 */
+    /** 판매자 주문 목록 조회 (SELLER) — 본인 상품 항목·본인 항목 합계(sellerItemsTotal)만 노출 (M-6) */
     @PreAuthorize("hasRole('SELLER')")
     @GetMapping("/seller")
-    public ResponseEntity<Page<OrderResponse>> getSellerOrders(
+    public ResponseEntity<Page<SellerOrderResponse>> getSellerOrders(
             @RequestHeader("X-User-Id") Long sellerId,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
     ) {
@@ -117,6 +120,24 @@ public class OrderController {
     ) {
         orderService.cancelOrderItem(orderId, itemId, request.reason(), userId, role);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 구매확정 (주문 소유자 본인). 확정 대상 주문상태 + 배송완료(DELIVERED) + 미확정 주문만 가능.
+     * 진행 중 반품이 있으면 확정할 수 없다. 확정 후에는 반품 자격이 사라진다 (payment-foundation §3.2).
+     * 자격 미충족 400, 이미 확정 409, 타인 주문 404, 인증 정보 부재 401.
+     *
+     * M-5: 이 엔드포인트만 X-User-Id 를 required=false 로 받는 이유 —
+     * 헤더 누락을 스프링의 400(Bad Request)이 아니라 서비스의 401(UnauthorizedException)로 응답하는
+     * 반품 API(ReturnController) 규약을 따른다. 인증 부재는 요청 형식 오류가 아니라 인증 오류이므로
+     * 신규 API 는 이 규약을 사용한다(기존 주문 API 의 필수 헤더 방식은 호환을 위해 유지).
+     */
+    @PatchMapping("/{orderId}/purchase-confirm")
+    public ResponseEntity<OrderResponse> confirmPurchase(
+            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @PathVariable Long orderId
+    ) {
+        return ResponseEntity.ok(purchaseConfirmService.confirm(orderId, userId));
     }
 
     /**
