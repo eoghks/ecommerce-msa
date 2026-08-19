@@ -42,6 +42,10 @@ export const getSellerOrders = (page = 0, size = 20): Promise<AxiosResponse<Page
 export const cancelOrderItem = (orderId: number, itemId: number, reason: string): Promise<AxiosResponse<void>> =>
   api.patch(`/api/v1/orders/${orderId}/items/${itemId}/cancel`, { reason });
 
+// 구매확정 (주문 소유자) — 배송완료 + 미확정 주문만. 확정 후에는 반품 불가 (payment-foundation 3.2)
+export const confirmPurchase = (orderId: number): Promise<AxiosResponse<Order>> =>
+  api.patch(`/api/v1/orders/${orderId}/purchase-confirm`);
+
 // V1.1-3: 배송상태 변경 (ADMIN 전체 / SELLER 본인 상품 포함 주문) — PREPARING→SHIPPING→DELIVERED
 export const updateDeliveryStatus = (orderId: number, status: DeliveryStatus): Promise<AxiosResponse<void>> =>
   api.patch(`/api/v1/orders/${orderId}/delivery-status`, { status });

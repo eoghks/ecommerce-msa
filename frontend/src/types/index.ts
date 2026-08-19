@@ -168,7 +168,22 @@ export interface Order {
   status: OrderStatus;
   deliveryStatus?: DeliveryStatus;
   items: OrderItem[];
+  /** 항목 정가 합계 — itemsTotal 과 같은 값 */
   totalPrice: number;
+  /** 금액 모델(payment-foundation 1) — 항목 정가 합계 */
+  itemsTotal?: number;
+  /** 쿠폰 할인액 (미도입 단계에서는 0) */
+  couponDiscount?: number;
+  /** 마일리지 사용액 (미도입 단계에서는 0) */
+  mileageUsed?: number;
+  /** 실 결제금액 = itemsTotal - couponDiscount - mileageUsed */
+  payableAmount?: number;
+  /** 적립 마일리지 (미도입 단계에서는 0) */
+  mileageEarned?: number;
+  /** 배송완료 전이 시각 — 자동 구매확정 기준 */
+  deliveredAt?: string | null;
+  /** 구매확정 시각. null 이면 미확정(= 반품 가능 구간) */
+  purchaseConfirmedAt?: string | null;
   receiver?: string;
   phone?: string;
   address?: string;
