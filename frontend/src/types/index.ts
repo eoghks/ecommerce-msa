@@ -143,7 +143,12 @@ export interface Cart {
 // ── 주문 ─────────────────────────────────────────────
 
 /** 주문 상태 (백엔드 OrderStatus enum) */
-export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PARTIALLY_CANCELLED' | 'CANCELLED';
+export type OrderStatus =
+  | 'PAYMENT_PENDING'   // V1.1-6: 결제 승인 대기 — 재고 미차감 (payment-foundation 5)
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PARTIALLY_CANCELLED'
+  | 'CANCELLED';
 
 /** 배송 상태 (백엔드 DeliveryStatus enum) */
 export type DeliveryStatus = 'PREPARING' | 'SHIPPING' | 'DELIVERED';
@@ -354,4 +359,34 @@ export interface ServiceHealth {
   status: string;
   responseTimeMs: number;
   error?: string | null;
+}
+
+// ── 결제 (V1.1-6) ────────────────────────────────────
+
+/** 결제 진행 상태 (백엔드 PaymentStatus enum) — READY→APPROVED→CANCELED / READY→FAILED */
+export type PaymentStatus = 'READY' | 'APPROVED' | 'CANCELED' | 'FAILED';
+
+/** 결제 대행사 (백엔드 PaymentProvider enum) — NONE 은 0원 결제(PG 미사용) */
+export type PaymentProvider = 'TOSS' | 'NONE';
+
+/** 결제 조회 응답 (백엔드 PaymentResponse) — PG 거래키는 내려오지 않는다 */
+export interface Payment {
+  id: number;
+  orderId: number;
+  pgProvider: PaymentProvider;
+  status: PaymentStatus;
+  amount: number;
+  /** 누적 취소·환불 금액(부분취소 포함) */
+  cancelledAmount: number;
+  approvedAt?: string | null;
+  canceledAt?: string | null;
+  failReason?: string | null;
+}
+
+/** 결제 승인 요청 — 결제위젯 성공 리다이렉트 값 그대로 전달한다 */
+export interface PaymentConfirmPayload {
+  paymentKey: string;
+  /** 내부 주문 id (PG 주문번호가 아님) */
+  orderId: number;
+  amount: number;
 }
