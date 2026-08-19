@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import { getOrder } from '../../api/order';
-import { toPgOrderId } from '../../utils/pgOrderId';
+import { newPgOrderId } from '../../utils/pgOrderId';
 import {
   loadTossPayments,
   paymentRedirectUrls,
@@ -130,7 +130,8 @@ const PaymentPage = () => {
     try {
       // 성공·실패 모두 SDK 가 리다이렉트하므로 이 아래는 실행되지 않는다
       await widgets.requestPayment({
-        orderId: toPgOrderId(order.id),
+        // M-05: 시도마다 새 PG 주문번호 — 실패 후 재결제가 주문번호 재사용으로 막히지 않게 한다
+        orderId: newPgOrderId(order.id),
         orderName: orderNameOf(order),
         successUrl,
         failUrl,

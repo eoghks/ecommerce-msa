@@ -363,8 +363,11 @@ export interface ServiceHealth {
 
 // ── 결제 (V1.1-6) ────────────────────────────────────
 
-/** 결제 진행 상태 (백엔드 PaymentStatus enum) — READY→APPROVED→CANCELED / READY→FAILED */
-export type PaymentStatus = 'READY' | 'APPROVED' | 'CANCELED' | 'FAILED';
+/**
+ * 결제 진행 상태 (백엔드 PaymentStatus enum) — READY→APPROVED→CANCELED / READY→FAILED.
+ * UNKNOWN 은 PG 통신 실패 후 재조회로도 승인 여부를 판정하지 못한 상태(C-01) — 운영 확인 대상이다.
+ */
+export type PaymentStatus = 'READY' | 'APPROVED' | 'CANCELED' | 'FAILED' | 'UNKNOWN';
 
 /** 결제 대행사 (백엔드 PaymentProvider enum) — NONE 은 0원 결제(PG 미사용) */
 export type PaymentProvider = 'TOSS' | 'NONE';
@@ -386,6 +389,11 @@ export interface Payment {
 /** 결제 승인 요청 — 결제위젯 성공 리다이렉트 값 그대로 전달한다 */
 export interface PaymentConfirmPayload {
   paymentKey: string;
+  /**
+   * PG 주문번호 — 결제 시도마다 달라지므로(재시도 시 접미사 변경) 서버가 재생성할 수 없어 그대로 보낸다.
+   * 서버는 규칙·주문 id 일치를 검증한 뒤 승인·재조회에 사용한다.
+   */
+  pgOrderId: string;
   /** 내부 주문 id (PG 주문번호가 아님) */
   orderId: number;
   amount: number;

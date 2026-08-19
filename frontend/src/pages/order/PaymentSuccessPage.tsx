@@ -30,15 +30,17 @@ const PaymentSuccessPage = () => {
     requestedRef.current = true;
 
     const paymentKey = params.get('paymentKey');
-    const orderId = toOrderId(params.get('orderId'));
+    // M-05: PG 주문번호는 시도마다 달라 서버가 재생성할 수 없다 — 받은 값을 그대로 전달한다
+    const pgOrderId = params.get('orderId');
+    const orderId = toOrderId(pgOrderId);
     const amount = Number(params.get('amount'));
-    if (!paymentKey || orderId === null || !Number.isFinite(amount) || amount <= 0) {
+    if (!paymentKey || !pgOrderId || orderId === null || !Number.isFinite(amount) || amount <= 0) {
       setError('결제 결과 정보가 올바르지 않습니다. 주문 내역에서 결제 상태를 확인해주세요.');
       setConfirming(false);
       return;
     }
 
-    confirmPayment({ paymentKey, orderId, amount })
+    confirmPayment({ paymentKey, pgOrderId, orderId, amount })
       .then((res) => {
         setPayment(res.data);
         // 결제가 확정된 뒤에 장바구니를 비운다 — 승인 실패 시 담은 상품이 그대로 남는다
