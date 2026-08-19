@@ -57,6 +57,13 @@ app:
     auto-confirm-batch-size: ${ORDER_AUTO_CONFIRM_BATCH_SIZE:500}
     # payment-foundation §11.1: 결제 대기(PAYMENT_PENDING) 주문을 만료 처리하기까지의 대기 분(정책값)
     payment-expire-minutes: ${ORDER_PAYMENT_EXPIRE_MINUTES:30}
+    # M-07: 만료 1회 실행당 처리 상한 — 적체 시 10분 주기 배치가 롱 트랜잭션이 되지 않게 제한
+    payment-expire-batch-size: ${ORDER_PAYMENT_EXPIRE_BATCH_SIZE:500}
+    # C-01/C-02: 진행 중(READY)·미확정(UNKNOWN) 결제를 회수(PG 재조회) 대상으로 보기까지의 대기 분.
+    # PG 승인 왕복 상한(read 타임아웃 10초)보다 충분히 크게 잡아 정상 승인 중인 결제를 건드리지 않는다.
+    payment-inflight-stale-minutes: ${ORDER_PAYMENT_INFLIGHT_STALE_MINUTES:3}
+    # 회수 1회 실행당 처리 상한 — PG 재조회가 건별 HTTP 왕복이므로 작게 잡는다
+    payment-reconcile-batch-size: ${ORDER_PAYMENT_RECONCILE_BATCH_SIZE:100}
   internal:
     # M-N1: 서비스 간 내부 호출 공유 시크릿. dev 기본값, prod는 INTERNAL_TOKEN env 필수.
     token: ${INTERNAL_TOKEN:dev-internal-secret}

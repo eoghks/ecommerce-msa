@@ -4,11 +4,15 @@ import com.ecommerce.order.domain.DeliveryStatus;
 import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItemStatus;
 import com.ecommerce.order.domain.OrderStatus;
+import com.ecommerce.order.domain.PaymentStatus;
 import com.ecommerce.order.domain.ReturnStatus;
 import com.ecommerce.order.dto.AutoConfirmTarget;
+import com.ecommerce.order.dto.PaymentExpireTarget;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +20,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
@@ -137,20 +142,62 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                            @Param("confirmedAt") LocalDateTime confirmedAt);
 
     /**
-     * V1.1-6: 미완료 주문 만료 (payment-foundation §11.1) — 결제 대기로 방치된 주문을 일괄 취소한다.
-     * 조건부 벌크 UPDATE 라 다중 인스턴스가 동시에 실행해도 같은 주문이 두 번 취소되지 않는다.
-     * 승인 전 단계라 재고 복구·환불 대상이 없어 건별 후처리가 필요 없다.
+     * V1.1-6: 미완료 주문 만료 대상 조회 (payment-foundation §11.1).
+     * M-07: 무제한 벌크 UPDATE 대신 대상을 먼저 뽑아 1회 실행 상한(batch-size)을 적용하고,
+     *       건별로 만료 사유를 남길 수 있게 한다. 오래 대기한 주문부터 처리한다.
+     * C-02: 진행 중(READY)·미확정(UNKNOWN) 결제가 있는 주문은 제외한다 — PG 왕복 중에 만료시키면
+     *       승인된 결제가 주문 취소로 덮여 환불 트리거가 사라진다(돈 유실).
+     */
+    @Query("""
+            select new com.ecommerce.order.dto.PaymentExpireTarget(o.id, o.userId)
+            from Order o
+            where o.status = :paymentPendingStatus
+              and o.createdAt <= :threshold
+              and not exists (
+                    select p.id from Payment p
+                    where p.orderId = o.id
+                      and p.status in :inFlightPaymentStatuses
+              )
+            order by o.createdAt asc
+            """)
+    List<PaymentExpireTarget> findExpirableOrders(
+            @Param("paymentPendingStatus") OrderStatus paymentPendingStatus,
+            @Param("inFlightPaymentStatuses") Collection<PaymentStatus> inFlightPaymentStatuses,
+            @Param("threshold") LocalDateTime threshold,
+            Pageable pageable);
+
+    /**
+     * V1.1-6: 미완료 주문 만료 원자 처리 (§11.1) — 조건부 UPDATE 라 다중 인스턴스가 동시에 실행해도
+     * 같은 주문을 두 번 취소하지 않는다(갱신 1건을 받은 인스턴스만 사유를 기록한다).
+     * 조회(findExpirableOrders)와 동일한 자격 조건을 그대로 반복해야 원자성이 유지된다(C-02 진행 중 결제 제외).
      * 벌크 연산은 감사(@LastModifiedDate)를 우회하므로 updatedAt 도 함께 갱신한다.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Order o
             set o.status = :cancelledStatus, o.updatedAt = :now
-            where o.status = :paymentPendingStatus
+            where o.id = :orderId
+              and o.status = :paymentPendingStatus
               and o.createdAt <= :threshold
+              and not exists (
+                    select p.id from Payment p
+                    where p.orderId = o.id
+                      and p.status in :inFlightPaymentStatuses
+              )
             """)
-    int expirePaymentPendingOrders(@Param("paymentPendingStatus") OrderStatus paymentPendingStatus,
-                                   @Param("cancelledStatus") OrderStatus cancelledStatus,
-                                   @Param("threshold") LocalDateTime threshold,
-                                   @Param("now") LocalDateTime now);
+    int expireIfStillUnpaid(@Param("orderId") Long orderId,
+                            @Param("paymentPendingStatus") OrderStatus paymentPendingStatus,
+                            @Param("cancelledStatus") OrderStatus cancelledStatus,
+                            @Param("inFlightPaymentStatuses") Collection<PaymentStatus> inFlightPaymentStatuses,
+                            @Param("threshold") LocalDateTime threshold,
+                            @Param("now") LocalDateTime now);
+
+    /**
+     * M-03: 결제 승인 준비용 주문 조회 — 주문 행을 잠근다.
+     * 같은 주문에 동시 confirm 이 들어오면 두 요청이 애플리케이션 검증(주문상태·멱등)을 모두 통과해
+     * PG 로 이중 승인이 나갈 수 있다. 주문 행을 직렬화해 한 번에 하나의 승인만 준비되게 한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :orderId")
+    Optional<Order> findByIdForUpdate(@Param("orderId") Long orderId);
 }

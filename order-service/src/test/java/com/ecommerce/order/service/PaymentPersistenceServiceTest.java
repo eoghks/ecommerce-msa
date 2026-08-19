@@ -13,6 +13,8 @@ import com.ecommerce.order.event.OrderCreatedApplicationEvent;
 import com.ecommerce.order.exception.OrderNotFoundException;
 import com.ecommerce.order.exception.PaymentAlreadyApprovedException;
 import com.ecommerce.order.exception.PaymentAmountMismatchException;
+import com.ecommerce.order.exception.PaymentInProgressException;
+import com.ecommerce.order.exception.PaymentNotCompletedException;
 import com.ecommerce.order.repository.OrderRepository;
 import com.ecommerce.order.repository.PaymentRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -48,20 +50,22 @@ class PaymentPersistenceServiceTest {
     private static final Long USER_ID  = 7L;
     private static final Long AMOUNT   = 20_000L;
     private static final String PAYMENT_KEY = "test_payment_key_123456";
+    private static final String PG_ORDER_ID = "ORD-00000001-a1b2c3d4";
 
     @InjectMocks private PaymentPersistenceService paymentPersistenceService;
 
     @Mock private PaymentRepository         paymentRepository;
     @Mock private OrderRepository           orderRepository;
     @Mock private NotificationService       notificationService;
+    @Mock private PaymentIncidentService    paymentIncidentService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
 
     // ── 승인 준비(prepare) ─────────────────────────────────────────
 
     @Test
-    @DisplayName("승인 준비 — 소유자·금액·멱등 검증을 통과하면 READY 결제를 만든다")
+    @DisplayName("승인 준비 — 소유자·금액·멱등 검증을 통과하면 READY 결제를 만든다(PG 주문번호 저장)")
     void prepare_success() {
-        givenOrder(unpaidOrder());
+        givenLockedOrder(unpaidOrder());
         givenNoPreviousPayment();
         given(paymentRepository.save(any(Payment.class))).willAnswer(call -> {
             Payment payment = call.getArgument(0);
@@ -69,18 +73,61 @@ class PaymentPersistenceServiceTest {
             return payment;
         });
 
-        Long paymentId = paymentPersistenceService.prepare(USER_ID, request(AMOUNT));
+        Long paymentId = paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID));
 
         assertThat(paymentId).isEqualTo(99L);
     }
 
     @Test
-    @DisplayName("승인 준비 — 요청 금액이 서버 결제금액과 다르면 거부(위변조 차단)")
-    void prepare_amountMismatch_rejected() {
-        givenOrder(unpaidOrder());
+    @DisplayName("M-03 승인 준비 — 주문 행을 잠그고 읽어 동시 confirm 이 함께 통과하지 못하게 한다")
+    void prepare_locksOrderRow() {
+        givenLockedOrder(unpaidOrder());
+        givenNoPreviousPayment();
+        given(paymentRepository.save(any(Payment.class))).willAnswer(call -> {
+            Payment payment = call.getArgument(0);
+            ReflectionTestUtils.setField(payment, "id", 99L);
+            return payment;
+        });
+
+        paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID));
+
+        then(orderRepository).should(times(1)).findByIdForUpdate(ORDER_ID);
+        then(orderRepository).should(never()).findById(anyLong());
+    }
+
+    @Test
+    @DisplayName("M-03 승인 준비 — 진행 중(READY) 결제가 있으면 409 (이중 출금 차단)")
+    void prepare_inFlightPayment_conflict() {
+        givenLockedOrder(unpaidOrder());
+        given(paymentRepository.existsByOrderIdAndStatusIn(eq(ORDER_ID), anyCollection()))
+                .willReturn(false);
+        given(paymentRepository.findByOrderIdAndStatusIn(eq(ORDER_ID), anyCollection()))
+                .willReturn(List.of(readyPayment()));
+
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID)))
+                .isInstanceOf(PaymentInProgressException.class);
+        then(paymentRepository).should(never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("M-05 승인 준비 — 다른 주문의 PG 주문번호는 거부한다")
+    void prepare_foreignPgOrderId_rejected() {
+        givenLockedOrder(unpaidOrder());
         givenNoPreviousPayment();
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(10L)))
+        assertThatThrownBy(() ->
+                paymentPersistenceService.prepare(USER_ID, request(AMOUNT, "ORD-00000999-a1b2c3d4")))
+                .isInstanceOf(IllegalArgumentException.class);
+        then(paymentRepository).should(never()).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("승인 준비 — 요청 금액이 서버 결제금액과 다르면 거부(위변조 차단)")
+    void prepare_amountMismatch_rejected() {
+        givenLockedOrder(unpaidOrder());
+        givenNoPreviousPayment();
+
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(10L, PG_ORDER_ID)))
                 .isInstanceOf(PaymentAmountMismatchException.class);
         then(paymentRepository).should(never()).save(any(Payment.class));
     }
@@ -88,10 +135,10 @@ class PaymentPersistenceServiceTest {
     @Test
     @DisplayName("승인 준비 — 이미 승인된 주문 재승인 시도는 409")
     void prepare_alreadyApprovedPayment_conflict() {
-        givenOrder(unpaidOrder());
+        givenLockedOrder(unpaidOrder());
         given(paymentRepository.existsByOrderIdAndStatusIn(eq(ORDER_ID), anyCollection())).willReturn(true);
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT)))
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID)))
                 .isInstanceOf(PaymentAlreadyApprovedException.class);
     }
 
@@ -100,30 +147,32 @@ class PaymentPersistenceServiceTest {
     void prepare_orderAlreadyPaid_conflict() {
         Order order = unpaidOrder();
         order.markPaid();
-        givenOrder(order);
+        givenLockedOrder(order);
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT)))
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID)))
                 .isInstanceOf(PaymentAlreadyApprovedException.class);
     }
 
     @Test
     @DisplayName("승인 준비 — 동일 PG 거래키 재사용은 409 (멱등)")
     void prepare_duplicatePaymentKey_conflict() {
-        givenOrder(unpaidOrder());
+        givenLockedOrder(unpaidOrder());
         given(paymentRepository.existsByOrderIdAndStatusIn(eq(ORDER_ID), anyCollection())).willReturn(false);
+        given(paymentRepository.findByOrderIdAndStatusIn(eq(ORDER_ID), anyCollection()))
+                .willReturn(List.of());
         given(paymentRepository.findByPgPaymentKey(PAYMENT_KEY))
                 .willReturn(Optional.of(readyPayment()));
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT)))
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID)))
                 .isInstanceOf(PaymentAlreadyApprovedException.class);
     }
 
     @Test
     @DisplayName("승인 준비 — 타인 주문 승인 시도는 404 (정보 노출 방지)")
     void prepare_otherUsersOrder_notFound() {
-        givenOrder(unpaidOrder());
+        givenLockedOrder(unpaidOrder());
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(999L, request(AMOUNT)))
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(999L, request(AMOUNT, PG_ORDER_ID)))
                 .isInstanceOf(OrderNotFoundException.class);
         then(paymentRepository).should(never()).save(any(Payment.class));
     }
@@ -133,9 +182,9 @@ class PaymentPersistenceServiceTest {
     void prepare_cancelledOrder_illegalState() {
         Order order = unpaidOrder();
         order.cancel();
-        givenOrder(order);
+        givenLockedOrder(order);
 
-        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT)))
+        assertThatThrownBy(() -> paymentPersistenceService.prepare(USER_ID, request(AMOUNT, PG_ORDER_ID)))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -149,7 +198,7 @@ class PaymentPersistenceServiceTest {
         given(paymentRepository.findById(99L)).willReturn(Optional.of(payment));
         given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
 
-        paymentPersistenceService.markApproved(99L, tossResult());
+        paymentPersistenceService.markApproved(99L, tossResult("DONE", AMOUNT, PG_ORDER_ID));
 
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(payment.getPgPaymentKey()).isEqualTo(PAYMENT_KEY);
@@ -159,7 +208,41 @@ class PaymentPersistenceServiceTest {
                 .publishEvent(any(OrderCreatedApplicationEvent.class));
     }
 
-    // ── 승인 실패 보상(markFailed) ─────────────────────────────────
+    @Test
+    @DisplayName("H-03 승인 확정 — 가상계좌 입금대기(WAITING_FOR_DEPOSIT)는 확정하지 않는다")
+    void markApproved_waitingForDeposit_rejected() {
+        Payment payment = readyPayment();
+        given(paymentRepository.findById(99L)).willReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> paymentPersistenceService.markApproved(
+                99L, tossResult("WAITING_FOR_DEPOSIT", AMOUNT, PG_ORDER_ID)))
+                .isInstanceOf(PaymentNotCompletedException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
+        then(applicationEventPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("M-01 승인 확정 — 응답 금액이 승인 금액과 다르면 확정하지 않는다")
+    void markApproved_amountMismatch_rejected() {
+        given(paymentRepository.findById(99L)).willReturn(Optional.of(readyPayment()));
+
+        assertThatThrownBy(() -> paymentPersistenceService.markApproved(
+                99L, tossResult("DONE", 1_000L, PG_ORDER_ID)))
+                .isInstanceOf(PaymentNotCompletedException.class);
+    }
+
+    @Test
+    @DisplayName("M-01 승인 확정 — 응답 PG 주문번호가 저장값과 다르면 확정하지 않는다")
+    void markApproved_pgOrderIdMismatch_rejected() {
+        given(paymentRepository.findById(99L)).willReturn(Optional.of(readyPayment()));
+
+        assertThatThrownBy(() -> paymentPersistenceService.markApproved(
+                99L, tossResult("DONE", AMOUNT, "ORD-00000002-zzzz")))
+                .isInstanceOf(PaymentNotCompletedException.class);
+    }
+
+    // ── 승인 실패·미확정·정리 ──────────────────────────────────────
 
     @Test
     @DisplayName("승인 실패 — 결제 FAILED + 주문 CANCELLED + 사유 기록 (§5.1)")
@@ -178,19 +261,49 @@ class PaymentPersistenceServiceTest {
                 .create(eq(USER_ID), eq(NotificationType.ORDER_CANCELLED), eq(ORDER_ID));
     }
 
+    @Test
+    @DisplayName("C-01 결과 미확정 — 결제 UNKNOWN 유지 + 미결 기록, 주문은 취소하지 않는다")
+    void markUnknown_keepsOrderAndRecordsIncident() {
+        Payment payment = readyPayment();
+        given(paymentRepository.findById(99L)).willReturn(Optional.of(payment));
+
+        paymentPersistenceService.markUnknown(99L, PAYMENT_KEY, "재조회 판정 불가");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(payment.getPgPaymentKey()).isEqualTo(PAYMENT_KEY);
+        then(paymentIncidentService).should(times(1))
+                .record(ORDER_ID, USER_ID, "재조회 판정 불가");
+        then(orderRepository).should(never()).findById(anyLong());
+    }
+
+    @Test
+    @DisplayName("C-02 고아 결제 정리 — 결제만 FAILED 로 닫고 주문은 결제 대기로 남겨 재결제를 허용한다")
+    void abandon_closesPaymentOnly() {
+        Payment payment = readyPayment();
+        given(paymentRepository.findById(99L)).willReturn(Optional.of(payment));
+
+        paymentPersistenceService.abandon(99L, "결제 미완료(진행 중 결제 정리)");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        then(orderRepository).should(never()).findById(anyLong());
+        then(notificationService).shouldHaveNoInteractions();
+    }
+
     // ── helper ───────────────────────────────────────────────────
 
-    private void givenOrder(Order order) {
-        given(orderRepository.findById(ORDER_ID)).willReturn(Optional.of(order));
+    private void givenLockedOrder(Order order) {
+        given(orderRepository.findByIdForUpdate(ORDER_ID)).willReturn(Optional.of(order));
     }
 
     private void givenNoPreviousPayment() {
         given(paymentRepository.existsByOrderIdAndStatusIn(anyLong(), anyCollection())).willReturn(false);
+        given(paymentRepository.findByOrderIdAndStatusIn(anyLong(), anyCollection()))
+                .willReturn(List.of());
         given(paymentRepository.findByPgPaymentKey(anyString())).willReturn(Optional.empty());
     }
 
-    private PaymentConfirmRequest request(Long amount) {
-        return new PaymentConfirmRequest(PAYMENT_KEY, ORDER_ID, amount);
+    private PaymentConfirmRequest request(Long amount, String pgOrderId) {
+        return new PaymentConfirmRequest(PAYMENT_KEY, pgOrderId, ORDER_ID, amount);
     }
 
     private Order unpaidOrder() {
@@ -203,13 +316,14 @@ class PaymentPersistenceServiceTest {
 
     private Payment readyPayment() {
         Payment payment = Payment.builder()
-                .orderId(ORDER_ID).userId(USER_ID).pgProvider(PaymentProvider.TOSS).amount(AMOUNT).build();
+                .orderId(ORDER_ID).userId(USER_ID).pgProvider(PaymentProvider.TOSS)
+                .pgOrderId(PG_ORDER_ID).amount(AMOUNT).build();
         ReflectionTestUtils.setField(payment, "id", 99L);
         return payment;
     }
 
-    private TossPaymentClient.TossPayment tossResult() {
+    private TossPaymentClient.TossPayment tossResult(String status, Long totalAmount, String pgOrderId) {
         return new TossPaymentClient.TossPayment(
-                PAYMENT_KEY, "ORD-00000001", "DONE", AMOUNT, AMOUNT, OffsetDateTime.now());
+                PAYMENT_KEY, pgOrderId, status, totalAmount, totalAmount, OffsetDateTime.now());
     }
 }

@@ -282,6 +282,40 @@ public class OrderExceptionHandler {
         return pd;
     }
 
+    /**
+     * C-01/M-04: PG 통신 실패(타임아웃·연결 오류) → 502 Bad Gateway.
+     * 카드 거절(400)과 달리 우리 요청은 유효했고 결과가 미확정이므로 상태코드로 구분한다 —
+     * 클라이언트는 재입력이 아니라 결제 상태 확인·재시도를 안내해야 한다.
+     */
+    @ExceptionHandler(PaymentGatewayUnavailableException.class)
+    public ProblemDetail handlePaymentGatewayUnavailable(PaymentGatewayUnavailableException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        pd.setTitle("Payment Gateway Unavailable");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-gateway-unavailable"));
+        return pd;
+    }
+
+    /**
+     * H-03: PG 응답이 승인 완료(DONE)가 아니거나 요청과 대조되지 않음 → 502 Bad Gateway.
+     * 가상계좌 입금대기 등 미지원 응답을 결제완료로 확정하지 않았음을 알린다(승인분은 보상 취소).
+     */
+    @ExceptionHandler(PaymentNotCompletedException.class)
+    public ProblemDetail handlePaymentNotCompleted(PaymentNotCompletedException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        pd.setTitle("Payment Not Completed");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-not-completed"));
+        return pd;
+    }
+
+    /** M-03: 같은 주문에 진행 중·미확정 결제가 있음 → 409 Conflict (이중 승인 차단) */
+    @ExceptionHandler(PaymentInProgressException.class)
+    public ProblemDetail handlePaymentInProgress(PaymentInProgressException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Payment In Progress");
+        pd.setType(URI.create(ERROR_TYPE_BASE + "/payment-in-progress"));
+        return pd;
+    }
+
     /** 주문 배송지 정보 유효하지 않음(addressId 무효/직접입력 누락) → 400 Bad Request */
     @ExceptionHandler(InvalidOrderShippingException.class)
     public ProblemDetail handleInvalidOrderShipping(InvalidOrderShippingException ex) {

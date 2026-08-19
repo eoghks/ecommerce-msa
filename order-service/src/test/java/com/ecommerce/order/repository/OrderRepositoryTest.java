@@ -6,9 +6,13 @@ import com.ecommerce.order.domain.Order;
 import com.ecommerce.order.domain.OrderItem;
 import com.ecommerce.order.domain.OrderItemStatus;
 import com.ecommerce.order.domain.OrderStatus;
+import com.ecommerce.order.domain.Payment;
+import com.ecommerce.order.domain.PaymentProvider;
+import com.ecommerce.order.domain.PaymentStatus;
 import com.ecommerce.order.domain.ReturnRequest;
 import com.ecommerce.order.domain.ReturnStatus;
 import com.ecommerce.order.dto.AutoConfirmTarget;
+import com.ecommerce.order.dto.PaymentExpireTarget;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -218,6 +222,97 @@ class OrderRepositoryTest {
         return orderRepository.confirmPurchaseIfEligible(orderId, DeliveryStatus.DELIVERED,
                 OrderStatus.confirmableStatuses(), ReturnStatus.pendingStatuses(),
                 LocalDateTime.now(), LocalDateTime.now());
+    }
+
+    // ── 결제 미완료 만료 (§11.1, C-02/M-07) ──────────────────────
+
+    @Test
+    @DisplayName("C-02 만료 대상 — 진행 중(READY) 결제가 있는 주문은 만료 대상에서 제외한다(승인 중 취소 방지)")
+    void findExpirableOrders_excludesOrdersWithInFlightPayment() {
+        Order plain = saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        Order paying = saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        saveReadyPayment(paying);
+        testEntityManager.clear();
+
+        List<PaymentExpireTarget> targets = orderRepository.findExpirableOrders(
+                OrderStatus.PAYMENT_PENDING, PaymentStatus.inFlightStatuses(),
+                LocalDateTime.now().minusMinutes(30), PageRequest.of(0, 10));
+
+        assertThat(targets).extracting(PaymentExpireTarget::orderId)
+                .containsExactly(plain.getId())
+                .doesNotContain(paying.getId());
+    }
+
+    @Test
+    @DisplayName("M-07 만료 대상 — 배치 상한(Pageable)만큼만 조회한다")
+    void findExpirableOrders_appliesBatchLimit() {
+        saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        testEntityManager.clear();
+
+        assertThat(orderRepository.findExpirableOrders(OrderStatus.PAYMENT_PENDING,
+                PaymentStatus.inFlightStatuses(), LocalDateTime.now().minusMinutes(30),
+                PageRequest.of(0, 1))).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("만료 원자 처리 — 조건을 만족하면 1건 갱신, 재실행은 0건(중복 취소 방지)")
+    void expireIfStillUnpaid_isIdempotent() {
+        Order order = saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        testEntityManager.clear();
+
+        assertThat(expire(order.getId())).isEqualTo(1);
+        assertThat(expire(order.getId())).isZero();
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("C-02 만료 원자 처리 — 진행 중 결제가 생긴 주문은 갱신하지 않는다(0건)")
+    void expireIfStillUnpaid_skipsOrdersWithInFlightPayment() {
+        Order order = saveUnpaidOrder(LocalDateTime.now().minusMinutes(40));
+        saveReadyPayment(order);
+        testEntityManager.clear();
+
+        assertThat(expire(order.getId())).isZero();
+        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_PENDING);
+    }
+
+    private int expire(Long orderId) {
+        return orderRepository.expireIfStillUnpaid(orderId, OrderStatus.PAYMENT_PENDING,
+                OrderStatus.CANCELLED, PaymentStatus.inFlightStatuses(),
+                LocalDateTime.now().minusMinutes(30), LocalDateTime.now());
+    }
+
+    /** 결제 대기 주문 저장 — 만료 기준을 넘기기 위해 생성 시각을 과거로 덮는다(감사 필드는 native update) */
+    private Order saveUnpaidOrder(LocalDateTime createdAt) {
+        OrderItem item = buildItem(PRODUCT_ID, false);
+        Order order = orderRepository.saveAndFlush(Order.builder()
+                .userId(USER_ID)
+                .totalPrice(item.subtotal())
+                .receiver("홍길동")
+                .phone("010-1234-5678")
+                .address("서울시 강남구")
+                .items(List.of(item))
+                .build());
+        testEntityManager.getEntityManager()
+                .createNativeQuery("update orders set created_at = :createdAt where id = :id")
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", order.getId())
+                .executeUpdate();
+        return order;
+    }
+
+    /** PG 왕복 중(READY) 결제 저장 — 만료 배제 조건 검증용 */
+    private void saveReadyPayment(Order order) {
+        testEntityManager.persistAndFlush(Payment.builder()
+                .orderId(order.getId())
+                .userId(order.getUserId())
+                .pgProvider(PaymentProvider.TOSS)
+                .pgOrderId("ORD-%08d-aaaa".formatted(order.getId()))
+                .amount(order.getPayableAmount())
+                .build());
     }
 
     private int confirmNow(Long orderId) {
