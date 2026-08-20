@@ -20,7 +20,9 @@ interface StatusStyle {
 }
 
 const STATUS_LABEL: Record<string, StatusStyle> = {
-  PENDING:             { text: '결제 대기',   color: '#f59e0b' },
+  // V1.1-6: 결제 도입 후 PAYMENT_PENDING = 결제 전(재고 미차감), PENDING = 결제 완료(재고 확인 중)
+  PAYMENT_PENDING:     { text: '결제 대기',   color: '#f59e0b' },
+  PENDING:             { text: '결제 완료',   color: '#0ea5e9' },
   CONFIRMED:           { text: '주문 확정',   color: '#22c55e' },
   PARTIALLY_CANCELLED: { text: '부분 취소',   color: '#f97316' },
   CANCELLED:           { text: '취소됨',     color: '#9ca3af' },

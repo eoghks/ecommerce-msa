@@ -15,7 +15,9 @@ interface StatusStyle {
 }
 
 const STATUS_LABEL: Record<string, StatusStyle> = {
-  PENDING:             { text: '결제 대기',   color: '#f59e0b' },
+  // V1.1-6: 결제 도입 후 PAYMENT_PENDING = 결제 전, PENDING = 결제 완료(재고 확인 중)
+  PAYMENT_PENDING:     { text: '결제 대기',   color: '#f59e0b' },
+  PENDING:             { text: '결제 완료',   color: '#0ea5e9' },
   CONFIRMED:           { text: '주문 확정',   color: '#22c55e' },
   PARTIALLY_CANCELLED: { text: '일부 취소',   color: '#f97316' },
   CANCELLED:           { text: '취소됨',     color: '#9ca3af' },
@@ -35,7 +37,7 @@ const PURCHASE_CONFIRMED_LABEL: StatusStyle = { text: '구매확정', color: '#7
 const DELIVERABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 // M-N3: 사용자가 취소 가능한 상태 (이미 전체취소된 CANCELLED 제외)
-const CANCELLABLE_STATUSES: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
+const CANCELLABLE_STATUSES: OrderStatus[] = ['PAYMENT_PENDING', 'PENDING', 'CONFIRMED', 'PARTIALLY_CANCELLED'];
 
 // V1.1-1: 구매 확정(재고 차감 완료) 상태 — 리뷰 작성 가능
 const REVIEWABLE_STATUSES: OrderStatus[] = ['CONFIRMED', 'PARTIALLY_CANCELLED'];
@@ -163,6 +165,8 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
     ? new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
   const cancellable = CANCELLABLE_STATUSES.includes(order.status);
+  // V1.1-6: 결제 대기 주문은 결제를 이어서 진행할 수 있다(30분 후 자동 만료)
+  const awaitingPayment = order.status === 'PAYMENT_PENDING';
   const reviewable = REVIEWABLE_STATUSES.includes(order.status);
   const delivery = DELIVERABLE_STATUSES.includes(order.status)
     ? DELIVERY_LABEL[order.deliveryStatus ?? '']
@@ -229,17 +233,23 @@ const OrderCard = ({ order, returnsByItem, onCancelled, onRequestReturn }: Order
       {/* 합계 */}
       <div className="h-px bg-gray-100 mb-3" />
       <div className="flex justify-between">
-        <span className="text-[13px] text-gray-500">총 결제금액</span>
+        <span className="text-[13px] text-gray-500">{awaitingPayment ? '결제 예정금액' : '총 결제금액'}</span>
         <span className="text-[15px] font-bold text-gray-900">
           {formatPrice(order.totalPrice ?? (order.items ?? []).reduce((s, i) => s + i.price * i.quantity, 0))}
         </span>
       </div>
 
-      {/* M-N3: 주문 취소 버튼(취소 가능 상태) · 구매확정 버튼(배송완료 + 미확정) */}
+      {/* M-N3: 주문 취소 버튼(취소 가능 상태) · 구매확정 버튼(배송완료 + 미확정) · 결제 계속하기(결제 대기) */}
       {(cancellable || confirmable) && (
         <div className="mt-4 flex flex-col items-end gap-1">
           {cancelError && <span className="text-[12px] text-red-500">{cancelError}</span>}
           <div className="flex gap-2">
+            {awaitingPayment && (
+              <Link to={`/payments/${order.id}`}
+                className="h-9 px-4 flex items-center text-[13px] font-semibold text-white no-underline rounded-[10px] bg-brand-600 hover:bg-brand-700 transition-colors">
+                결제 계속하기
+              </Link>
+            )}
             {cancellable && (
               <button onClick={handleCancel} disabled={cancelling}
                 className="h-9 px-4 text-[13px] font-medium text-red-600 border border-red-200 rounded-[10px] hover:bg-red-50 bg-white transition-colors disabled:opacity-60">

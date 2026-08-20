@@ -51,12 +51,13 @@ public class OrderService {
     private final FailedOrderLogRepository   failedOrderLogRepository;
     private final AddressRepository          addressRepository;
     private final NotificationService        notificationService;
+    private final PaymentCancelService       paymentCancelService;
 
     /**
      * 주문 생성.
      * 1. 상품 정보 조회 — @Transactional 외부에서 HTTP 호출 (DB 커넥션 점유 최소화)
-     * 2. Order + OrderItem 저장 (status=PENDING)
-     * 3. ApplicationEvent 등록 → AFTER_COMMIT 시 Kafka 발행 (C-01 수정)
+     * 2. Order + OrderItem 저장 (status=PAYMENT_PENDING — 승인 전에는 재고를 차감하지 않는다, §5)
+     * 3. 결제 승인 이후(또는 payable=0 즉시) order.created 발행 → 재고 차감 Saga 시작
      */
     public OrderResponse createOrder(Long userId, OrderCreateRequest request) {
         // V1.1-3: 배송지 스냅샷 확정 — 주소록 선택(addressId) 또는 직접입력
@@ -137,9 +138,12 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         boolean alreadyCancelled = order.getStatus() == com.ecommerce.order.domain.OrderStatus.CANCELLED;
+        long refundAmount = order.getPayableAmount();
         order.cancel();
         // M-3: 실제로 취소 전이가 일어난 경우에만 실패 로그 기록 (멱등 — 중복 재전달 시 중복 기록 방지)
         if (!alreadyCancelled) {
+            // §5.1: 승인된 결제가 있으면 전액 환불한다 (승인 전이면 대상이 없어 no-op)
+            paymentCancelService.cancelForOrder(orderId, refundAmount, AUTO_CANCEL_REASON);
             failedOrderLogRepository.save(FailedOrderLog.builder()
                     .orderId(orderId)
                     .userId(order.getUserId())
@@ -184,6 +188,7 @@ public class OrderService {
      * 취소 후 주문 상태(전체→CANCELLED, 일부→PARTIALLY_CANCELLED)·합계 재계산.
      * C-2: 재고가 실제 차감된 주문(CONFIRMED/부분취소)만 허용 — 과복구 방지.
      * C-3: 실제 취소 전이가 일어난 경우에만 재고 복구 이벤트 발행 — 중복 발행 방지.
+     * §4.2: 취소로 줄어든 결제금액만큼 PG 부분환불을 함께 호출한다(승인된 결제가 없으면 no-op).
      */
     @Transactional
     public void cancelOrderItem(Long orderId, Long itemId, String reason, Long userId, String role) {
@@ -206,10 +211,14 @@ public class OrderService {
                     "항목을 취소할 수 없는 주문 상태입니다. 현재 상태: " + order.getStatus());
         }
 
+        // §4.2: 항목 취소로 줄어드는 결제금액이 환불 대상 — 취소 전 값을 먼저 잡아둔다
+        long payableBefore = order.getPayableAmount();
+
         // C-3: 실제 ACTIVE→CANCELLED 전이가 일어난 경우에만 복구 이벤트 발행
         order.cancelItem(itemId, reason).ifPresent(cancelled -> {
             log.info("주문 항목 취소. orderId={}, itemId={}, by={}({}), reason={}",
                     orderId, itemId, userId, role, reason);
+            paymentCancelService.cancelForOrder(orderId, payableBefore - order.getPayableAmount(), reason);
             applicationEventPublisher.publishEvent(new OrderItemCancelledApplicationEvent(
                     new OrderItemCancelledEvent(
                             orderId, cancelled.getId(), cancelled.getProductId(), cancelled.getQuantity())));
@@ -267,6 +276,7 @@ public class OrderService {
      * 설계: 차감된 주문은 활성 항목 전체를 항목취소 처리하여 기존 재고복구 Saga(항목취소 이벤트)를 재사용.
      *   - 실제 전이가 일어난 항목만 복구 이벤트 발행 → 중복/과복구 방지
      *   - PENDING(미차감)은 항목취소 없이 단순 취소 → 복구 이벤트 없음
+     * §4.1: 승인된 결제가 있으면 취소 금액만큼 PG 환불을 함께 호출한다(결제 대기 주문은 대상 없음 → no-op).
      * @param reason 취소 사유 (없으면 기본 "고객 주문 취소")
      */
     @Transactional
@@ -283,7 +293,13 @@ public class OrderService {
         }
 
         String cancelReason = (reason == null || reason.isBlank()) ? USER_CANCEL_REASON : reason;
+        long payableBefore = order.getPayableAmount();
         List<OrderItem> restockTargets = order.cancelByUser(cancelReason);
+        // §4.1·§4.2: 전체 취소는 전액, 부분 취소는 줄어든 결제금액만큼 환불한다
+        long refundAmount = order.isFullyCancelled()
+                ? payableBefore
+                : payableBefore - order.getPayableAmount();
+        paymentCancelService.cancelForOrder(orderId, refundAmount, cancelReason);
         restockTargets.forEach(item -> applicationEventPublisher.publishEvent(
                 new OrderItemCancelledApplicationEvent(
                         new OrderItemCancelledEvent(

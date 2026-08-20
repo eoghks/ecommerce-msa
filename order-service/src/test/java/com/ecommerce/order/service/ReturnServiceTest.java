@@ -57,6 +57,7 @@ class ReturnServiceTest {
     @Mock private OrderRepository           orderRepository;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private NotificationService       notificationService;
+    @Mock private PaymentCancelService      paymentCancelService;
 
     // ── 반품 신청 ──────────────────────────────────────────────────
 
@@ -540,6 +541,7 @@ class ReturnServiceTest {
 
         Order order = Order.builder().userId(1L).totalPrice(20_000L).items(items).build();
         ReflectionTestUtils.setField(order, "id", 1L);
+        order.markPaid();   // V1.1-6: 결제 승인 완료(PENDING) 후 재고 차감 확정 흐름
         order.confirm();
         return order;
     }
@@ -567,6 +569,7 @@ class ReturnServiceTest {
 
         Order order = Order.builder().userId(1L).totalPrice(40_000L).items(items).build();
         ReflectionTestUtils.setField(order, "id", 1L);
+        order.markPaid();   // V1.1-6: 결제 승인 완료(PENDING) 후 재고 차감 확정 흐름
         order.confirm();
         order.advanceDeliveryStatus(DeliveryStatus.SHIPPING);
         order.advanceDeliveryStatus(DeliveryStatus.DELIVERED);

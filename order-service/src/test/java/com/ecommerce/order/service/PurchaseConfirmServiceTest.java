@@ -345,6 +345,7 @@ class PurchaseConfirmServiceTest {
 
         Order order = Order.builder().userId(USER_ID).totalPrice(20_000L).items(items).build();
         ReflectionTestUtils.setField(order, "id", ORDER_ID);
+        order.markPaid();
         order.confirm();
         return order;
     }

@@ -62,6 +62,7 @@ class OrderServiceTest {
     @Mock private com.ecommerce.order.repository.FailedOrderLogRepository failedOrderLogRepository;
     @Mock private AddressRepository         addressRepository;
     @Mock private NotificationService       notificationService;
+    @Mock private PaymentCancelService      paymentCancelService;
 
     // ── 주문 생성 ──────────────────────────────────────────────────
 
@@ -579,6 +580,31 @@ class OrderServiceTest {
                 .publishEvent(any(com.ecommerce.order.event.OrderItemCancelledApplicationEvent.class));
     }
 
+    @Test
+    @DisplayName("V1.1-6: cancelOrderItem — 줄어든 결제금액만큼 PG 부분환불 호출 (§4.2)")
+    void cancelOrderItem_partialRefund() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "재고 소진", 7L, "SELLER");
+
+        // 7만 → 5만으로 줄었으므로 취소된 항목분 2만원만 환불
+        then(paymentCancelService).should().cancelForOrder(1L, 20_000L, "재고 소진");
+    }
+
+    @Test
+    @DisplayName("V1.1-6: cancelOrderItem — 이미 취소된 항목 재취소 시 환불 미호출(이중 환불 방지)")
+    void cancelOrderItem_idempotentRefund() {
+        Order order = buildMultiSellerOrder(new long[]{7L, 8L}, new long[]{20_000L, 50_000L});
+        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
+
+        orderService.cancelOrderItem(1L, 1L, "사유", 7L, "SELLER");
+        orderService.cancelOrderItem(1L, 1L, "사유 재시도", 7L, "SELLER");
+
+        then(paymentCancelService).should(times(1))
+                .cancelForOrder(anyLong(), anyLong(), any());
+    }
+
     // ── M-3: 실패(자동취소) 주문 ────────────────────────────────────
 
     @Test
@@ -762,11 +788,13 @@ class OrderServiceTest {
                 .price(price)
                 .quantity(quantity)
                 .build();
-        return Order.builder()
+        Order order = Order.builder()
                 .userId(userId)
                 .totalPrice(price * quantity)
                 .items(List.of(item))
                 .build();
+        order.markPaid();   // V1.1-6: 주문은 PAYMENT_PENDING 으로 생성 → 결제 승인 후(PENDING) 상태를 전제로 한다
+        return order;
     }
 
     /**
@@ -794,6 +822,7 @@ class OrderServiceTest {
                 .items(items)
                 .build();
         ReflectionTestUtils.setField(order, "id", 1L);
+        order.markPaid();  // 결제 승인 완료 → PENDING
         order.confirm();   // 항목 취소 가능 상태(CONFIRMED) — 재고 차감 완료 가정 (C-2)
         return order;
     }

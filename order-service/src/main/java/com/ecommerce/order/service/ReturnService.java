@@ -32,7 +32,7 @@ import java.time.LocalDateTime;
  * 반품·환불 서비스 (V1.1-5).
  * - 신청: 배송완료(DELIVERED) 주문의 활성 항목, 주문 소유자 본인만. 중복 진행 시 409.
  * - 승인: 기존 항목취소 경로(cancelItem + OrderItemCancelledEvent)를 재사용해 재고 복구 후
- *         환불 훅(processRefund) 호출 → REFUNDED 전이.
+ *         PG 결제취소(processRefund → PaymentCancelService) 호출 → REFUNDED 전이.
  * - 거부: 거부 사유 필수. 거부된 항목은 재신청 허용(DB 부분 유니크가 REJECTED 제외).
  * - 권한: ADMIN 전체 / SELLER 는 반품 대상 항목이 본인 상품인 경우만. 그 외 403.
  */
@@ -55,6 +55,7 @@ public class ReturnService {
     private final OrderRepository           orderRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final NotificationService       notificationService;
+    private final PaymentCancelService      paymentCancelService;
 
     /**
      * 반품 신청 — 주문 소유자 본인만.
@@ -102,11 +103,14 @@ public class ReturnService {
         LocalDateTime now = LocalDateTime.now();
         returnRequest.approve(now);   // REQUESTED 아니면 400
         requireActiveItem(item);      // M-2: 이미 취소된 항목이면 400 → 트랜잭션 롤백으로 승인 취소
+        // §4.2: 환불액은 "취소 전 결제금액 - 남은 항목 기준 결제금액" — 부분 반품이면 해당 항목분만 환불된다
+        long payableBefore = order.getPayableAmount();
         restockApprovedItem(order, item.getId());
+        long refundAmount = payableBefore - order.getPayableAmount();
         notificationService.create(returnRequest.getUserId(),
                 NotificationType.RETURN_APPROVED, returnRequest.getOrderId());
 
-        processRefund(returnRequest);
+        processRefund(returnRequest, refundAmount);
         returnRequest.markRefunded(now);
         notificationService.create(returnRequest.getUserId(),
                 NotificationType.RETURN_REFUNDED, returnRequest.getOrderId());
@@ -163,13 +167,16 @@ public class ReturnService {
     }
 
     /**
-     * 환불 처리 훅 — 현재 결제가 mock 이므로 성공 처리 + 로그만 남긴다.
-     * V1.1-6(PG 연동) 교체 지점: 이 메서드에서 실제 결제취소(PG 환불) API를 호출하고,
-     * 응답에 따라 APPROVED(환불요청)→REFUNDED 전이를 비동기로 분리한다.
+     * 환불 처리 (V1.1-6) — 실제 PG 결제취소를 호출한다(mock 훅 교체 지점).
+     * 부분 반품이면 해당 항목분만 부분취소하며(§4.2), 승인된 결제가 없거나 이미 전액 취소됐으면 no-op 이다.
+     * PG 취소가 실패하면 예외가 승인 트랜잭션을 롤백시켜 "환불 안 됐는데 REFUNDED" 상태를 만들지 않는다.
      */
-    private void processRefund(ReturnRequest returnRequest) {
-        log.info("환불 처리(mock 성공). returnId={}, orderId={}, itemId={}",
-                returnRequest.getId(), returnRequest.getOrderId(), returnRequest.getOrderItemId());
+    private void processRefund(ReturnRequest returnRequest, long refundAmount) {
+        paymentCancelService.cancelForOrder(
+                returnRequest.getOrderId(), refundAmount, RETURN_CANCEL_REASON);
+        log.info("반품 환불 처리. returnId={}, orderId={}, itemId={}, 환불액={}",
+                returnRequest.getId(), returnRequest.getOrderId(),
+                returnRequest.getOrderItemId(), refundAmount);
     }
 
     /**
