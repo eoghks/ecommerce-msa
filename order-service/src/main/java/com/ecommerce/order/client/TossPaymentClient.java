@@ -1,6 +1,7 @@
 package com.ecommerce.order.client;
 
 import com.ecommerce.order.exception.PaymentApprovalFailedException;
+import com.ecommerce.order.support.ServiceTimeZone;
 import com.ecommerce.order.exception.PaymentCancelFailedException;
 import com.ecommerce.order.exception.PaymentGatewayUnavailableException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -246,9 +247,16 @@ public class TossPaymentClient {
             return status != null && TERMINATED_STATUSES.contains(status);
         }
 
-        /** 승인 시각 — 응답에 없으면 호출 시점을 쓰도록 Optional 로 돌려준다 */
+        /**
+         * 승인 시각 — 응답에 없으면 호출 시점을 쓰도록 Optional 로 돌려준다.
+         *
+         * <p>{@code toLocalDateTime()} 은 오프셋을 <b>변환 없이 버린다</b> — 토스가 UTC 오프셋으로
+         * 응답하면 서비스 타임존(KST)으로 기록되는 다른 컬럼과 9시간 어긋난다(실측 확인).
+         * 반드시 같은 순간을 서비스 타임존으로 옮긴 뒤 LocalDateTime 으로 변환한다.
+         */
         public Optional<LocalDateTime> approvedAtAsLocal() {
-            return Optional.ofNullable(approvedAt).map(OffsetDateTime::toLocalDateTime);
+            return Optional.ofNullable(approvedAt)
+                    .map(at -> at.atZoneSameInstant(ServiceTimeZone.zone()).toLocalDateTime());
         }
     }
 
